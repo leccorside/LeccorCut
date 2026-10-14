@@ -1,3 +1,15 @@
+const fs = require('fs');
+const pathMod = require('path');
+const FONTS = {
+  'Arial': ['arial.ttf', 'arialbd.ttf'], 'Impact': ['impact.ttf', 'impact.ttf'], 'Segoe UI': ['segoeui.ttf', 'segoeuib.ttf'],
+  'Comic Sans MS': ['comic.ttf', 'comicbd.ttf'], 'Times New Roman': ['times.ttf', 'timesbd.ttf'], 'Courier New': ['cour.ttf', 'courbd.ttf']
+};
+// Caminho escapado da fonte do Windows para o drawtext (ou null se não existir).
+function fontPath(name, bold) {
+  const pair = FONTS[name || 'Arial'] || FONTS.Arial;
+  const p = pathMod.join(process.env.WINDIR || 'C:\\Windows', 'Fonts', pair[bold ? 1 : 0]);
+  return fs.existsSync(p) ? p.replace(/\\/g, '/').replace(/:/g, '\\:') : null;
+}
 const esc = (t) => String(t).replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\u2019").replace(/%/g, '\\\\\\%');
 
 const PRESETS = {
@@ -88,7 +100,12 @@ function buildFfmpeg(project, outPath) {
     last = `o${k}`;
   });
   (project.texts || []).forEach((t, i) => {
-    f.push(`[${last}]drawtext=text='${esc(t.text)}':fontcolor=${t.color || 'white'}:fontsize=${Math.round((t.size || 48) * Math.min(W, H) / 720)}:x=(w-text_w)*${t.px ?? 0.5}:y=(h-text_h)*${t.py ?? 0.88}:borderw=2:bordercolor=black:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
+    const fs0 = t.fontSize || t.size || 48;
+    const fontFile = fontPath(t.font, t.bold !== false);
+    const bw = t.outline ?? 2;
+    const alpha = t.fade ? `:alpha='if(lt(t,${t.start}+0.3),(t-${t.start})/0.3,if(gt(t,${t.start + t.duration}-0.3),(${t.start + t.duration}-t)/0.3,1))'` : '';
+    const box = t.box ? `:box=1:boxcolor=${(t.boxColor || '#000000').replace('#', '0x')}@${t.boxOpacity ?? 0.6}:boxborderw=${Math.round(14 * Math.min(W, H) / 720)}` : '';
+    f.push(`[${last}]drawtext=text='${esc(t.text)}'${fontFile ? `:fontfile='${fontFile}'` : ''}:fontcolor=${t.color || 'white'}:fontsize=${Math.round(fs0 * Math.min(W, H) / 720)}:x=(w-text_w)*${t.px ?? 0.5}:y=(h-text_h)*${t.py ?? 0.88}:borderw=${Math.round(bw * Math.min(W, H) / 720)}:bordercolor=black${box}${alpha}:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
     last = `t${i}`;
   });
   args.push('-filter_complex', f.join(';'), '-map', `[${last}]`, '-map', `[${aOut}]`,

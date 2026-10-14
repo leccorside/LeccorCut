@@ -85,6 +85,11 @@ function renderPreview() {
   state.texts.filter(t => state.time >= t.start && state.time < t.start + t.duration).forEach(t => {
     const s = document.createElement('span'); s.textContent = t.text; s.style.color = t.color; s.style.fontSize = (t.size / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight)) + 'px';
     const px = t.px ?? 0.5, py = t.py ?? 0.88;
+    s.style.fontFamily = `'${t.font || 'Arial'}', sans-serif`; s.style.fontWeight = t.bold === false ? 400 : 700;
+    const ow = (t.outline ?? 2) / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight);
+    s.style.textShadow = ow > 0 ? `0 0 ${ow * 1.5}px #000, 0 0 ${ow * 1.5}px #000, 0 0 ${ow}px #000` : 'none';
+    if (t.box) { const h = (t.boxColor || '#000000').replace('#', ''); const rgb = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)).join(','); s.style.background = `rgba(${rgb},${t.boxOpacity ?? 0.6})`; s.style.padding = '0.2em 0.5em'; s.style.borderRadius = '4px'; }
+    if (t.fade) { const dt = state.time - t.start, rem = t.start + t.duration - state.time; s.style.opacity = Math.max(0, Math.min(1, dt / 0.3, rem / 0.3)); }
     s.style.left = (px * 100) + '%'; s.style.top = (py * 100) + '%'; s.style.transform = `translate(${-px * 100}%, ${-py * 100}%)`;
     if (state.selected?.id === t.id) s.style.outline = '1px dashed #00e5c3';
     s.onmousedown = (ev) => { ev.preventDefault(); textDrag = t; if (state.selected?.id !== t.id) select({ kind: 'text', id: t.id }); };
@@ -249,12 +254,24 @@ function renderProps() {
     p.innerHTML = `<div class="prop">Texto<input type="text" id="tText" value="${t.text.replace(/"/g, '&quot;')}"></div>`
       + `<div class="prop">Tamanho<input type="number" id="tSize" value="${t.size}" min="10" max="200"></div>`
       + `<div class="prop">Cor<input type="color" id="tColor" value="${t.color}"></div>`
+      + `<div class="prop">Fonte<select id="tFont">${['Arial', 'Impact', 'Segoe UI', 'Comic Sans MS', 'Times New Roman', 'Courier New'].map(v => `<option ${(t.font || 'Arial') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`
+      + `<div class="prop"><label><input type="checkbox" id="tBold" ${t.bold !== false ? 'checked' : ''}> Negrito</label> &nbsp; <label><input type="checkbox" id="tFade" ${t.fade ? 'checked' : ''}> Fade in/out</label></div>`
+      + `<div class="prop">Contorno<input type="range" id="tOut" min="0" max="8" step="1" value="${t.outline ?? 2}"></div>`
+      + `<div class="prop"><label><input type="checkbox" id="tBox" ${t.box ? 'checked' : ''}> Fundo (caixa)</label> <input type="color" id="tBoxColor" value="${t.boxColor || '#000000'}"></div>`
+      + `<div class="prop">Opacidade do fundo<input type="range" id="tBoxOp" min="0.1" max="1" step="0.05" value="${t.boxOpacity ?? 0.6}"></div>`
       + `<div class="prop">Início (s)<input type="number" id="pStart" value="${t.start.toFixed(1)}" min="0" step="0.5"></div>`
       + `<div class="prop">Duração (s)<input type="number" id="pDur" value="${t.duration.toFixed(1)}" min="0.5" step="0.5"></div>`
       + `<p class="hint">Arraste o texto no preview para posicionar.</p>`;
     $('tText').oninput = (e) => { t.text = e.target.value; renderTimeline(); renderPreview(); };
     $('tSize').oninput = (e) => { t.size = +e.target.value || 48; renderPreview(); };
     $('tColor').oninput = (e) => { t.color = e.target.value; renderPreview(); };
+    $('tFont').onchange = (e) => { t.font = e.target.value; renderPreview(); };
+    $('tBold').onchange = (e) => { t.bold = e.target.checked; renderPreview(); };
+    $('tFade').onchange = (e) => { t.fade = e.target.checked; renderPreview(); };
+    $('tOut').oninput = (e) => { t.outline = +e.target.value; renderPreview(); };
+    $('tBox').onchange = (e) => { t.box = e.target.checked; renderPreview(); };
+    $('tBoxColor').oninput = (e) => { t.boxColor = e.target.value; renderPreview(); };
+    $('tBoxOp').oninput = (e) => { t.boxOpacity = +e.target.value; renderPreview(); };
     $('pStart').onchange = (e) => { t.start = Math.max(0, +e.target.value); renderTimeline(); renderPreview(); };
     $('pDur').onchange = (e) => { t.duration = +e.target.value; renderTimeline(); renderPreview(); };
     return;
