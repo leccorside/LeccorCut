@@ -28,8 +28,9 @@ function clipAt(t) {
   return null;
 }
 
+const CSS_PRESETS = { sepia: 'sepia(1)', vintage: 'sepia(.5) contrast(1.1)', warm: 'sepia(.3) saturate(1.2)', cool: 'hue-rotate(15deg) saturate(1.1)', cinematic: 'contrast(1.15) saturate(.9)', vivid: 'saturate(1.6) contrast(1.1)' };
 function cssFilter(f = {}) {
-  return `brightness(${1 + (f.brightness || 0) / 100}) contrast(${1 + (f.contrast || 0) / 100}) saturate(${1 + (f.saturation || 0) / 100}) blur(${f.blur || 0}px) grayscale(${f.grayscale ? 1 : 0})`;
+  return `brightness(${1 + (f.brightness || 0) / 100}) contrast(${1 + (f.contrast || 0) / 100}) saturate(${1 + (f.saturation || 0) / 100}) blur(${f.blur || 0}px) grayscale(${f.grayscale ? 1 : 0}) ${CSS_PRESETS[f.preset] || ''}`;
 }
 function cssTransform(f = {}) {
   return `scale(${(f.hflip ? -1 : 1) * (f.zoom || 1)}, ${(f.vflip ? -1 : 1) * (f.zoom || 1)}) rotate(${f.rotate || 0}deg)`;
@@ -206,6 +207,7 @@ function renderProps() {
        <div class="prop"><label><input type="checkbox" id="pV" ${c.filters.vflip ? 'checked' : ''}> Espelhar vertical</label></div>
        <div class="prop"><label><input type="checkbox" id="pGray" ${c.filters.grayscale ? 'checked' : ''}> P&B</label></div>
        <div class="prop"><label><input type="checkbox" id="pFade" ${c.filters.fade ? 'checked' : ''}> Fade in/out</label></div>
+       <div class="prop">Filtro de cor<select id="pPreset">${['none', 'sepia', 'vintage', 'warm', 'cool', 'cinematic', 'vivid'].map(v => `<option ${(c.filters.preset || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Transição para o próximo clipe<select id="pTrans">${['none', 'fade', 'dissolve', 'wipeleft', 'slideleft', 'circleopen', 'pixelize'].map(v => `<option ${(c.transition || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Velocidade<select id="pSpeed">${[0.5, 1, 1.5, 2].map(v => `<option ${c.speed === v || (!c.speed && v === 1) ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>`;
@@ -215,6 +217,7 @@ function renderProps() {
   $('pRot').onchange = (e) => { c.filters.rotate = +e.target.value; renderPreview(); };
   $('pH').onchange = (e) => { c.filters.hflip = e.target.checked; renderPreview(); };
   $('pV').onchange = (e) => { c.filters.vflip = e.target.checked; renderPreview(); };
+  $('pPreset').onchange = (e) => { c.filters.preset = e.target.value; renderPreview(); };
   $('pTrans').onchange = (e) => { c.transition = e.target.value; renderTimeline(); renderPreview(); };
   $('pFade').onchange = (e) => { c.filters.fade = e.target.checked; };
   $('pVol').oninput = (e) => { c.volume = +e.target.value; renderPreview(); };
@@ -314,7 +317,7 @@ $('btnOpen').onclick = async () => {
 $('btnExport').onclick = async () => {
   if (!state.clips.length) return toast('Adicione clipes à timeline');
   toast('Exportando...'); window.api.onProgress(s => toast(`Exportando... ${Math.min(99, Math.round(s / total() * 100))}%`));
-  const r = await window.api.exportVideo({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays });
+  const r = await window.api.exportVideo({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, settings: { height: +$('expRes').value, fps: +$('expFps').value, crf: +$('expQ').value } });
   toast(r.ok ? 'Exportado: ' + r.path : (r.log ? 'Erro: ' + r.log.slice(-200) : 'Cancelado'));
 };
 renderTimeline(); renderPreview();

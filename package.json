@@ -7,6 +7,7 @@
     "start": "electron ."
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.3.1",
     "ffmpeg-static": "^5.2.0",
     "ffprobe-static": "^3.1.0"
   },

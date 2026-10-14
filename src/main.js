@@ -118,9 +118,19 @@ ipcMain.handle('open-project', async () => {
 
 const esc = (t) => String(t).replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\u2019").replace(/%/g, '\\%');
 
+const PRESETS = {
+  sepia: 'colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131',
+  vintage: 'curves=preset=vintage',
+  warm: 'colorbalance=rs=.15:gs=.05:bs=-.15',
+  cool: 'colorbalance=rs=-.15:bs=.15',
+  cinematic: 'eq=contrast=1.15:saturation=0.9,colorbalance=rs=-.05:bs=.08:rh=.08:bh=-.05',
+  vivid: 'eq=saturation=1.6:contrast=1.1'
+};
+
 // Trilha principal: clips em sequência. Textos: sobreposição por tempo.
 function buildFfmpeg(project, outPath) {
-  const W = 1280, H = 720, FPS = 30;
+  const S = project.settings || {};
+  const H = S.height || 720, W = Math.round(H * 16 / 9 / 2) * 2, FPS = S.fps || 30, CRF = S.crf || 18;
   const clips = project.clips;
   const args = [];
   const f = [];
@@ -140,6 +150,7 @@ function buildFfmpeg(project, outPath) {
       + (fl.rotate === 180 ? 'hflip,vflip,' : '')
       + (fl.rotate === 90 ? `transpose=1,scale=${W}:${H},` : fl.rotate === 270 ? `transpose=2,scale=${W}:${H},` : '')
       + `eq=brightness=${(fl.brightness || 0) / 100}:contrast=${1 + (fl.contrast || 0) / 100}:saturation=${1 + (fl.saturation || 0) / 100}`;
+    if (PRESETS[fl.preset]) v += ',' + PRESETS[fl.preset];
     if (fl.blur) v += `,gblur=sigma=${fl.blur}`;
     if (fl.grayscale) v += ',hue=s=0';
     if (fl.fade) v += `,fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0, c.duration - 0.5)}:d=0.5`;
@@ -197,6 +208,6 @@ function buildFfmpeg(project, outPath) {
     last = `t${i}`;
   });
   args.push('-filter_complex', f.join(';'), '-map', `[${last}]`, '-map', `[${aOut}]`,
-    '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-y', outPath);
+    '-c:v', 'libx264', '-preset', 'medium', '-crf', String(CRF), '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-y', outPath);
   return { args };
 }
