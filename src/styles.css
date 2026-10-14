@@ -31,6 +31,7 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .tick{position:absolute;top:0;border-left:1px solid var(--line);padding-left:3px;height:22px}
 .track{position:relative;height:56px;margin-top:8px;background:#12141c;border-radius:6px}
 .clip{position:absolute;top:4px;height:48px;border-radius:6px;background:linear-gradient(135deg,#2b6cff,#7c5cff);padding:4px 8px;font-size:11px;overflow:hidden;white-space:nowrap;cursor:pointer;border:2px solid transparent}
+.clip:not(.audio){text-shadow:0 1px 3px #000}
 .clip{cursor:grab;user-select:none}
 .clip .h{position:absolute;top:0;bottom:0;width:7px;cursor:ew-resize;background:rgba(255,255,255,.3);opacity:0;transition:.15s}
 .clip:hover .h,.clip.sel .h{opacity:1}.clip .h.l{left:0}.clip .h.r{right:0}

@@ -20,6 +20,24 @@ function createWindow() {
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());
 
+function ffBuf(args) {
+  return new Promise((resolve) => {
+    const p = spawn(ffmpegPath, args); const b = [];
+    p.stdout.on('data', d => b.push(d)); p.on('error', () => resolve(Buffer.alloc(0))); p.on('close', () => resolve(Buffer.concat(b)));
+  });
+}
+async function decorateMedia(info) {
+  if (info.hasVideo) {
+    const ss = info.isImage ? 0 : Math.min(1, info.duration / 2);
+    const b = await ffBuf(['-v', 'error', '-ss', String(ss), '-i', info.path, '-frames:v', '1', '-vf', 'scale=160:-2', '-f', 'image2pipe', '-c:v', 'mjpeg', '-q:v', '5', '-']);
+    if (b.length) info.thumb = 'data:image/jpeg;base64,' + b.toString('base64');
+  } else if (info.hasAudio) {
+    const b = await ffBuf(['-v', 'error', '-i', info.path, '-filter_complex', 'aformat=channel_layouts=mono,showwavespic=s=1200x48:colors=0x06121a', '-frames:v', '1', '-f', 'image2pipe', '-c:v', 'png', '-']);
+    if (b.length) info.wave = 'data:image/png;base64,' + b.toString('base64');
+  }
+  return info;
+}
+
 ipcMain.handle('import-media', async () => {
   const r = await dialog.showOpenDialog(win, {
     properties: ['openFile', 'multiSelections'],
@@ -27,7 +45,7 @@ ipcMain.handle('import-media', async () => {
   });
   if (r.canceled) return [];
   const out = [];
-  for (const p of r.filePaths) out.push(await probe(p));
+  for (const p of r.filePaths) out.push(await decorateMedia(await probe(p)));
   return out;
 });
 
