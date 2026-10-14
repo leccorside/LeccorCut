@@ -49,6 +49,7 @@ function buildFfmpeg(project, outPath) {
     if (PRESETS[fl.preset]) v += ',' + PRESETS[fl.preset];
     if (fl.blur) v += `,gblur=sigma=${fl.blur}`;
     if (fl.grayscale) v += ',hue=s=0';
+    if (fl.vignette) v += ',vignette=PI/4';
     if (fl.fade) v += `,fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0, c.duration - 0.5)}:d=0.5`;
     f.push(v + `[v${i}]`);
     if (c.hasAudio && !c.isImage) {
@@ -107,9 +108,25 @@ function buildFfmpeg(project, outPath) {
     const fs0 = t.fontSize || t.size || 48;
     const fontFile = fontPath(t.font, t.bold !== false);
     const bw = t.outline ?? 2;
-    const alpha = t.fade ? `:alpha='if(lt(t,${t.start}+0.3),(t-${t.start})/0.3,if(gt(t,${t.start + t.duration}-0.3),(${t.start + t.duration}-t)/0.3,1))'` : '';
+    const anim = t.anim || (t.fade ? 'fade' : 'none');
+    let alpha = '';
+    let yExpr = `(h-text_h)*${t.py ?? 0.88}`;
+    let fsExpr = String(Math.round(fs0 * Math.min(W, H) / 720));
+
+    if (anim === 'fade') {
+      alpha = `:alpha='if(lt(t,${t.start}+0.3),(t-${t.start})/0.3,if(gt(t,${t.start + t.duration}-0.3),(${t.start + t.duration}-t)/0.3,1))'`;
+    } else if (anim === 'slide') {
+      alpha = `:alpha='if(lt(t,${t.start}+0.25),(t-${t.start})/0.25,1)'`;
+      const slideDist = Math.round(35 * Math.min(W, H) / 720);
+      yExpr = `if(lt(t\\,${t.start}+0.3)\\,(h-text_h)*${t.py ?? 0.88}+(1-(t-${t.start})/0.3)*${slideDist}\\,(h-text_h)*${t.py ?? 0.88})`;
+    } else if (anim === 'pop') {
+      alpha = `:alpha='if(lt(t,${t.start}+0.2),(t-${t.start})/0.2,1)'`;
+      const baseFs = Math.round(fs0 * Math.min(W, H) / 720);
+      fsExpr = `if(lt(t\\,${t.start}+0.25)\\,${baseFs}*(0.6+0.4*(t-${t.start})/0.25)\\,${baseFs})`;
+    }
+
     const box = t.box ? `:box=1:boxcolor=${(t.boxColor || '#000000').replace('#', '0x')}@${t.boxOpacity ?? 0.6}:boxborderw=${Math.round(14 * Math.min(W, H) / 720)}` : '';
-    f.push(`[${last}]drawtext=text='${esc(t.text)}'${fontFile ? `:fontfile='${fontFile}'` : ''}:fontcolor=${t.color || 'white'}:fontsize=${Math.round(fs0 * Math.min(W, H) / 720)}:x=(w-text_w)*${t.px ?? 0.5}:y=(h-text_h)*${t.py ?? 0.88}:borderw=${Math.round(bw * Math.min(W, H) / 720)}:bordercolor=black${box}${alpha}:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
+    f.push(`[${last}]drawtext=text='${esc(t.text)}'${fontFile ? `:fontfile='${fontFile}'` : ''}:fontcolor=${t.color || 'white'}:fontsize='${fsExpr}':x=(w-text_w)*${t.px ?? 0.5}:y='${yExpr}':borderw=${Math.round(bw * Math.min(W, H) / 720)}:bordercolor=black${box}${alpha}:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
     last = `t${i}`;
   });
   args.push('-filter_complex', f.join(';'), '-map', `[${last}]`, '-map', `[${aOut}]`,

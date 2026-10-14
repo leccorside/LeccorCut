@@ -93,13 +93,21 @@ function renderPreview() {
     const ow = (t.outline ?? 2) / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight);
     s.style.textShadow = ow > 0 ? `0 0 ${ow * 1.5}px #000, 0 0 ${ow * 1.5}px #000, 0 0 ${ow}px #000` : 'none';
     if (t.box) { const h = (t.boxColor || '#000000').replace('#', ''); const rgb = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)).join(','); s.style.background = `rgba(${rgb},${t.boxOpacity ?? 0.6})`; s.style.padding = '0.2em 0.5em'; s.style.borderRadius = '4px'; }
-    if (t.fade) { const dt = state.time - t.start, rem = t.start + t.duration - state.time; s.style.opacity = Math.max(0, Math.min(1, dt / 0.3, rem / 0.3)); }
-    s.style.left = (px * 100) + '%'; s.style.top = (py * 100) + '%'; s.style.transform = `translate(${-px * 100}%, ${-py * 100}%)`;
+    const anim = t.anim || (t.fade ? 'fade' : 'none');
+    const dt = state.time - t.start, rem = t.start + t.duration - state.time;
+    let animScale = 1, animY = 0, animOp = 1;
+    if (anim === 'fade') animOp = Math.max(0, Math.min(1, dt / 0.3, rem / 0.3));
+    else if (anim === 'slide' && dt < 0.3) { const pr = Math.max(0, dt / 0.3); animY = (1 - pr) * 25; animOp = Math.min(1, dt / 0.2); }
+    else if (anim === 'pop' && dt < 0.25) { const pr = Math.max(0, dt / 0.25); animScale = 0.6 + 0.4 * pr; animOp = Math.min(1, dt / 0.15); }
+    s.style.opacity = animOp;
+    s.style.left = (px * 100) + '%'; s.style.top = (py * 100) + '%';
+    s.style.transform = `translate(${-px * 100}%, ${-py * 100}%) translateY(${animY}px) scale(${animScale})`;
     if (state.selected?.id === t.id) s.style.outline = '1px dashed #00e5c3';
     s.onmousedown = (ev) => { ev.preventDefault(); textDrag = t; if (state.selected?.id !== t.id) select({ kind: 'text', id: t.id }); };
     $('textLayer').appendChild(s);
   });
-  if (!view) { player.removeAttribute('src'); img.hidden = true; player.style.visibility = 'hidden'; syncAudio(); updateTime(); return; }
+  if (!view) { player.removeAttribute('src'); img.hidden = true; player.style.visibility = 'hidden'; $('vignetteLayer').hidden = true; syncAudio(); updateTime(); return; }
+  $('vignetteLayer').hidden = !view.filters?.vignette;
   player.style.visibility = 'visible';
   const src = fileUrl(view.path);
   const f = cssFilter(view.filters);
@@ -332,7 +340,8 @@ function renderProps() {
       + `<div class="prop">Tamanho<input type="number" id="tSize" value="${t.size}" min="10" max="200"></div>`
       + `<div class="prop">Cor<input type="color" id="tColor" value="${t.color}"></div>`
       + `<div class="prop">Fonte<select id="tFont">${['Arial', 'Impact', 'Segoe UI', 'Comic Sans MS', 'Times New Roman', 'Courier New'].map(v => `<option ${(t.font || 'Arial') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`
-      + `<div class="prop"><label><input type="checkbox" id="tBold" ${t.bold !== false ? 'checked' : ''}> Negrito</label> &nbsp; <label><input type="checkbox" id="tFade" ${t.fade ? 'checked' : ''}> Fade in/out</label></div>`
+      + `<div class="prop">Animação<select id="tAnim">${[['none', 'Nenhuma'], ['fade', 'Fade In/Out'], ['slide', 'Deslizar (Slide Up)'], ['pop', 'Pop / Zoom In']].map(([k, label]) => `<option ${(t.anim || (t.fade ? 'fade' : 'none')) === k ? 'selected' : ''} value="${k}">${label}</option>`).join('')}</select></div>`
+      + `<div class="prop"><label><input type="checkbox" id="tBold" ${t.bold !== false ? 'checked' : ''}> Negrito</label></div>`
       + `<div class="prop">Contorno<input type="range" id="tOut" min="0" max="8" step="1" value="${t.outline ?? 2}"></div>`
       + `<div class="prop"><label><input type="checkbox" id="tBox" ${t.box ? 'checked' : ''}> Fundo (caixa)</label> <input type="color" id="tBoxColor" value="${t.boxColor || '#000000'}"></div>`
       + `<div class="prop">Opacidade do fundo<input type="range" id="tBoxOp" min="0.1" max="1" step="0.05" value="${t.boxOpacity ?? 0.6}"></div>`
@@ -344,8 +353,8 @@ function renderProps() {
     $('tSize').oninput = (e) => { t.size = +e.target.value || 48; renderPreview(); };
     $('tColor').oninput = (e) => { t.color = e.target.value; renderPreview(); };
     $('tFont').onchange = (e) => { t.font = e.target.value; renderPreview(); };
+    $('tAnim').onchange = (e) => { t.anim = e.target.value; t.fade = (e.target.value === 'fade'); renderPreview(); };
     $('tBold').onchange = (e) => { t.bold = e.target.checked; renderPreview(); };
-    $('tFade').onchange = (e) => { t.fade = e.target.checked; renderPreview(); };
     $('tOut').oninput = (e) => { t.outline = +e.target.value; renderPreview(); };
     $('tBox').onchange = (e) => { t.box = e.target.checked; renderPreview(); };
     $('tBoxColor').oninput = (e) => { t.boxColor = e.target.value; renderPreview(); };
@@ -355,7 +364,7 @@ function renderProps() {
     $('btnApplyAllTexts').onclick = () => {
       state.texts.forEach(other => {
         other.size = t.size; other.color = t.color; other.font = t.font;
-        other.bold = t.bold; other.fade = t.fade; other.outline = t.outline;
+        other.bold = t.bold; other.anim = t.anim; other.fade = t.fade; other.outline = t.outline;
         other.box = t.box; other.boxColor = t.boxColor; other.boxOpacity = t.boxOpacity;
         other.px = t.px; other.py = t.py;
       });
@@ -372,6 +381,7 @@ function renderProps() {
        <div class="prop"><label><input type="checkbox" id="pH" ${c.filters.hflip ? 'checked' : ''}> Espelhar horizontal</label></div>
        <div class="prop"><label><input type="checkbox" id="pV" ${c.filters.vflip ? 'checked' : ''}> Espelhar vertical</label></div>
        <div class="prop"><label><input type="checkbox" id="pGray" ${c.filters.grayscale ? 'checked' : ''}> P&B</label></div>
+       <div class="prop"><label><input type="checkbox" id="pVin" ${c.filters.vignette ? 'checked' : ''}> Vinheta (bordas escuras)</label></div>
        <div class="prop"><label><input type="checkbox" id="pFade" ${c.filters.fade ? 'checked' : ''}> Fade in/out</label></div>
        <div class="prop">Filtro de cor<select id="pPreset">${['none', 'sepia', 'vintage', 'warm', 'cool', 'cinematic', 'vivid'].map(v => `<option ${(c.filters.preset || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Transição para o próximo clipe<select id="pTrans">${['none', 'fade', 'dissolve', 'wipeleft', 'slideleft', 'circleopen', 'pixelize'].map(v => `<option ${(c.transition || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
@@ -379,6 +389,7 @@ function renderProps() {
        <div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>`;
   p.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => { c.filters[i.dataset.k] = +i.value; renderPreview(); });
   $('pGray').onchange = (e) => { c.filters.grayscale = e.target.checked; renderPreview(); };
+  $('pVin').onchange = (e) => { c.filters.vignette = e.target.checked; renderPreview(); };
   $('pZoom').oninput = (e) => { c.filters.zoom = +e.target.value; renderPreview(); };
   $('pRot').onchange = (e) => { c.filters.rotate = +e.target.value; renderPreview(); };
   $('pH').onchange = (e) => { c.filters.hflip = e.target.checked; renderPreview(); };

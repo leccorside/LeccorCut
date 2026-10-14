@@ -12,16 +12,17 @@
 - **Chroma Key**: remoção de fundo por cor com seletor de tolerância para vídeos e fotos em PiP.
 - **Trilha de Áudio Independente**: suporte para músicas e efeitos sonoros com visualização de **forma de onda sonora (*waveform*)**, controles de **Fade In / Fade Out**, início, duração e controle de volume dedicado.
 - **Alinhamento Magnético (Snap)**: sistema magnético inteligente que atrai cortes e posições de clipes, áudios, textos e overlays para bordas de outros blocos, para o início (0s) ou para a agulha (playhead), com guia visual em tempo real.
-- **Trilha de Texto / Legendas**: textos arrastáveis no preview com escala dinâmica e estilos avançados.
+- **Trilha de Texto / Legendas**: textos arrastáveis no preview com escala dinâmica, **animações de entrada (Fade In/Out, Deslizar / Slide Up, Pop / Zoom In)** e estilos avançados.
 
 ### 🤖 IA e Legendas Automáticas
 - **Transcrição Local com Whisper (OpenAI / Transformers.js)**: reconhecimento de fala automático 100% offline (sem APIs pagas ou envio de dados para terceiros). Suporte a Português, Inglês e Espanhol.
 - **Importação de Legendas `.srt`**: integração instantânea de arquivos de legendas prévios.
-- **Estilização em Massa**: configure fonte, caixa de fundo com transparência, contorno, cor, negrito, fade in/out e posição de uma legenda e aplique a **todas as legendas com 1 clique**.
+- **Estilização em Massa**: configure fonte, caixa de fundo com transparência, contorno, cor, negrito, animações e posição de uma legenda e aplique a **todas as legendas com 1 clique**.
 
 ### 🎨 Efeitos, Ajustes e Transições
 - **Transições Suaves entre Clipes**: `fade`, `dissolve`, `wipeleft`, `slideleft`, `circleopen`, `pixelize` processados via `xfade`/`acrossfade`.
 - **Filtros e Presets de Cor**: `sepia`, `vintage`, `warm`, `cool`, `cinematic`, `vivid`.
+- **Efeito Vinheta Cinematográfica**: escurecimento elegante das bordas do vídeo com preview instantâneo e processamento nativo FFmpeg.
 - **Ajustes Finos de Imagem**: brilho, contraste, saturação, desfoque gaussiano, preto e branco (P&B) e velocidade de reprodução (0.5x até 2x com ajuste de pitch).
 - **Transformações**: espelhamento horizontal, vertical, rotações (90°, 180°, 270°) e zoom digital.
 
