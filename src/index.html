@@ -39,6 +39,7 @@
     <input id="txtInput" placeholder="Digite o texto">
     <div class="row"><input id="txtColor" type="color" value="#ffffff"><input id="txtSize" type="number" value="48" min="10" max="200"></div>
     <button id="btnAddText" class="wide">Adicionar texto no cursor</button>
+    <button id="btnSrt" class="wide">Importar legendas (.srt)</button>
   </section>
 </main>
 <section id="timelineWrap">
@@ -51,9 +52,11 @@
     <div id="ruler"></div>
     <div id="trackVideo" class="track"></div>
     <div id="trackText" class="track"></div>
+    <div id="trackAudio" class="track"></div>
     <div id="playhead"></div>
   </div>
 </section>
+<audio id="bgAudio"></audio>
 <div id="toast" hidden></div>
 <script src="renderer.js"></script>
 </body>

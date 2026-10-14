@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const state = { media: [], clips: [], texts: [], selected: null, time: 0, playing: false };
+const state = { media: [], clips: [], texts: [], audios: [], selected: null, time: 0, playing: false };
 const player = $('player'), img = $('imgPlayer');
 let pxPerSec = 60, uid = 1, raf = null, lastTs = 0;
 
@@ -17,6 +17,21 @@ function clipAt(t) {
 function cssFilter(f = {}) {
   return `brightness(${1 + (f.brightness || 0) / 100}) contrast(${1 + (f.contrast || 0) / 100}) saturate(${1 + (f.saturation || 0) / 100}) blur(${f.blur || 0}px) grayscale(${f.grayscale ? 1 : 0})`;
 }
+function cssTransform(f = {}) {
+  return `scale(${(f.hflip ? -1 : 1) * (f.zoom || 1)}, ${(f.vflip ? -1 : 1) * (f.zoom || 1)}) rotate(${f.rotate || 0}deg)`;
+}
+
+function syncAudio() {
+  const el = $('bgAudio');
+  const a = state.audios.find(x => state.time >= x.start && state.time < x.start + x.duration);
+  if (!a) { el.pause(); return; }
+  const src = fileUrl(a.path);
+  if (el.dataset.src !== src) { el.src = src; el.dataset.src = src; }
+  el.volume = Math.min(1, a.volume ?? 1);
+  const target = (a.in || 0) + state.time - a.start;
+  if (!state.playing || Math.abs(el.currentTime - target) > 0.3) el.currentTime = target;
+  if (state.playing && el.paused) el.play().catch(() => {}); else if (!state.playing) el.pause();
+}
 
 function renderPreview() {
   const hit = clipAt(state.time);
@@ -26,20 +41,21 @@ function renderPreview() {
     const s = document.createElement('span'); s.textContent = t.text; s.style.color = t.color; s.style.fontSize = (t.size / 720 * $('stage').clientHeight) + 'px';
     $('textLayer').appendChild(s);
   });
-  if (!view) { player.removeAttribute('src'); img.hidden = true; player.style.visibility = 'hidden'; updateTime(); return; }
+  if (!view) { player.removeAttribute('src'); img.hidden = true; player.style.visibility = 'hidden'; syncAudio(); updateTime(); return; }
   player.style.visibility = 'visible';
   const src = fileUrl(view.path);
   const f = cssFilter(view.filters);
-  if (view.isImage) { img.hidden = false; player.style.visibility = 'hidden'; if (img.src !== src) img.src = src; img.style.filter = f; }
+  if (view.isImage) { img.hidden = false; player.style.visibility = 'hidden'; if (img.src !== src) img.src = src; img.style.filter = f; img.style.transform = cssTransform(view.filters); }
   else {
     img.hidden = true;
     if (player.dataset.src !== src) { player.src = src; player.dataset.src = src; }
-    player.style.filter = f; player.playbackRate = view.speed || 1;
+    player.style.filter = f; player.style.transform = cssTransform(view.filters); player.playbackRate = view.speed || 1;
     player.muted = false; player.volume = Math.min(1, view.volume ?? 1);
     const target = view.in + hit.local * (view.speed || 1);
     if (!state.playing || Math.abs(player.currentTime - target) > 0.3) player.currentTime = target;
     if (state.playing && player.paused) player.play().catch(() => {});
   }
+  syncAudio();
   updateTime();
 }
 
@@ -57,14 +73,14 @@ function tick(ts) {
 function setPlaying(p) {
   state.playing = p && total() > 0; $('btnPlay').textContent = state.playing ? '⏸' : '▶';
   if (state.playing) { if (state.time >= total()) state.time = 0; lastTs = performance.now(); raf = requestAnimationFrame(tick); }
-  else { player.pause(); cancelAnimationFrame(raf); }
+  else { player.pause(); $('bgAudio').pause(); cancelAnimationFrame(raf); }
 }
 
 function renderTimeline() {
-  const tv = $('trackVideo'), tt = $('trackText'), ru = $('ruler');
-  tv.innerHTML = tt.innerHTML = ru.innerHTML = '';
+  const tv = $('trackVideo'), tt = $('trackText'), ta = $('trackAudio'), ru = $('ruler');
+  tv.innerHTML = tt.innerHTML = ta.innerHTML = ru.innerHTML = '';
   const dur = Math.max(total(), 30);
-  ru.style.width = tv.style.width = tt.style.width = (dur * pxPerSec) + 'px';
+  ru.style.width = tv.style.width = tt.style.width = ta.style.width = (dur * pxPerSec) + 'px';
   for (let s = 0; s < dur; s += 5) { const k = document.createElement('div'); k.className = 'tick'; k.style.left = s * pxPerSec + 'px'; k.textContent = s + 's'; ru.appendChild(k); }
   let acc = 0;
   state.clips.forEach(c => {
@@ -79,6 +95,12 @@ function renderTimeline() {
     e.onclick = (ev) => { ev.stopPropagation(); select({ kind: 'text', id: t.id }); };
     tt.appendChild(e);
   });
+  state.audios.forEach(a => {
+    const e = document.createElement('div'); e.className = 'clip audio' + (state.selected?.id === a.id ? ' sel' : '');
+    e.style.left = a.start * pxPerSec + 'px'; e.style.width = a.duration * pxPerSec + 'px'; e.textContent = '♪ ' + a.name;
+    e.onclick = (ev) => { ev.stopPropagation(); select({ kind: 'audio', id: a.id }); };
+    ta.appendChild(e);
+  });
   updateTime();
 }
 
@@ -91,6 +113,16 @@ function slider(label, key, min, max, obj) {
 function renderProps() {
   const p = $('props'); const s = state.selected;
   if (!s) { p.innerHTML = '<p class="hint">Selecione um clipe na timeline.</p>'; return; }
+  if (s.kind === 'audio') {
+    const a = state.audios.find(x => x.id === s.id); if (!a) return;
+    p.innerHTML = `<div class="prop">Início (s)<input type="number" id="aStart" value="${a.start.toFixed(1)}" min="0" step="0.5"></div>
+      <div class="prop">Duração (s)<input type="number" id="aDur" value="${a.duration.toFixed(1)}" min="0.5" step="0.5"></div>
+      <div class="prop">Volume<input type="range" id="aVol" min="0" max="1" step="0.05" value="${a.volume ?? 1}"></div>`;
+    $('aStart').onchange = (e) => { a.start = Math.max(0, +e.target.value); renderTimeline(); };
+    $('aDur').onchange = (e) => { a.duration = Math.min(a.max, +e.target.value); renderTimeline(); };
+    $('aVol').oninput = (e) => { a.volume = +e.target.value; syncAudio(); };
+    return;
+  }
   if (s.kind === 'text') {
     const t = state.texts.find(x => x.id === s.id); if (!t) return;
     p.innerHTML = `<div class="prop">Duração (s)<input type="number" id="pDur" value="${t.duration}" min="0.5" step="0.5"></div>`;
@@ -101,12 +133,20 @@ function renderProps() {
   c.filters = c.filters || {};
   p.innerHTML = slider('Brilho', 'brightness', -50, 50, c.filters) + slider('Contraste', 'contrast', -50, 100, c.filters)
     + slider('Saturação', 'saturation', -100, 100, c.filters) + slider('Desfoque', 'blur', 0, 20, c.filters)
-    + `<div class="prop"><label><input type="checkbox" id="pGray" ${c.filters.grayscale ? 'checked' : ''}> P&B</label></div>
+    + `<div class="prop">Zoom<input type="range" id="pZoom" min="1" max="3" step="0.05" value="${c.filters.zoom || 1}"></div>
+       <div class="prop">Rotação<select id="pRot">${[0, 90, 180, 270].map(v => `<option ${(c.filters.rotate || 0) === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+       <div class="prop"><label><input type="checkbox" id="pH" ${c.filters.hflip ? 'checked' : ''}> Espelhar horizontal</label></div>
+       <div class="prop"><label><input type="checkbox" id="pV" ${c.filters.vflip ? 'checked' : ''}> Espelhar vertical</label></div>
+       <div class="prop"><label><input type="checkbox" id="pGray" ${c.filters.grayscale ? 'checked' : ''}> P&B</label></div>
        <div class="prop"><label><input type="checkbox" id="pFade" ${c.filters.fade ? 'checked' : ''}> Fade in/out</label></div>
        <div class="prop">Velocidade<select id="pSpeed">${[0.5, 1, 1.5, 2].map(v => `<option ${c.speed === v || (!c.speed && v === 1) ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>`;
   p.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => { c.filters[i.dataset.k] = +i.value; renderPreview(); });
   $('pGray').onchange = (e) => { c.filters.grayscale = e.target.checked; renderPreview(); };
+  $('pZoom').oninput = (e) => { c.filters.zoom = +e.target.value; renderPreview(); };
+  $('pRot').onchange = (e) => { c.filters.rotate = +e.target.value; renderPreview(); };
+  $('pH').onchange = (e) => { c.filters.hflip = e.target.checked; renderPreview(); };
+  $('pV').onchange = (e) => { c.filters.vflip = e.target.checked; renderPreview(); };
   $('pFade').onchange = (e) => { c.filters.fade = e.target.checked; };
   $('pVol').oninput = (e) => { c.volume = +e.target.value; renderPreview(); };
   $('pSpeed').onchange = (e) => {
@@ -123,7 +163,9 @@ function split() {
 }
 function del() {
   const s = state.selected; if (!s) return;
-  if (s.kind === 'clip') state.clips = state.clips.filter(c => c.id !== s.id); else state.texts = state.texts.filter(t => t.id !== s.id);
+  if (s.kind === 'clip') state.clips = state.clips.filter(c => c.id !== s.id);
+  else if (s.kind === 'audio') state.audios = state.audios.filter(a => a.id !== s.id);
+  else state.texts = state.texts.filter(t => t.id !== s.id);
   state.selected = null; renderTimeline(); renderProps(); renderPreview();
 }
 
@@ -131,7 +173,11 @@ function renderMedia() {
   const l = $('mediaList'); l.innerHTML = '';
   state.media.forEach(m => {
     const e = document.createElement('div'); e.className = 'media-item'; e.innerHTML = `${m.name}<small>${m.duration.toFixed(1)}s${m.hasAudio ? ' · áudio' : ''}</small>`;
-    e.onclick = () => { state.clips.push({ id: uid++, ...m, in: 0, filters: {}, speed: 1, volume: 1 }); renderTimeline(); renderPreview(); };
+    e.onclick = () => {
+      if (m.hasAudio && !m.hasVideo) state.audios.push({ id: uid++, path: m.path, name: m.name, start: state.time, in: 0, duration: m.duration, max: m.duration, volume: 1 });
+      else state.clips.push({ id: uid++, ...m, in: 0, filters: {}, speed: 1, volume: 1 });
+      renderTimeline(); renderPreview();
+    };
     l.appendChild(e);
   });
 }
@@ -144,23 +190,34 @@ $('btnAddText').onclick = () => {
   state.texts.push({ id: uid++, text: v, color: $('txtColor').value, size: +$('txtSize').value, start: state.time, duration: 3 });
   renderTimeline(); renderPreview();
 };
+$('btnSrt').onclick = async () => {
+  const srt = await window.api.importSrt(); if (!srt) return;
+  const toSec = (s) => { const m = /(\d+):(\d+):(\d+)[,.](\d+)/.exec(s); return +m[1] * 3600 + +m[2] * 60 + +m[3] + +m[4] / 1000; };
+  let n = 0;
+  srt.replace(/\r/g, '').split(/\n\n+/).forEach(b => {
+    const l = b.trim().split('\n'); const i = l.findIndex(x => x.includes('-->')); if (i < 0) return;
+    const [a, z] = l[i].split('-->'); const text = l.slice(i + 1).join(' ').trim(); if (!text) return;
+    state.texts.push({ id: uid++, text, color: $('txtColor').value, size: +$('txtSize').value, start: toSec(a), duration: toSec(z) - toSec(a) }); n++;
+  });
+  renderTimeline(); renderPreview(); toast(n + ' legendas importadas');
+};
 $('zoom').oninput = (e) => { pxPerSec = +e.target.value; renderTimeline(); };
 $('ruler').onclick = (e) => { state.time = Math.max(0, (e.clientX - $('ruler').getBoundingClientRect().left) / pxPerSec); renderPreview(); };
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.key === 's' || e.key === 'S') split(); else if (e.key === 'Delete') del(); else if (e.key === ' ') { e.preventDefault(); setPlaying(!state.playing); }
 });
-$('btnSave').onclick = async () => { if (await window.api.saveProject({ media: state.media, clips: state.clips, texts: state.texts })) toast('Projeto salvo'); };
+$('btnSave').onclick = async () => { if (await window.api.saveProject({ media: state.media, clips: state.clips, texts: state.texts, audios: state.audios })) toast('Projeto salvo'); };
 $('btnOpen').onclick = async () => {
   const d = await window.api.openProject(); if (!d) return;
-  Object.assign(state, { media: d.media, clips: d.clips, texts: d.texts, selected: null, time: 0 });
-  uid = 1 + Math.max(0, ...state.clips.map(c => c.id), ...state.texts.map(t => t.id));
+  Object.assign(state, { media: d.media, clips: d.clips, texts: d.texts, audios: d.audios || [], selected: null, time: 0 });
+  uid = 1 + Math.max(0, ...state.clips.map(c => c.id), ...state.texts.map(t => t.id), ...state.audios.map(a => a.id));
   renderMedia(); renderTimeline(); renderProps(); renderPreview();
 };
 $('btnExport').onclick = async () => {
   if (!state.clips.length) return toast('Adicione clipes à timeline');
   toast('Exportando...'); window.api.onProgress(s => toast(`Exportando... ${Math.min(99, Math.round(s / total() * 100))}%`));
-  const r = await window.api.exportVideo({ clips: state.clips, texts: state.texts });
+  const r = await window.api.exportVideo({ clips: state.clips, texts: state.texts, audios: state.audios });
   toast(r.ok ? 'Exportado: ' + r.path : (r.log ? 'Erro: ' + r.log.slice(-200) : 'Cancelado'));
 };
 renderTimeline(); renderPreview();

@@ -60,6 +60,12 @@ ipcMain.handle('export', async (_e, project) => {
   });
 });
 
+ipcMain.handle('import-srt', async () => {
+  const r = await dialog.showOpenDialog(win, { filters: [{ name: 'Legendas SRT', extensions: ['srt'] }], properties: ['openFile'] });
+  if (r.canceled) return null;
+  return fs.readFileSync(r.filePaths[0], 'utf8');
+});
+
 ipcMain.handle('save-project', async (_e, data) => {
   const r = await dialog.showSaveDialog(win, { defaultPath: 'projeto.lccut', filters: [{ name: 'LeccorCut', extensions: ['lccut'] }] });
   if (r.canceled) return false;
@@ -90,6 +96,10 @@ function buildFfmpeg(project, outPath) {
     let v = `[${i}:v]` + (c.isImage ? '' : `trim=start=${c.in}:end=${c.in + c.duration * speed},setpts=(PTS-STARTPTS)/${speed},`)
       + (c.isImage ? 'setpts=PTS-STARTPTS,' : '')
       + `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${FPS},`
+      + ((fl.zoom || 1) > 1 ? `scale=${Math.round(W * fl.zoom)}:${Math.round(H * fl.zoom)},crop=${W}:${H},` : '')
+      + (fl.hflip ? 'hflip,' : '') + (fl.vflip ? 'vflip,' : '')
+      + (fl.rotate === 180 ? 'hflip,vflip,' : '')
+      + (fl.rotate === 90 ? `transpose=1,scale=${W}:${H},` : fl.rotate === 270 ? `transpose=2,scale=${W}:${H},` : '')
       + `eq=brightness=${(fl.brightness || 0) / 100}:contrast=${1 + (fl.contrast || 0) / 100}:saturation=${1 + (fl.saturation || 0) / 100}`;
     if (fl.blur) v += `,gblur=sigma=${fl.blur}`;
     if (fl.grayscale) v += ',hue=s=0';
@@ -103,13 +113,25 @@ function buildFfmpeg(project, outPath) {
     }
     concatIn += `[v${i}][a${i}]`;
   });
-  f.push(`${concatIn}concat=n=${clips.length}:v=1:a=1[vc][ac]`);
+  f.push(`${concatIn}concat=n=${clips.length}:v=1:a=1[vc][ac0]`);
+  const audios = project.audios || [];
+  let aOut = 'ac0';
+  if (audios.length) {
+    audios.forEach((a, j) => {
+      const idx = clips.length + j; args.push('-i', a.path);
+      const ms = Math.round(a.start * 1000);
+      f.push(`[${idx}:a]atrim=start=${a.in || 0}:end=${(a.in || 0) + a.duration},asetpts=PTS-STARTPTS,volume=${a.volume ?? 1},aresample=44100,aformat=channel_layouts=stereo,adelay=${ms}|${ms}[m${j}]`);
+    });
+    const n = audios.length + 1;
+    f.push(`[ac0]${audios.map((_, j) => `[m${j}]`).join('')}amix=inputs=${n}:duration=first:dropout_transition=0,volume=${n}[acm]`);
+    aOut = 'acm';
+  }
   let last = 'vc';
   (project.texts || []).forEach((t, i) => {
     f.push(`[${last}]drawtext=text='${esc(t.text)}':fontcolor=${t.color || 'white'}:fontsize=${t.size || 48}:x=(w-text_w)/2:y=${t.y ?? 'h-th-80'}:borderw=2:bordercolor=black:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
     last = `t${i}`;
   });
-  args.push('-filter_complex', f.join(';'), '-map', `[${last}]`, '-map', '[ac]',
+  args.push('-filter_complex', f.join(';'), '-map', `[${last}]`, '-map', `[${aOut}]`,
     '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-y', outPath);
   return { args };
 }
