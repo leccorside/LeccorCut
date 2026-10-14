@@ -10,6 +10,14 @@
 <header id="topbar">
   <div class="logo">Leccor<span>Cut</span></div>
   <div class="actions">
+    <select id="quickPreset" title="Predefinições Rápidas de Plataforma">
+      <option value="custom" disabled selected>Plataforma...</option>
+      <option value="tiktok">📱 TikTok / Reels (9:16)</option>
+      <option value="youtube">🎥 YouTube (16:9)</option>
+      <option value="youtube4k">🎬 YouTube 4K (16:9)</option>
+      <option value="instagram_feed">📸 Feed (1:1)</option>
+      <option value="instagram_portrait">📐 Retrato (4:5)</option>
+    </select>
     <select id="expAspect" title="Proporção"><option>16:9</option><option>9:16</option><option>1:1</option><option>4:5</option></select>
     <select id="expRes" title="Resolução"><option value="720">720p</option><option value="1080" selected>1080p</option><option value="1440">1440p</option><option value="2160">4K</option></select>
     <select id="expFps" title="FPS"><option>24</option><option selected>30</option><option>60</option></select>
@@ -56,6 +64,7 @@
     <button id="btnUndo" title="Desfazer (Ctrl+Z)">↶</button>
     <button id="btnRedo" title="Refazer (Ctrl+Y)">↷</button>
     <button id="btnSnap" class="active" title="Alinhamento Magnético / Snap (N)">🧲 Snap</button>
+    <button id="btnMarker" title="Adicionar ou Alternar Marcador na agulha (M)">🏷️ Marcador (M)</button>
     <button id="btnSplit">✂ Dividir (S)</button>
     <button id="btnFreeze" title="Congelar Quadro no cursor (F)">❄ Congelar (F)</button>
     <button id="btnDelete">🗑 Excluir (Del)</button>

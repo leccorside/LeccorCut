@@ -1,6 +1,6 @@
 const $ = (id) => document.getElementById(id);
 const state = {
-  media: [], clips: [], texts: [], audios: [], overlays: [], selected: null, time: 0, playing: false,
+  media: [], clips: [], texts: [], audios: [], overlays: [], markers: [], selected: null, time: 0, playing: false,
   tracks: {
     video: { visible: true, mute: false },
     overlay: { visible: true },
@@ -208,6 +208,7 @@ function getSnapTargets(excludeItem) {
   state.overlays.forEach(o => { if (o !== excludeItem) pts.push(o.start, o.start + o.duration); });
   state.texts.forEach(t => { if (t !== excludeItem) pts.push(t.start, t.start + t.duration); });
   state.audios.forEach(a => { if (a !== excludeItem) pts.push(a.start, a.start + a.duration); });
+  (state.markers || []).forEach(m => pts.push(m.time));
   return pts;
 }
 
@@ -296,6 +297,15 @@ function renderTimeline() {
   const dur = Math.max(total(), 30);
   ru.style.width = tv.style.width = to.style.width = tt.style.width = ta.style.width = (dur * pxPerSec) + 'px';
   for (let s = 0; s < dur; s += 5) { const k = document.createElement('div'); k.className = 'tick'; k.style.left = s * pxPerSec + 'px'; k.textContent = s + 's'; ru.appendChild(k); }
+  (state.markers || []).forEach(m => {
+    const el = document.createElement('div'); el.className = 'marker';
+    el.style.left = (m.time * pxPerSec) + 'px';
+    el.title = `${m.label || 'Marcador'} (${fmt(m.time)}) - Clique para ir / Duplo clique para excluir`;
+    el.innerHTML = `<span class="marker-flag">🏷️</span><span class="marker-label">${m.label || ''}</span>`;
+    el.onclick = (ev) => { ev.stopPropagation(); state.time = m.time; renderPreview(); };
+    el.ondblclick = (ev) => { ev.stopPropagation(); removeMarker(m.id); };
+    ru.appendChild(el);
+  });
   const { starts } = layout();
   state.clips.forEach((c, i) => {
     const acc = starts[i];
@@ -535,6 +545,25 @@ async function freezeFrame() {
   }
 }
 
+function addOrToggleMarker() {
+  if (!state.markers) state.markers = [];
+  const idx = state.markers.findIndex(m => Math.abs(m.time - state.time) < 0.15);
+  if (idx >= 0) {
+    state.markers.splice(idx, 1);
+    toast('Marcador removido');
+  } else {
+    state.markers.push({ id: uid++, time: state.time, label: `M${state.markers.length + 1}` });
+    state.markers.sort((a, b) => a.time - b.time);
+    toast(`Marcador adicionado em ${fmt(state.time)}`);
+  }
+  renderTimeline();
+}
+function removeMarker(id) {
+  state.markers = (state.markers || []).filter(m => m.id !== id);
+  renderTimeline();
+  toast('Marcador removido');
+}
+
 function split() {
   const hit = clipAt(state.time); if (!hit || hit.local < 0.1 || hit.c.duration - hit.local < 0.1) return toast('Posicione o cursor dentro de um clipe');
   const c = hit.c, sp = c.speed || 1, idx = state.clips.indexOf(c);
@@ -645,28 +674,56 @@ $('btnAuto').onclick = async () => {
 };
 $('zoom').oninput = (e) => { pxPerSec = +e.target.value; renderTimeline(); };
 $('ruler').onclick = (e) => { state.time = Math.max(0, (e.clientX - $('ruler').getBoundingClientRect().left) / pxPerSec); renderPreview(); };
+$('btnMarker').onclick = addOrToggleMarker;
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 's' || e.key === 'S') split();
   else if (e.key === 'Delete') del();
   else if (e.key === 'f' || e.key === 'F') freezeFrame();
+  else if (e.key === 'm' || e.key === 'M') addOrToggleMarker();
   else if (e.key === 'n' || e.key === 'N') toggleSnap();
   else if (e.key === ' ') { e.preventDefault(); setPlaying(!state.playing); }
 });
+
+const PRESET_CONFIGS = {
+  tiktok: { aspect: '9:16', res: '1080', fps: '30', crf: '18' },
+  youtube: { aspect: '16:9', res: '1080', fps: '60', crf: '18' },
+  youtube4k: { aspect: '16:9', res: '2160', fps: '60', crf: '14' },
+  instagram_feed: { aspect: '1:1', res: '1080', fps: '30', crf: '18' },
+  instagram_portrait: { aspect: '4:5', res: '1080', fps: '30', crf: '18' }
+};
+
+if ($('quickPreset')) {
+  $('quickPreset').onchange = (e) => {
+    const cfg = PRESET_CONFIGS[e.target.value];
+    if (!cfg) return;
+    $('expAspect').value = cfg.aspect;
+    $('expRes').value = cfg.res;
+    $('expFps').value = cfg.fps;
+    $('expQ').value = cfg.crf;
+    applyAspect();
+    toast(`Predefinição aplicada: ${e.target.options[e.target.selectedIndex].text}`);
+  };
+  ['expAspect', 'expRes', 'expFps', 'expQ'].forEach(id => {
+    const el = $(id);
+    if (el) el.addEventListener('change', () => { $('quickPreset').value = 'custom'; });
+  });
+}
+
 $('btnSave').onclick = async () => {
   if (await window.api.saveProject({
-    media: state.media, clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, tracks: state.tracks,
+    media: state.media, clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, tracks: state.tracks, markers: state.markers,
     settings: { aspect: $('expAspect').value, res: $('expRes').value, fps: $('expFps').value, crf: $('expQ').value }
   })) toast('Projeto salvo');
 };
 $('btnOpen').onclick = async () => {
   const d = await window.api.openProject(); if (!d) return;
   Object.assign(state, {
-    media: d.media, clips: d.clips, texts: d.texts, audios: d.audios || [], overlays: d.overlays || [],
+    media: d.media, clips: d.clips, texts: d.texts, audios: d.audios || [], overlays: d.overlays || [], markers: d.markers || [],
     tracks: d.tracks || { video: { visible: true, mute: false }, overlay: { visible: true }, text: { visible: true }, audio: { mute: false, solo: false } },
     selected: null, time: 0
   });
-  uid = 1 + Math.max(0, ...state.clips.map(c => c.id), ...state.texts.map(t => t.id), ...state.audios.map(a => a.id), ...state.overlays.map(o => o.id));
+  uid = 1 + Math.max(0, ...state.clips.map(c => c.id), ...state.texts.map(t => t.id), ...state.audios.map(a => a.id), ...state.overlays.map(o => o.id), ...(state.markers || []).map(m => m.id));
   if (d.settings) { $('expAspect').value = d.settings.aspect; $('expRes').value = d.settings.res; $('expFps').value = d.settings.fps; $('expQ').value = d.settings.crf; }
   renderMedia(); renderTrackHeaders(); renderTimeline(); renderProps(); applyAspect();
 };
@@ -689,7 +746,7 @@ function applyAspect() {
 $('expAspect').onchange = applyAspect;
 
 // Histórico (desfazer/refazer): detecta mudanças no projeto por comparação de snapshots.
-const snapshot = () => JSON.stringify({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, tracks: state.tracks });
+const snapshot = () => JSON.stringify({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, tracks: state.tracks, markers: state.markers });
 let hLast = snapshot(); const undoStack = [], redoStack = [];
 function hCheck() {
   const cur = snapshot();
@@ -700,6 +757,7 @@ function hApply(json) {
   if (!state.tracks) {
     state.tracks = { video: { visible: true, mute: false }, overlay: { visible: true }, text: { visible: true }, audio: { mute: false, solo: false } };
   }
+  if (!state.markers) state.markers = [];
   hLast = json;
   renderTrackHeaders(); renderTimeline(); renderProps(); renderPreview();
 }

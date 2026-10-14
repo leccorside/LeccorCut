@@ -14,7 +14,8 @@
 - **Trilha de Sobreposição (PiP - Picture-in-Picture)**: suporte para múltiplos vídeos e imagens sobrepostos, ajuste de escala (10% a 100%), posicionamento contínuo, opacidade, **rotação angular (-180° a +180°)**, **espelhamento horizontal (Flip)**, **animações de entrada e movimento** (*Fade In/Out, Deslizar da Esquerda, Deslizar da Direita, Zoom In, Flutuar / Sticker Float*) e **suavização cinemática (*Smoothstep*)** na interpolação de posição.
 - **Chroma Key**: remoção de fundo por cor com seletor de tolerância para vídeos e fotos em PiP.
 - **Trilha de Áudio Independente**: suporte para músicas e efeitos sonoros com visualização de **forma de onda sonora (*waveform*)**, controles de **Fade In / Fade Out**, início, duração e controle de volume dedicado.
-- **Alinhamento Magnético (Snap)**: sistema magnético inteligente (`N` ou botão 🧲) que atrai cortes e posições de clipes, áudios, textos e overlays para bordas de outros blocos, para o início (0s) ou para a agulha (playhead), com guia visual em tempo real.
+- **Marcadores na Linha do Tempo (Markers)**: adicione pinos/marcadores com o atalho `M` ou botão `🏷️ Marcador` para sincronizar batidas sonoras e cortes. Os marcadores atraem o snap magnético, navegam para a posição com 1 clique e podem ser excluídos com duplo clique.
+- **Alinhamento Magnético (Snap)**: sistema magnético inteligente (`N` ou botão 🧲) que atrai cortes e posições de clipes, áudios, textos, overlays e marcadores para bordas de outros blocos, para o início (0s) ou para a agulha (playhead), com guia visual em tempo real.
 - **Trilha de Texto / Legendas**: textos arrastáveis no preview com escala dinâmica, **animações de entrada (Fade In/Out, Deslizar / Slide Up, Pop / Zoom In)** e estilos avançados.
 
 ### 🤖 IA e Legendas Automáticas
@@ -30,11 +31,12 @@
 - **Transformações**: espelhamento horizontal, vertical, rotações (90°, 180°, 270°) e zoom digital.
 
 ### 📐 Formatos e Exportação
+- **Predefinições Rápidas de Plataforma (Quick Presets)**: configuração instantânea em 1 clique para TikTok / Reels / Shorts (9:16), YouTube Full HD / 4K (16:9), Instagram Feed (1:1) e Retrato (4:5).
 - **Proporções de Tela Flexíveis**: 16:9 (Horizontal/YouTube), 9:16 (Vertical/TikTok/Reels/Shorts), 1:1 (Quadrado/Feed) e 4:5.
 - **Resoluções e Taxas de Quadro**: 720p, 1080p, 1440p (2K) e 2160p (4K), com 24, 30 ou 60 FPS.
 - **Renderização Rápida via FFmpeg Nativo**: pipeline de filtros otimizado em C++ (`filter_complex`), com codificação H.264/AAC e suporte aos filtros e estados de mute/visibilidade de cada trilha.
 - **Histórico Completo de Ações**: `Ctrl+Z` (Desfazer) e `Ctrl+Y` / `Ctrl+Shift+Z` (Refazer) com retenção de até 100 estados.
-- **Projetos Salváveis**: persistência de todo o estado em arquivos `.lccut`.
+- **Projetos Salváveis**: persistência de todo o estado (inclusive trilhas e marcadores) em arquivos `.lccut`.
 
 ---
 
@@ -45,6 +47,7 @@
 | `Espaço` | Reproduzir / Pausar timeline |
 | `S` | Dividir clipe selecionado na posição da agulha |
 | `F` | Congelar quadro atual em clipe estático (3s) |
+| `M` | Adicionar ou alternar marcador na agulha |
 | `N` | Alternar Alinhamento Magnético (Snap On/Off) |
 | `Delete` | Excluir clipe, texto, áudio ou overlay selecionado |
 | `Ctrl + Z` | Desfazer última alteração |
