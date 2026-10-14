@@ -261,6 +261,7 @@ function renderProps() {
       + `<div class="prop">Opacidade do fundo<input type="range" id="tBoxOp" min="0.1" max="1" step="0.05" value="${t.boxOpacity ?? 0.6}"></div>`
       + `<div class="prop">Início (s)<input type="number" id="pStart" value="${t.start.toFixed(1)}" min="0" step="0.5"></div>`
       + `<div class="prop">Duração (s)<input type="number" id="pDur" value="${t.duration.toFixed(1)}" min="0.5" step="0.5"></div>`
+      + `<button id="btnApplyAllTexts" class="wide primary">Aplicar estilo a todas as legendas</button>`
       + `<p class="hint">Arraste o texto no preview para posicionar.</p>`;
     $('tText').oninput = (e) => { t.text = e.target.value; renderTimeline(); renderPreview(); };
     $('tSize').oninput = (e) => { t.size = +e.target.value || 48; renderPreview(); };
@@ -274,6 +275,15 @@ function renderProps() {
     $('tBoxOp').oninput = (e) => { t.boxOpacity = +e.target.value; renderPreview(); };
     $('pStart').onchange = (e) => { t.start = Math.max(0, +e.target.value); renderTimeline(); renderPreview(); };
     $('pDur').onchange = (e) => { t.duration = +e.target.value; renderTimeline(); renderPreview(); };
+    $('btnApplyAllTexts').onclick = () => {
+      state.texts.forEach(other => {
+        other.size = t.size; other.color = t.color; other.font = t.font;
+        other.bold = t.bold; other.fade = t.fade; other.outline = t.outline;
+        other.box = t.box; other.boxColor = t.boxColor; other.boxOpacity = t.boxOpacity;
+        other.px = t.px; other.py = t.py;
+      });
+      renderTimeline(); renderPreview(); toast('Estilo aplicado a ' + state.texts.length + ' textos');
+    };
     return;
   }
   const c = state.clips.find(x => x.id === s.id); if (!c) return;
