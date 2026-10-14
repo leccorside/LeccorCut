@@ -125,6 +125,42 @@ function setPlaying(p) {
   else { player.pause(); $('bgAudio').pause(); $('ovPlayer').pause(); cancelAnimationFrame(raf); }
 }
 
+// Arrastar (mover/reordenar) e aparar clipes pelas bordas.
+let tlDrag = null;
+function decorate(e, kind, item) {
+  ['l', 'r'].forEach(side => {
+    const h = document.createElement('span'); h.className = 'h ' + side;
+    h.onmousedown = (ev) => startDrag(ev, kind, item, side); e.appendChild(h);
+  });
+  e.onmousedown = (ev) => startDrag(ev, kind, item, 'move');
+}
+function startDrag(ev, kind, item, mode) {
+  ev.preventDefault(); ev.stopPropagation();
+  const s0 = kind === 'clip' ? layout().starts[state.clips.indexOf(item)] : item.start;
+  select({ kind, id: item.id });
+  tlDrag = { kind, item, mode, x0: ev.clientX, s0, o: { start: item.start, duration: item.duration, in: item.in || 0 } };
+}
+document.addEventListener('mousemove', (ev) => {
+  if (!tlDrag) return;
+  const { kind, item: it, mode, o } = tlDrag, dx = (ev.clientX - tlDrag.x0) / pxPerSec, MIN = 0.2;
+  if (kind === 'clip') {
+    const sp = it.speed || 1, srcDur = it.isImage ? 1e9 : (it.srcDur || (o.in + o.duration * sp));
+    if (mode === 'move') {
+      const others = state.clips.filter(c => c !== it); const center = tlDrag.s0 + o.duration / 2 + dx;
+      let acc = 0, n = 0; for (const c of others) { if (acc + c.duration / 2 < center) n++; acc += c.duration; }
+      if (n !== state.clips.indexOf(it)) { state.clips = others; state.clips.splice(n, 0, it); }
+    } else if (mode === 'r') it.duration = Math.min(Math.max(MIN, o.duration + dx), (srcDur - o.in) / sp);
+    else { const d = Math.min(Math.max(dx, -o.in / sp), o.duration - MIN); it.in = o.in + d * sp; it.duration = o.duration - d; }
+  } else {
+    const hasIn = kind !== 'text', cap = hasIn && it.max ? it.max : 1e9;
+    if (mode === 'move') it.start = Math.max(0, o.start + dx);
+    else if (mode === 'r') it.duration = Math.min(Math.max(MIN, o.duration + dx), cap - o.in);
+    else { const d = Math.min(Math.max(dx, -o.start, hasIn ? -o.in : -1e9), o.duration - MIN); it.start = o.start + d; it.duration = o.duration - d; if (hasIn) it.in = o.in + d; }
+  }
+  renderTimeline(); renderPreview();
+});
+document.addEventListener('mouseup', () => { if (tlDrag) { tlDrag = null; renderProps(); } });
+
 function renderTimeline() {
   const tv = $('trackVideo'), to = $('trackOverlay'), tt = $('trackText'), ta = $('trackAudio'), ru = $('ruler');
   tv.innerHTML = to.innerHTML = tt.innerHTML = ta.innerHTML = ru.innerHTML = '';
@@ -136,25 +172,25 @@ function renderTimeline() {
     const acc = starts[i];
     const e = document.createElement('div'); e.className = 'clip' + (state.selected?.id === c.id ? ' sel' : '');
     e.style.left = acc * pxPerSec + 'px'; e.style.width = c.duration * pxPerSec + 'px'; e.textContent = (c.transition && c.transition !== 'none' ? '⇆ ' : '') + c.name;
-    e.onclick = (ev) => { ev.stopPropagation(); select({ kind: 'clip', id: c.id }); };
+    decorate(e, 'clip', c);
     tv.appendChild(e);
   });
   state.texts.forEach(t => {
     const e = document.createElement('div'); e.className = 'clip text' + (state.selected?.id === t.id ? ' sel' : '');
     e.style.left = t.start * pxPerSec + 'px'; e.style.width = t.duration * pxPerSec + 'px'; e.textContent = 'T: ' + t.text;
-    e.onclick = (ev) => { ev.stopPropagation(); select({ kind: 'text', id: t.id }); };
+    decorate(e, 'text', t);
     tt.appendChild(e);
   });
   state.overlays.forEach(o => {
     const e = document.createElement('div'); e.className = 'clip overlay' + (state.selected?.id === o.id ? ' sel' : '');
     e.style.left = o.start * pxPerSec + 'px'; e.style.width = o.duration * pxPerSec + 'px'; e.textContent = 'PiP: ' + o.name;
-    e.onclick = (ev) => { ev.stopPropagation(); select({ kind: 'overlay', id: o.id }); };
+    decorate(e, 'overlay', o);
     to.appendChild(e);
   });
   state.audios.forEach(a => {
     const e = document.createElement('div'); e.className = 'clip audio' + (state.selected?.id === a.id ? ' sel' : '');
     e.style.left = a.start * pxPerSec + 'px'; e.style.width = a.duration * pxPerSec + 'px'; e.textContent = '♪ ' + a.name;
-    e.onclick = (ev) => { ev.stopPropagation(); select({ kind: 'audio', id: a.id }); };
+    decorate(e, 'audio', a);
     ta.appendChild(e);
   });
   updateTime();
@@ -271,7 +307,7 @@ function renderMedia() {
     const e = document.createElement('div'); e.className = 'media-item'; e.innerHTML = `${m.name}<small>${m.duration.toFixed(1)}s${m.hasAudio ? ' · áudio' : ''}</small>`;
     e.onclick = () => {
       if (m.hasAudio && !m.hasVideo) state.audios.push({ id: uid++, path: m.path, name: m.name, start: state.time, in: 0, duration: m.duration, max: m.duration, volume: 1 });
-      else state.clips.push({ id: uid++, ...m, in: 0, filters: {}, speed: 1, volume: 1 });
+      else state.clips.push({ id: uid++, ...m, srcDur: m.duration, in: 0, filters: {}, speed: 1, volume: 1 });
       renderTimeline(); renderPreview();
     };
     l.appendChild(e);
