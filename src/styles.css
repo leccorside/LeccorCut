@@ -12,7 +12,8 @@ button.wide{width:100%;margin:8px 0}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;overflow:auto}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin:8px 0}
 .media-item{padding:8px;margin:6px 0;background:var(--panel2);border-radius:8px;font-size:13px;cursor:pointer;border:1px solid transparent}
-.media-item:hover{border-color:var(--a2)}.media-item small{color:var(--mut);display:block}
+.media-item:hover{border-color:var(--a2)}.media-item .pip{float:right;padding:1px 8px;font-size:11px}
+.media-item small{color:var(--mut);display:block}
 #previewPanel{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px}
 #stage{position:relative;width:100%;max-width:820px;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
 #stage video,#stage img{width:100%;height:100%;object-fit:contain}
@@ -23,13 +24,15 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .row{display:flex;gap:6px;margin-top:6px}input[type=color]{width:50px;padding:0}
 .prop{margin:8px 0;font-size:12px;color:var(--mut)}.prop input[type=range]{padding:0}
 .hint{color:var(--mut);font-size:13px}
-#timelineWrap{height:290px;background:var(--panel);border-top:1px solid var(--line);display:flex;flex-direction:column}
+#timelineWrap{height:350px;background:var(--panel);border-top:1px solid var(--line);display:flex;flex-direction:column}
 .tl-tools{display:flex;gap:10px;align-items:center;padding:8px 12px}.tl-tools label{margin-left:auto;display:flex;gap:6px;align-items:center;font-size:12px;color:var(--mut)}
 #timeline{position:relative;flex:1;overflow:auto;padding:0 12px 10px}
 #ruler{height:22px;position:relative;border-bottom:1px solid var(--line);font-size:10px;color:var(--mut);cursor:pointer}
 .tick{position:absolute;top:0;border-left:1px solid var(--line);padding-left:3px;height:22px}
 .track{position:relative;height:56px;margin-top:8px;background:#12141c;border-radius:6px}
 .clip{position:absolute;top:4px;height:48px;border-radius:6px;background:linear-gradient(135deg,#2b6cff,#7c5cff);padding:4px 8px;font-size:11px;overflow:hidden;white-space:nowrap;cursor:pointer;border:2px solid transparent}
+.clip.overlay{background:linear-gradient(135deg,#f9a825,#ff6f00);color:#1a1000}
+#stage #ovPlayer,#stage #ovImg{position:absolute;height:auto;object-fit:contain}
 .clip.audio{background:linear-gradient(135deg,#00b894,#00e5c3);color:#06121a}
 .clip.text{background:linear-gradient(135deg,#ff7a59,#ff3d81)}.clip.sel{border-color:var(--a1)}
 #playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--a1);pointer-events:none;left:12px;box-shadow:0 0 8px var(--a1)}

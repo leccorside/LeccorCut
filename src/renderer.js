@@ -1,5 +1,5 @@
 const $ = (id) => document.getElementById(id);
-const state = { media: [], clips: [], texts: [], audios: [], selected: null, time: 0, playing: false };
+const state = { media: [], clips: [], texts: [], audios: [], overlays: [], selected: null, time: 0, playing: false };
 const player = $('player'), img = $('imgPlayer');
 let pxPerSec = 60, uid = 1, raf = null, lastTs = 0;
 
@@ -35,7 +35,25 @@ function cssTransform(f = {}) {
   return `scale(${(f.hflip ? -1 : 1) * (f.zoom || 1)}, ${(f.vflip ? -1 : 1) * (f.zoom || 1)}) rotate(${f.rotate || 0}deg)`;
 }
 
+function syncOverlay() {
+  const v = $('ovPlayer'), im = $('ovImg');
+  const o = state.overlays.find(x => state.time >= x.start && state.time < x.start + x.duration);
+  if (!o) { v.hidden = im.hidden = true; v.pause(); return; }
+  const el = o.isImage ? im : v, other = o.isImage ? v : im;
+  other.hidden = true; el.hidden = false; if (!o.isImage) {} else v.pause();
+  const src = fileUrl(o.path);
+  if (el.dataset.src !== src) { el.src = src; el.dataset.src = src; }
+  el.style.width = o.scale + '%'; el.style.left = (o.x * 100) + '%'; el.style.top = (o.y * 100) + '%';
+  el.style.transform = `translate(${-o.x * 100}%, ${-o.y * 100}%)`; el.style.opacity = o.opacity;
+  if (!o.isImage) {
+    const target = (o.in || 0) + state.time - o.start;
+    if (!state.playing || Math.abs(v.currentTime - target) > 0.3) v.currentTime = target;
+    if (state.playing && v.paused) v.play().catch(() => {}); else if (!state.playing) v.pause();
+  }
+}
+
 function syncAudio() {
+  syncOverlay();
   const el = $('bgAudio');
   const a = state.audios.find(x => state.time >= x.start && state.time < x.start + x.duration);
   if (!a) { el.pause(); return; }
@@ -87,14 +105,14 @@ function tick(ts) {
 function setPlaying(p) {
   state.playing = p && total() > 0; $('btnPlay').textContent = state.playing ? '⏸' : '▶';
   if (state.playing) { if (state.time >= total()) state.time = 0; lastTs = performance.now(); raf = requestAnimationFrame(tick); }
-  else { player.pause(); $('bgAudio').pause(); cancelAnimationFrame(raf); }
+  else { player.pause(); $('bgAudio').pause(); $('ovPlayer').pause(); cancelAnimationFrame(raf); }
 }
 
 function renderTimeline() {
-  const tv = $('trackVideo'), tt = $('trackText'), ta = $('trackAudio'), ru = $('ruler');
-  tv.innerHTML = tt.innerHTML = ta.innerHTML = ru.innerHTML = '';
+  const tv = $('trackVideo'), to = $('trackOverlay'), tt = $('trackText'), ta = $('trackAudio'), ru = $('ruler');
+  tv.innerHTML = to.innerHTML = tt.innerHTML = ta.innerHTML = ru.innerHTML = '';
   const dur = Math.max(total(), 30);
-  ru.style.width = tv.style.width = tt.style.width = ta.style.width = (dur * pxPerSec) + 'px';
+  ru.style.width = tv.style.width = to.style.width = tt.style.width = ta.style.width = (dur * pxPerSec) + 'px';
   for (let s = 0; s < dur; s += 5) { const k = document.createElement('div'); k.className = 'tick'; k.style.left = s * pxPerSec + 'px'; k.textContent = s + 's'; ru.appendChild(k); }
   const { starts } = layout();
   state.clips.forEach((c, i) => {
@@ -109,6 +127,12 @@ function renderTimeline() {
     e.style.left = t.start * pxPerSec + 'px'; e.style.width = t.duration * pxPerSec + 'px'; e.textContent = 'T: ' + t.text;
     e.onclick = (ev) => { ev.stopPropagation(); select({ kind: 'text', id: t.id }); };
     tt.appendChild(e);
+  });
+  state.overlays.forEach(o => {
+    const e = document.createElement('div'); e.className = 'clip overlay' + (state.selected?.id === o.id ? ' sel' : '');
+    e.style.left = o.start * pxPerSec + 'px'; e.style.width = o.duration * pxPerSec + 'px'; e.textContent = 'PiP: ' + o.name;
+    e.onclick = (ev) => { ev.stopPropagation(); select({ kind: 'overlay', id: o.id }); };
+    to.appendChild(e);
   });
   state.audios.forEach(a => {
     const e = document.createElement('div'); e.className = 'clip audio' + (state.selected?.id === a.id ? ' sel' : '');
@@ -128,6 +152,21 @@ function slider(label, key, min, max, obj) {
 function renderProps() {
   const p = $('props'); const s = state.selected;
   if (!s) { p.innerHTML = '<p class="hint">Selecione um clipe na timeline.</p>'; return; }
+  if (s.kind === 'overlay') {
+    const o = state.overlays.find(x => x.id === s.id); if (!o) return;
+    const r = (id, label, min, max, step, val) => `<div class="prop">${label}<input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
+    p.innerHTML = `<div class="prop">Início (s)<input type="number" id="oStart" value="${o.start.toFixed(1)}" min="0" step="0.5"></div>`
+      + `<div class="prop">Duração (s)<input type="number" id="oDur" value="${o.duration.toFixed(1)}" min="0.5" step="0.5"></div>`
+      + r('oScale', 'Tamanho (%)', 10, 100, 1, o.scale) + r('oX', 'Posição horizontal', 0, 1, 0.01, o.x)
+      + r('oY', 'Posição vertical', 0, 1, 0.01, o.y) + r('oOp', 'Opacidade', 0.1, 1, 0.05, o.opacity);
+    $('oStart').onchange = (e) => { o.start = Math.max(0, +e.target.value); renderTimeline(); renderPreview(); };
+    $('oDur').onchange = (e) => { o.duration = Math.min(o.max, +e.target.value); renderTimeline(); renderPreview(); };
+    $('oScale').oninput = (e) => { o.scale = +e.target.value; renderPreview(); };
+    $('oX').oninput = (e) => { o.x = +e.target.value; renderPreview(); };
+    $('oY').oninput = (e) => { o.y = +e.target.value; renderPreview(); };
+    $('oOp').oninput = (e) => { o.opacity = +e.target.value; renderPreview(); };
+    return;
+  }
   if (s.kind === 'audio') {
     const a = state.audios.find(x => x.id === s.id); if (!a) return;
     p.innerHTML = `<div class="prop">Início (s)<input type="number" id="aStart" value="${a.start.toFixed(1)}" min="0" step="0.5"></div>
@@ -182,6 +221,7 @@ function del() {
   const s = state.selected; if (!s) return;
   if (s.kind === 'clip') state.clips = state.clips.filter(c => c.id !== s.id);
   else if (s.kind === 'audio') state.audios = state.audios.filter(a => a.id !== s.id);
+  else if (s.kind === 'overlay') state.overlays = state.overlays.filter(o => o.id !== s.id);
   else state.texts = state.texts.filter(t => t.id !== s.id);
   state.selected = null; renderTimeline(); renderProps(); renderPreview();
 }
@@ -196,6 +236,15 @@ function renderMedia() {
       renderTimeline(); renderPreview();
     };
     l.appendChild(e);
+    if (m.hasVideo) {
+      const b = document.createElement('button'); b.className = 'pip'; b.textContent = 'PiP'; b.title = 'Adicionar como sobreposição (picture-in-picture)';
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        state.overlays.push({ id: uid++, path: m.path, name: m.name, isImage: m.isImage, start: state.time, in: 0, duration: m.duration, max: m.duration, x: 1, y: 0, scale: 30, opacity: 1 });
+        renderTimeline(); renderPreview();
+      };
+      e.prepend(b);
+    }
   });
 }
 
@@ -224,17 +273,17 @@ document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.key === 's' || e.key === 'S') split(); else if (e.key === 'Delete') del(); else if (e.key === ' ') { e.preventDefault(); setPlaying(!state.playing); }
 });
-$('btnSave').onclick = async () => { if (await window.api.saveProject({ media: state.media, clips: state.clips, texts: state.texts, audios: state.audios })) toast('Projeto salvo'); };
+$('btnSave').onclick = async () => { if (await window.api.saveProject({ media: state.media, clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays })) toast('Projeto salvo'); };
 $('btnOpen').onclick = async () => {
   const d = await window.api.openProject(); if (!d) return;
-  Object.assign(state, { media: d.media, clips: d.clips, texts: d.texts, audios: d.audios || [], selected: null, time: 0 });
-  uid = 1 + Math.max(0, ...state.clips.map(c => c.id), ...state.texts.map(t => t.id), ...state.audios.map(a => a.id));
+  Object.assign(state, { media: d.media, clips: d.clips, texts: d.texts, audios: d.audios || [], overlays: d.overlays || [], selected: null, time: 0 });
+  uid = 1 + Math.max(0, ...state.clips.map(c => c.id), ...state.texts.map(t => t.id), ...state.audios.map(a => a.id), ...state.overlays.map(o => o.id));
   renderMedia(); renderTimeline(); renderProps(); renderPreview();
 };
 $('btnExport').onclick = async () => {
   if (!state.clips.length) return toast('Adicione clipes à timeline');
   toast('Exportando...'); window.api.onProgress(s => toast(`Exportando... ${Math.min(99, Math.round(s / total() * 100))}%`));
-  const r = await window.api.exportVideo({ clips: state.clips, texts: state.texts, audios: state.audios });
+  const r = await window.api.exportVideo({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays });
   toast(r.ok ? 'Exportado: ' + r.path : (r.log ? 'Erro: ' + r.log.slice(-200) : 'Cancelado'));
 };
 renderTimeline(); renderPreview();

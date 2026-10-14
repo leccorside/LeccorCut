@@ -142,6 +142,14 @@ function buildFfmpeg(project, outPath) {
     aOut = 'acm';
   }
   let last = 'vc';
+  (project.overlays || []).forEach((o, k) => {
+    const idx = clips.length + audios.length + k;
+    if (o.isImage) args.push('-loop', '1', '-t', String(o.duration), '-i', o.path); else args.push('-i', o.path);
+    const trim = o.isImage ? '' : `trim=start=${o.in || 0}:end=${(o.in || 0) + o.duration},`;
+    f.push(`[${idx}:v]${trim}setpts=PTS-STARTPTS+${o.start}/TB,scale=${Math.round(W * o.scale / 100 / 2) * 2}:-2,format=yuva420p,colorchannelmixer=aa=${o.opacity}[ov${k}]`);
+    f.push(`[${last}][ov${k}]overlay=x=(W-w)*${o.x}:y=(H-h)*${o.y}:enable='between(t,${o.start},${o.start + o.duration})':eof_action=pass[o${k}]`);
+    last = `o${k}`;
+  });
   (project.texts || []).forEach((t, i) => {
     f.push(`[${last}]drawtext=text='${esc(t.text)}':fontcolor=${t.color || 'white'}:fontsize=${t.size || 48}:x=(w-text_w)/2:y=${t.y ?? 'h-th-80'}:borderw=2:bordercolor=black:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
     last = `t${i}`;
