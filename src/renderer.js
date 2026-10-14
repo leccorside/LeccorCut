@@ -73,7 +73,7 @@ function renderPreview() {
   const view = hit ? hit.c : null;
   $('textLayer').innerHTML = '';
   state.texts.filter(t => state.time >= t.start && state.time < t.start + t.duration).forEach(t => {
-    const s = document.createElement('span'); s.textContent = t.text; s.style.color = t.color; s.style.fontSize = (t.size / 720 * $('stage').clientHeight) + 'px';
+    const s = document.createElement('span'); s.textContent = t.text; s.style.color = t.color; s.style.fontSize = (t.size / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight)) + 'px';
     $('textLayer').appendChild(s);
   });
   if (!view) { player.removeAttribute('src'); img.hidden = true; player.style.visibility = 'hidden'; syncAudio(); updateTime(); return; }
@@ -317,7 +317,38 @@ $('btnOpen').onclick = async () => {
 $('btnExport').onclick = async () => {
   if (!state.clips.length) return toast('Adicione clipes à timeline');
   toast('Exportando...'); window.api.onProgress(s => toast(`Exportando... ${Math.min(99, Math.round(s / total() * 100))}%`));
-  const r = await window.api.exportVideo({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, settings: { height: +$('expRes').value, fps: +$('expFps').value, crf: +$('expQ').value } });
+  const r = await window.api.exportVideo({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, settings: { height: +$('expRes').value, fps: +$('expFps').value, crf: +$('expQ').value, aspect: $('expAspect').value } });
   toast(r.ok ? 'Exportado: ' + r.path : (r.log ? 'Erro: ' + r.log.slice(-200) : 'Cancelado'));
 };
+
+function applyAspect() {
+  const [a, b] = $('expAspect').value.split(':').map(Number), st = $('stage');
+  st.style.aspectRatio = `${a} / ${b}`;
+  if (a >= b) { st.style.width = '100%'; st.style.height = 'auto'; } else { st.style.width = 'auto'; st.style.height = '50vh'; }
+  renderPreview();
+}
+$('expAspect').onchange = applyAspect;
+
+// Histórico (desfazer/refazer): detecta mudanças no projeto por comparação de snapshots.
+const snapshot = () => JSON.stringify({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays });
+let hLast = snapshot(); const undoStack = [], redoStack = [];
+function hCheck() {
+  const cur = snapshot();
+  if (cur !== hLast) { undoStack.push(hLast); if (undoStack.length > 100) undoStack.shift(); redoStack.length = 0; hLast = cur; }
+}
+function hApply(json) {
+  const d = JSON.parse(json); Object.assign(state, d, { selected: null }); hLast = json;
+  renderTimeline(); renderProps(); renderPreview();
+}
+function undo() { hCheck(); if (!undoStack.length) return; redoStack.push(snapshot()); hApply(undoStack.pop()); }
+function redo() { hCheck(); if (!redoStack.length) return; undoStack.push(snapshot()); hApply(redoStack.pop()); }
+setInterval(hCheck, 300);
+$('btnUndo').onclick = undo; $('btnRedo').onclick = redo;
+document.addEventListener('keydown', (e) => {
+  const t = e.target; if (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && ['text', 'number'].includes(t.type))) return;
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const k = e.key.toLowerCase();
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
+});
+applyAspect();
 renderTimeline(); renderPreview();

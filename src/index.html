@@ -10,6 +10,7 @@
 <header id="topbar">
   <div class="logo">Leccor<span>Cut</span></div>
   <div class="actions">
+    <select id="expAspect" title="Proporção"><option>16:9</option><option>9:16</option><option>1:1</option><option>4:5</option></select>
     <select id="expRes" title="Resolução"><option value="720">720p</option><option value="1080" selected>1080p</option><option value="1440">1440p</option><option value="2160">4K</option></select>
     <select id="expFps" title="FPS"><option>24</option><option selected>30</option><option>60</option></select>
     <select id="expQ" title="Qualidade"><option value="23">Normal</option><option value="18" selected>Alta</option><option value="14">Máxima</option></select>
@@ -51,6 +52,8 @@
 </main>
 <section id="timelineWrap">
   <div class="tl-tools">
+    <button id="btnUndo" title="Desfazer (Ctrl+Z)">↶</button>
+    <button id="btnRedo" title="Refazer (Ctrl+Y)">↷</button>
     <button id="btnSplit">✂ Dividir (S)</button>
     <button id="btnDelete">🗑 Excluir (Del)</button>
     <label>Zoom <input id="zoom" type="range" min="20" max="200" value="60"></label>

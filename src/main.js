@@ -130,7 +130,9 @@ const PRESETS = {
 // Trilha principal: clips em sequência. Textos: sobreposição por tempo.
 function buildFfmpeg(project, outPath) {
   const S = project.settings || {};
-  const H = S.height || 720, W = Math.round(H * 16 / 9 / 2) * 2, FPS = S.fps || 30, CRF = S.crf || 18;
+  const [ra, rb] = (S.aspect || '16:9').split(':').map(Number), r = ra / rb, res = S.height || 720;
+  const ev = (n) => Math.round(n / 2) * 2;
+  const H = r >= 1 ? ev(res) : ev(res / r), W = r >= 1 ? ev(res * r) : ev(res), FPS = S.fps || 30, CRF = S.crf || 18;
   const clips = project.clips;
   const args = [];
   const f = [];
@@ -204,7 +206,7 @@ function buildFfmpeg(project, outPath) {
     last = `o${k}`;
   });
   (project.texts || []).forEach((t, i) => {
-    f.push(`[${last}]drawtext=text='${esc(t.text)}':fontcolor=${t.color || 'white'}:fontsize=${t.size || 48}:x=(w-text_w)/2:y=${t.y ?? 'h-th-80'}:borderw=2:bordercolor=black:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
+    f.push(`[${last}]drawtext=text='${esc(t.text)}':fontcolor=${t.color || 'white'}:fontsize=${Math.round((t.size || 48) * Math.min(W, H) / 720)}:x=(w-text_w)/2:y=${t.y ?? 'h-th-80'}:borderw=2:bordercolor=black:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
     last = `t${i}`;
   });
   args.push('-filter_complex', f.join(';'), '-map', `[${last}]`, '-map', `[${aOut}]`,
