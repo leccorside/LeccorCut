@@ -81,7 +81,11 @@ function buildFfmpeg(project, outPath) {
     audios.forEach((a, j) => {
       const idx = clips.length + j; args.push('-i', a.path);
       const ms = Math.round(a.start * 1000);
-      f.push(`[${idx}:a]atrim=start=${a.in || 0}:end=${(a.in || 0) + a.duration},asetpts=PTS-STARTPTS,volume=${a.volume ?? 1},aresample=44100,aformat=channel_layouts=stereo,adelay=${ms}|${ms}[m${j}]`);
+      let af = `atrim=start=${a.in || 0}:end=${(a.in || 0) + a.duration},asetpts=PTS-STARTPTS,volume=${a.volume ?? 1}`;
+      if (a.fadeIn) af += `,afade=t=in:st=0:d=${a.fadeIn}`;
+      if (a.fadeOut) af += `,afade=t=out:st=${Math.max(0, a.duration - a.fadeOut)}:d=${a.fadeOut}`;
+      af += `,aresample=44100,aformat=channel_layouts=stereo,adelay=${ms}|${ms}`;
+      f.push(`[${idx}:a]${af}[m${j}]`);
     });
     const n = audios.length + 1;
     f.push(`[ac0]${audios.map((_, j) => `[m${j}]`).join('')}amix=inputs=${n}:duration=first:dropout_transition=0,volume=${n}[acm]`);

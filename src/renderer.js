@@ -62,7 +62,11 @@ function syncAudio() {
   if (!a) { el.pause(); return; }
   const src = fileUrl(a.path);
   if (el.dataset.src !== src) { el.src = src; el.dataset.src = src; }
-  el.volume = Math.min(1, a.volume ?? 1);
+  let vol = Math.min(1, a.volume ?? 1);
+  const local = state.time - a.start;
+  if (a.fadeIn && local < a.fadeIn) vol *= Math.max(0, local / a.fadeIn);
+  if (a.fadeOut && local > a.duration - a.fadeOut) vol *= Math.max(0, (a.duration - local) / a.fadeOut);
+  el.volume = Math.max(0, Math.min(1, vol));
   const target = (a.in || 0) + state.time - a.start;
   if (!state.playing || Math.abs(el.currentTime - target) > 0.3) el.currentTime = target;
   if (state.playing && el.paused) el.play().catch(() => {}); else if (!state.playing) el.pause();
@@ -132,6 +136,40 @@ function setPlaying(p) {
 
 // Arrastar (mover/reordenar) e aparar clipes pelas bordas.
 let tlDrag = null;
+let snapEnabled = true;
+const snapGuide = $('snapGuide');
+function toggleSnap(val) {
+  snapEnabled = typeof val === 'boolean' ? val : !snapEnabled;
+  $('btnSnap').classList.toggle('active', snapEnabled);
+  toast(`Alinhamento magnético (Snap): ${snapEnabled ? 'Ativado' : 'Desativado'}`);
+}
+$('btnSnap').onclick = () => toggleSnap();
+
+function showSnap(t) {
+  if (snapGuide) { snapGuide.style.left = (12 + t * pxPerSec) + 'px'; snapGuide.hidden = false; }
+}
+function hideSnap() { if (snapGuide) snapGuide.hidden = true; }
+
+function getSnapTargets(excludeItem) {
+  const pts = [0, state.time];
+  const { starts } = layout();
+  state.clips.forEach((c, i) => { pts.push(starts[i], starts[i] + c.duration); });
+  state.overlays.forEach(o => { if (o !== excludeItem) pts.push(o.start, o.start + o.duration); });
+  state.texts.forEach(t => { if (t !== excludeItem) pts.push(t.start, t.start + t.duration); });
+  state.audios.forEach(a => { if (a !== excludeItem) pts.push(a.start, a.start + a.duration); });
+  return pts;
+}
+
+function trySnap(val, targets, threshSec) {
+  if (!snapEnabled) return { val, snapped: false };
+  let best = val, minDiff = threshSec, hit = null;
+  for (const p of targets) {
+    const diff = Math.abs(val - p);
+    if (diff < minDiff) { minDiff = diff; best = p; hit = p; }
+  }
+  return { val: best, snapped: hit !== null, point: hit };
+}
+
 function decorate(e, kind, item) {
   ['l', 'r'].forEach(side => {
     const h = document.createElement('span'); h.className = 'h ' + side;
@@ -148,23 +186,58 @@ function startDrag(ev, kind, item, mode) {
 document.addEventListener('mousemove', (ev) => {
   if (!tlDrag) return;
   const { kind, item: it, mode, o } = tlDrag, dx = (ev.clientX - tlDrag.x0) / pxPerSec, MIN = 0.2;
+  const thresh = 8 / pxPerSec;
   if (kind === 'clip') {
     const sp = it.speed || 1, srcDur = it.isImage ? 1e9 : (it.srcDur || (o.in + o.duration * sp));
     if (mode === 'move') {
       const others = state.clips.filter(c => c !== it); const center = tlDrag.s0 + o.duration / 2 + dx;
       let acc = 0, n = 0; for (const c of others) { if (acc + c.duration / 2 < center) n++; acc += c.duration; }
       if (n !== state.clips.indexOf(it)) { state.clips = others; state.clips.splice(n, 0, it); }
-    } else if (mode === 'r') it.duration = Math.min(Math.max(MIN, o.duration + dx), (srcDur - o.in) / sp);
-    else { const d = Math.min(Math.max(dx, -o.in / sp), o.duration - MIN); it.in = o.in + d * sp; it.duration = o.duration - d; }
+      hideSnap();
+    } else if (mode === 'r') {
+      let tEnd = tlDrag.s0 + o.duration + dx;
+      const snapR = trySnap(tEnd, getSnapTargets(it), thresh);
+      if (snapR.snapped) { tEnd = snapR.val; showSnap(snapR.point); } else { hideSnap(); }
+      const newDur = Math.max(MIN, tEnd - tlDrag.s0);
+      it.duration = Math.min(newDur, (srcDur - o.in) / sp);
+    } else {
+      let tStart = tlDrag.s0 + dx;
+      const snapL = trySnap(tStart, getSnapTargets(it), thresh);
+      if (snapL.snapped) { tStart = snapL.val; showSnap(snapL.point); } else { hideSnap(); }
+      const d = Math.min(Math.max(tStart - tlDrag.s0, -o.in / sp), o.duration - MIN);
+      it.in = o.in + d * sp; it.duration = o.duration - d;
+    }
   } else {
     const hasIn = kind !== 'text', cap = hasIn && it.max ? it.max : 1e9;
-    if (mode === 'move') it.start = Math.max(0, o.start + dx);
-    else if (mode === 'r') it.duration = Math.min(Math.max(MIN, o.duration + dx), cap - o.in);
-    else { const d = Math.min(Math.max(dx, -o.start, hasIn ? -o.in : -1e9), o.duration - MIN); it.start = o.start + d; it.duration = o.duration - d; if (hasIn) it.in = o.in + d; }
+    const targets = getSnapTargets(it);
+    if (mode === 'move') {
+      let tStart = Math.max(0, o.start + dx);
+      const snapL = trySnap(tStart, targets, thresh);
+      if (snapL.snapped) {
+        tStart = snapL.val; showSnap(snapL.point);
+      } else {
+        const snapR = trySnap(tStart + o.duration, targets, thresh);
+        if (snapR.snapped) {
+          tStart = Math.max(0, snapR.val - o.duration); showSnap(snapR.point);
+        } else { hideSnap(); }
+      }
+      it.start = tStart;
+    } else if (mode === 'r') {
+      let tEnd = o.start + o.duration + dx;
+      const snapR = trySnap(tEnd, targets, thresh);
+      if (snapR.snapped) { tEnd = snapR.val; showSnap(snapR.point); } else { hideSnap(); }
+      it.duration = Math.min(Math.max(MIN, tEnd - o.start), cap - o.in);
+    } else {
+      let tStart = Math.max(0, o.start + dx);
+      const snapL = trySnap(tStart, targets, thresh);
+      if (snapL.snapped) { tStart = snapL.val; showSnap(snapL.point); } else { hideSnap(); }
+      const d = Math.min(Math.max(tStart - o.start, hasIn ? -o.in : -1e9), o.duration - MIN);
+      it.start = o.start + d; it.duration = o.duration - d; if (hasIn) it.in = o.in + d;
+    }
   }
   renderTimeline(); renderPreview();
 });
-document.addEventListener('mouseup', () => { if (tlDrag) { tlDrag = null; renderProps(); } });
+document.addEventListener('mouseup', () => { if (tlDrag) { tlDrag = null; hideSnap(); renderProps(); } });
 
 function renderTimeline() {
   const tv = $('trackVideo'), to = $('trackOverlay'), tt = $('trackText'), ta = $('trackAudio'), ru = $('ruler');
@@ -243,10 +316,14 @@ function renderProps() {
     const a = state.audios.find(x => x.id === s.id); if (!a) return;
     p.innerHTML = `<div class="prop">Início (s)<input type="number" id="aStart" value="${a.start.toFixed(1)}" min="0" step="0.5"></div>
       <div class="prop">Duração (s)<input type="number" id="aDur" value="${a.duration.toFixed(1)}" min="0.5" step="0.5"></div>
-      <div class="prop">Volume<input type="range" id="aVol" min="0" max="1" step="0.05" value="${a.volume ?? 1}"></div>`;
+      <div class="prop">Volume<input type="range" id="aVol" min="0" max="1" step="0.05" value="${a.volume ?? 1}"></div>
+      <div class="prop">Fade in (s)<input type="number" id="aFadeIn" value="${a.fadeIn || 0}" min="0" max="10" step="0.2"></div>
+      <div class="prop">Fade out (s)<input type="number" id="aFadeOut" value="${a.fadeOut || 0}" min="0" max="10" step="0.2"></div>`;
     $('aStart').onchange = (e) => { a.start = Math.max(0, +e.target.value); renderTimeline(); };
     $('aDur').onchange = (e) => { a.duration = Math.min(a.max, +e.target.value); renderTimeline(); };
     $('aVol').oninput = (e) => { a.volume = +e.target.value; syncAudio(); };
+    $('aFadeIn').onchange = (e) => { a.fadeIn = Math.max(0, +e.target.value); };
+    $('aFadeOut').onchange = (e) => { a.fadeOut = Math.max(0, +e.target.value); };
     return;
   }
   if (s.kind === 'text') {
@@ -394,7 +471,10 @@ $('zoom').oninput = (e) => { pxPerSec = +e.target.value; renderTimeline(); };
 $('ruler').onclick = (e) => { state.time = Math.max(0, (e.clientX - $('ruler').getBoundingClientRect().left) / pxPerSec); renderPreview(); };
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
-  if (e.key === 's' || e.key === 'S') split(); else if (e.key === 'Delete') del(); else if (e.key === ' ') { e.preventDefault(); setPlaying(!state.playing); }
+  if (e.key === 's' || e.key === 'S') split();
+  else if (e.key === 'Delete') del();
+  else if (e.key === 'n' || e.key === 'N') toggleSnap();
+  else if (e.key === ' ') { e.preventDefault(); setPlaying(!state.playing); }
 });
 $('btnSave').onclick = async () => { if (await window.api.saveProject({ media: state.media, clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, settings: { aspect: $('expAspect').value, res: $('expRes').value, fps: $('expFps').value, crf: $('expQ').value } })) toast('Projeto salvo'); };
 $('btnOpen').onclick = async () => {

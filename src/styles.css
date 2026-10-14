@@ -40,4 +40,6 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .clip.audio{background:linear-gradient(135deg,#00b894,#00e5c3);color:#06121a}
 .clip.text{background:linear-gradient(135deg,#ff7a59,#ff3d81)}.clip.sel{border-color:var(--a1)}
 #playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--a1);pointer-events:none;left:12px;box-shadow:0 0 8px var(--a1)}
+#snapGuide{position:absolute;top:0;bottom:0;width:2px;background:#ff3366;box-shadow:0 0 8px #ff3366;pointer-events:none;z-index:99}
+button.active{background:rgba(0,229,195,0.15);border-color:var(--a1);color:var(--a1)}
 #toast{position:fixed;bottom:20px;right:20px;background:var(--panel2);border:1px solid var(--a1);padding:12px 18px;border-radius:10px}

@@ -54,12 +54,14 @@
   <div class="tl-tools">
     <button id="btnUndo" title="Desfazer (Ctrl+Z)">↶</button>
     <button id="btnRedo" title="Refazer (Ctrl+Y)">↷</button>
+    <button id="btnSnap" class="active" title="Alinhamento Magnético / Snap (N)">🧲 Snap</button>
     <button id="btnSplit">✂ Dividir (S)</button>
     <button id="btnDelete">🗑 Excluir (Del)</button>
     <label>Zoom <input id="zoom" type="range" min="20" max="200" value="60"></label>
   </div>
   <div id="timeline">
     <div id="ruler"></div>
+    <div id="snapGuide" hidden></div>
     <div id="trackVideo" class="track"></div>
     <div id="trackOverlay" class="track"></div>
     <div id="trackText" class="track"></div>

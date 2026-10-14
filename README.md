@@ -10,7 +10,8 @@
 - **Trilha Principal de Vídeo**: corte preciso (`S`), reorganização por drag-and-drop, redimensionamento/trim pelas alças laterais (`l` e `r`).
 - **Trilha de Sobreposição (PiP - Picture-in-Picture)**: suporte para múltiplos vídeos e imagens sobrepostos, ajuste de escala (10% a 100%), posicionamento contínuo, opacidade e animação linear de posição (*keyframe de início ao fim*).
 - **Chroma Key**: remoção de fundo por cor com seletor de tolerância para vídeos e fotos em PiP.
-- **Trilha de Áudio Independente**: suporte para músicas e efeitos sonoros com visualização de **forma de onda sonora (*waveform*)** gerada via FFmpeg, início, duração e controle de volume dedicado.
+- **Trilha de Áudio Independente**: suporte para músicas e efeitos sonoros com visualização de **forma de onda sonora (*waveform*)**, controles de **Fade In / Fade Out**, início, duração e controle de volume dedicado.
+- **Alinhamento Magnético (Snap)**: sistema magnético inteligente que atrai cortes e posições de clipes, áudios, textos e overlays para bordas de outros blocos, para o início (0s) ou para a agulha (playhead), com guia visual em tempo real.
 - **Trilha de Texto / Legendas**: textos arrastáveis no preview com escala dinâmica e estilos avançados.
 
 ### 🤖 IA e Legendas Automáticas
@@ -39,6 +40,7 @@
 | :--- | :--- |
 | `Espaço` | Reproduzir / Pausar timeline |
 | `S` | Dividir clipe selecionado na posição da agulha |
+| `N` | Alternar Alinhamento Magnético (Snap On/Off) |
 | `Delete` | Excluir clipe, texto, áudio ou overlay selecionado |
 | `Ctrl + Z` | Desfazer última alteração |
 | `Ctrl + Y` ou `Ctrl + Shift + Z` | Refazer alteração |
