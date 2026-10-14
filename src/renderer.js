@@ -3,14 +3,28 @@ const state = { media: [], clips: [], texts: [], audios: [], selected: null, tim
 const player = $('player'), img = $('imgPlayer');
 let pxPerSec = 60, uid = 1, raf = null, lastTs = 0;
 
-const total = () => state.clips.reduce((s, c) => s + c.duration, 0);
+const joinDur = (prev, cur, any) => (prev.transition && prev.transition !== 'none')
+  ? Math.max(0.05, Math.min(0.5, prev.duration / 2, cur.duration / 2)) : (any ? 0.04 : 0);
+function layout() {
+  const any = state.clips.some(c => c.transition && c.transition !== 'none');
+  const starts = []; let acc = 0;
+  state.clips.forEach((c, i) => {
+    if (i > 0) acc -= joinDur(state.clips[i - 1], c, any);
+    starts.push(acc); acc += c.duration;
+  });
+  return { starts, end: acc };
+}
+const total = () => layout().end;
 const fmt = (t) => `${String(Math.floor(t / 60)).padStart(2, '0')}:${(t % 60).toFixed(1).padStart(4, '0')}`;
 const toast = (m) => { const t = $('toast'); t.textContent = m; t.hidden = false; clearTimeout(t._h); t._h = setTimeout(() => t.hidden = true, 3500); };
 const fileUrl = (p) => 'file:///' + p.replace(/\\/g, '/');
 
 function clipAt(t) {
-  let acc = 0;
-  for (const c of state.clips) { if (t < acc + c.duration) return { c, local: t - acc, start: acc }; acc += c.duration; }
+  const { starts } = layout();
+  for (let i = state.clips.length - 1; i >= 0; i--) {
+    const c = state.clips[i];
+    if (t >= starts[i] && t < starts[i] + c.duration) return { c, local: t - starts[i], start: starts[i] };
+  }
   return null;
 }
 
@@ -82,12 +96,13 @@ function renderTimeline() {
   const dur = Math.max(total(), 30);
   ru.style.width = tv.style.width = tt.style.width = ta.style.width = (dur * pxPerSec) + 'px';
   for (let s = 0; s < dur; s += 5) { const k = document.createElement('div'); k.className = 'tick'; k.style.left = s * pxPerSec + 'px'; k.textContent = s + 's'; ru.appendChild(k); }
-  let acc = 0;
-  state.clips.forEach(c => {
+  const { starts } = layout();
+  state.clips.forEach((c, i) => {
+    const acc = starts[i];
     const e = document.createElement('div'); e.className = 'clip' + (state.selected?.id === c.id ? ' sel' : '');
-    e.style.left = acc * pxPerSec + 'px'; e.style.width = c.duration * pxPerSec + 'px'; e.textContent = c.name;
+    e.style.left = acc * pxPerSec + 'px'; e.style.width = c.duration * pxPerSec + 'px'; e.textContent = (c.transition && c.transition !== 'none' ? '⇆ ' : '') + c.name;
     e.onclick = (ev) => { ev.stopPropagation(); select({ kind: 'clip', id: c.id }); };
-    tv.appendChild(e); acc += c.duration;
+    tv.appendChild(e);
   });
   state.texts.forEach(t => {
     const e = document.createElement('div'); e.className = 'clip text' + (state.selected?.id === t.id ? ' sel' : '');
@@ -139,6 +154,7 @@ function renderProps() {
        <div class="prop"><label><input type="checkbox" id="pV" ${c.filters.vflip ? 'checked' : ''}> Espelhar vertical</label></div>
        <div class="prop"><label><input type="checkbox" id="pGray" ${c.filters.grayscale ? 'checked' : ''}> P&B</label></div>
        <div class="prop"><label><input type="checkbox" id="pFade" ${c.filters.fade ? 'checked' : ''}> Fade in/out</label></div>
+       <div class="prop">Transição para o próximo clipe<select id="pTrans">${['none', 'fade', 'dissolve', 'wipeleft', 'slideleft', 'circleopen', 'pixelize'].map(v => `<option ${(c.transition || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Velocidade<select id="pSpeed">${[0.5, 1, 1.5, 2].map(v => `<option ${c.speed === v || (!c.speed && v === 1) ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>`;
   p.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => { c.filters[i.dataset.k] = +i.value; renderPreview(); });
@@ -147,6 +163,7 @@ function renderProps() {
   $('pRot').onchange = (e) => { c.filters.rotate = +e.target.value; renderPreview(); };
   $('pH').onchange = (e) => { c.filters.hflip = e.target.checked; renderPreview(); };
   $('pV').onchange = (e) => { c.filters.vflip = e.target.checked; renderPreview(); };
+  $('pTrans').onchange = (e) => { c.transition = e.target.value; renderTimeline(); renderPreview(); };
   $('pFade').onchange = (e) => { c.filters.fade = e.target.checked; };
   $('pVol').oninput = (e) => { c.volume = +e.target.value; renderPreview(); };
   $('pSpeed').onchange = (e) => {
@@ -159,7 +176,7 @@ function split() {
   const hit = clipAt(state.time); if (!hit || hit.local < 0.1 || hit.c.duration - hit.local < 0.1) return toast('Posicione o cursor dentro de um clipe');
   const c = hit.c, sp = c.speed || 1, idx = state.clips.indexOf(c);
   const b = { ...c, id: uid++, filters: { ...(c.filters || {}) }, in: c.in + hit.local * sp, duration: c.duration - hit.local };
-  c.duration = hit.local; state.clips.splice(idx + 1, 0, b); renderTimeline();
+  c.duration = hit.local; c.transition = 'none'; state.clips.splice(idx + 1, 0, b); renderTimeline();
 }
 function del() {
   const s = state.selected; if (!s) return;

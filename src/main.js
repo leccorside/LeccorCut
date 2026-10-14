@@ -113,7 +113,22 @@ function buildFfmpeg(project, outPath) {
     }
     concatIn += `[v${i}][a${i}]`;
   });
-  f.push(`${concatIn}concat=n=${clips.length}:v=1:a=1[vc][ac0]`);
+  const anyT = clips.some(c => c.transition && c.transition !== 'none');
+  if (!anyT || clips.length === 1) {
+    f.push(`${concatIn}concat=n=${clips.length}:v=1:a=1[vc][ac0]`);
+  } else {
+    let vP = 'v0', aP = 'a0', L = clips[0].duration;
+    for (let i = 1; i < clips.length; i++) {
+      const prev = clips[i - 1], cur = clips[i];
+      const has = prev.transition && prev.transition !== 'none';
+      const t = has ? prev.transition : 'fade';
+      const d = has ? Math.max(0.05, Math.min(0.5, prev.duration / 2, cur.duration / 2)) : 0.04;
+      f.push(`[${vP}][v${i}]xfade=transition=${t}:duration=${d}:offset=${(L - d).toFixed(3)}[xv${i}]`);
+      f.push(`[${aP}][a${i}]acrossfade=d=${d}[xa${i}]`);
+      vP = `xv${i}`; aP = `xa${i}`; L += cur.duration - d;
+    }
+    f.push(`[${vP}]null[vc]`, `[${aP}]anull[ac0]`);
+  }
   const audios = project.audios || [];
   let aOut = 'ac0';
   if (audios.length) {
