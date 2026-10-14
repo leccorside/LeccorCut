@@ -1,0 +1,16 @@
+{
+  "name": "leccorcut",
+  "version": "0.1.0",
+  "description": "LeccorCut - editor de vídeo desktop original (Electron + FFmpeg)",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0"
+  },
+  "devDependencies": {
+    "electron": "^31.0.0"
+  }
+}

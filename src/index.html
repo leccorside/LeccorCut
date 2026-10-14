@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="LeccorCut - editor de vídeo desktop">
+<title>LeccorCut</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header id="topbar">
+  <div class="logo">Leccor<span>Cut</span></div>
+  <div class="actions">
+    <button id="btnOpen">Abrir</button>
+    <button id="btnSave">Salvar</button>
+    <button id="btnExport" class="primary">Exportar</button>
+  </div>
+</header>
+<main id="workspace">
+  <section id="mediaPanel" class="panel">
+    <h2>Mídia</h2>
+    <button id="btnImport" class="primary wide">+ Importar</button>
+    <div id="mediaList"></div>
+  </section>
+  <section id="previewPanel" class="panel">
+    <div id="stage">
+      <video id="player" muted></video>
+      <img id="imgPlayer" hidden>
+      <div id="textLayer"></div>
+    </div>
+    <div class="transport">
+      <button id="btnPlay">▶</button>
+      <span id="timeLabel">00:00.0 / 00:00.0</span>
+    </div>
+  </section>
+  <section id="propsPanel" class="panel">
+    <h2>Propriedades</h2>
+    <div id="props"><p class="hint">Selecione um clipe na timeline.</p></div>
+    <h2>Texto</h2>
+    <input id="txtInput" placeholder="Digite o texto">
+    <div class="row"><input id="txtColor" type="color" value="#ffffff"><input id="txtSize" type="number" value="48" min="10" max="200"></div>
+    <button id="btnAddText" class="wide">Adicionar texto no cursor</button>
+  </section>
+</main>
+<section id="timelineWrap">
+  <div class="tl-tools">
+    <button id="btnSplit">✂ Dividir (S)</button>
+    <button id="btnDelete">🗑 Excluir (Del)</button>
+    <label>Zoom <input id="zoom" type="range" min="20" max="200" value="60"></label>
+  </div>
+  <div id="timeline">
+    <div id="ruler"></div>
+    <div id="trackVideo" class="track"></div>
+    <div id="trackText" class="track"></div>
+    <div id="playhead"></div>
+  </div>
+</section>
+<div id="toast" hidden></div>
+<script src="renderer.js"></script>
+</body>
+</html>
