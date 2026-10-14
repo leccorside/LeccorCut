@@ -25,7 +25,7 @@ const project = {
   ],
   texts: [{ id: 4, text: "Olá: mundo's 100%", color: '#ffffff', size: 48, start: 0.5, duration: 3, px: 0.5, py: 0.2, font: 'Impact', bold: false, box: true, boxColor: '#000000', boxOpacity: 0.5, outline: 3, anim: 'slide' }],
   audios: [{ id: 5, path: au, name: 'music.wav', start: 1, in: 0, duration: 4, max: 6, volume: 0.5, fadeIn: 0.8, fadeOut: 1.0 }],
-  overlays: [{ id: 6, path: ov, name: 'ov.mp4', isImage: false, start: 1, in: 0, duration: 2.5, max: 3, x: 0, y: 0, x2: 1, y2: 1, motion: true, scale: 25, opacity: 0.9, chroma: true, chromaColor: '#00ff00', chromaSim: 0.3 }],
+  overlays: [{ id: 6, path: ov, name: 'ov.mp4', isImage: false, start: 1, in: 0, duration: 2.5, max: 3, x: 0, y: 0, x2: 1, y2: 1, motion: true, easing: 'smooth', anim: 'slide_left', rotate: 15, hflip: true, scale: 25, opacity: 0.9, chroma: true, chromaColor: '#00ff00', chromaSim: 0.3 }],
   settings: { height: 360, fps: 30, crf: 28, aspect: '9:16' }
 };
 

@@ -107,9 +107,30 @@ function buildFfmpeg(project, outPath) {
     if (o.isImage) args.push('-loop', '1', '-t', String(o.duration), '-i', o.path); else args.push('-i', o.path);
     const trim = o.isImage ? '' : `trim=start=${o.in || 0}:end=${(o.in || 0) + o.duration},`;
     const ck = o.chroma ? `colorkey=color=0x${(o.chromaColor || '#00ff00').slice(1)}:similarity=${o.chromaSim ?? 0.3}:blend=0.1,` : '';
-    f.push(`[${idx}:v]${trim}setpts=PTS-STARTPTS+${o.start}/TB,scale=${Math.round(W * o.scale / 100 / 2) * 2}:-2,${ck}format=yuva420p,colorchannelmixer=aa=${o.opacity}[ov${k}]`);
-    const pr = o.motion ? `min(1,max(0,(t-${o.start})/${o.duration}))` : '0';
-    const ex = o.motion ? `(${o.x}+(${o.x2 ?? o.x}-${o.x})*${pr})` : `${o.x}`, ey = o.motion ? `(${o.y}+(${o.y2 ?? o.y}-${o.y})*${pr})` : `${o.y}`;
+    const flip = o.hflip ? 'hflip,' : '';
+    const rot = o.rotate ? `rotate=${o.rotate}*PI/180:c=none:ow='rotw(${o.rotate}*PI/180)':oh='roth(${o.rotate}*PI/180)',` : '';
+    const anim = o.anim || 'none';
+    let alphaExpr = `aa=${o.opacity ?? 1}`;
+    if (anim === 'fade') {
+      alphaExpr = `aa='if(lt(t\\,${o.start}+0.4)\\,(t-${o.start})/0.4*${o.opacity ?? 1}\\,if(gt(t\\,${o.start + o.duration}-0.4)\\,(${o.start + o.duration}-t)/0.4*${o.opacity ?? 1}\\,${o.opacity ?? 1}))'`;
+    }
+    f.push(`[${idx}:v]${trim}setpts=PTS-STARTPTS+${o.start}/TB,scale=${Math.round(W * o.scale / 100 / 2) * 2}:-2,${flip}${rot}${ck}format=yuva420p,colorchannelmixer=${alphaExpr}[ov${k}]`);
+
+    let pr = o.motion ? `min(1\\,max(0\\,(t-${o.start})/${o.duration}))` : '0';
+    if (o.motion && o.easing === 'smooth') {
+      pr = `(3*pow(${pr}\\,2)-2*pow(${pr}\\,3))`;
+    }
+    let ex = o.motion ? `(${o.x}+(${o.x2 ?? o.x}-${o.x})*${pr})` : `${o.x}`;
+    let ey = o.motion ? `(${o.y}+(${o.y2 ?? o.y}-${o.y})*${pr})` : `${o.y}`;
+
+    if (anim === 'slide_left') {
+      ex = `if(lt(t\\,${o.start}+0.4)\\,${ex}-(1-(t-${o.start})/0.4)*0.35\\,${ex})`;
+    } else if (anim === 'slide_right') {
+      ex = `if(lt(t\\,${o.start}+0.4)\\,${ex}+(1-(t-${o.start})/0.4)*0.35\\,${ex})`;
+    } else if (anim === 'float') {
+      ey = `(${ey}+sin((t-${o.start})*PI)*0.03)`;
+    }
+
     f.push(`[${last}][ov${k}]overlay=x='(W-w)*${ex}':y='(H-h)*${ey}':enable='between(t,${o.start},${o.start + o.duration})':eof_action=pass[o${k}]`);
     last = `o${k}`;
   });
