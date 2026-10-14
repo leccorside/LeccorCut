@@ -43,8 +43,10 @@ function syncOverlay() {
   other.hidden = true; el.hidden = false; if (!o.isImage) {} else v.pause();
   const src = fileUrl(o.path);
   if (el.dataset.src !== src) { el.src = src; el.dataset.src = src; }
-  el.style.width = o.scale + '%'; el.style.left = (o.x * 100) + '%'; el.style.top = (o.y * 100) + '%';
-  el.style.transform = `translate(${-o.x * 100}%, ${-o.y * 100}%)`; el.style.opacity = o.opacity;
+  const pr = Math.min(1, Math.max(0, (state.time - o.start) / o.duration));
+  const ox = o.motion ? o.x + ((o.x2 ?? o.x) - o.x) * pr : o.x, oy = o.motion ? o.y + ((o.y2 ?? o.y) - o.y) * pr : o.y;
+  el.style.width = o.scale + '%'; el.style.left = (ox * 100) + '%'; el.style.top = (oy * 100) + '%';
+  el.style.transform = `translate(${-ox * 100}%, ${-oy * 100}%)`; el.style.opacity = o.opacity;
   if (!o.isImage) {
     const target = (o.in || 0) + state.time - o.start;
     if (!state.playing || Math.abs(v.currentTime - target) > 0.3) v.currentTime = target;
@@ -158,7 +160,18 @@ function renderProps() {
     p.innerHTML = `<div class="prop">Início (s)<input type="number" id="oStart" value="${o.start.toFixed(1)}" min="0" step="0.5"></div>`
       + `<div class="prop">Duração (s)<input type="number" id="oDur" value="${o.duration.toFixed(1)}" min="0.5" step="0.5"></div>`
       + r('oScale', 'Tamanho (%)', 10, 100, 1, o.scale) + r('oX', 'Posição horizontal', 0, 1, 0.01, o.x)
-      + r('oY', 'Posição vertical', 0, 1, 0.01, o.y) + r('oOp', 'Opacidade', 0.1, 1, 0.05, o.opacity);
+      + r('oY', 'Posição vertical', 0, 1, 0.01, o.y) + r('oOp', 'Opacidade', 0.1, 1, 0.05, o.opacity)
+      + `<div class="prop"><label><input type="checkbox" id="oMot" ${o.motion ? 'checked' : ''}> Animar posição (início → fim)</label></div>`
+      + r('oX2', 'Posição horizontal final', 0, 1, 0.01, o.x2 ?? o.x) + r('oY2', 'Posição vertical final', 0, 1, 0.01, o.y2 ?? o.y)
+      + `<div class="prop"><label><input type="checkbox" id="oChroma" ${o.chroma ? 'checked' : ''}> Chroma key (remover cor)</label></div>`
+      + `<div class="prop">Cor<input type="color" id="oCColor" value="${o.chromaColor || '#00ff00'}"></div>`
+      + r('oCSim', 'Tolerância', 0.05, 0.6, 0.01, o.chromaSim ?? 0.3);
+    $('oMot').onchange = (e) => { o.motion = e.target.checked; renderPreview(); };
+    $('oX2').oninput = (e) => { o.x2 = +e.target.value; renderPreview(); };
+    $('oY2').oninput = (e) => { o.y2 = +e.target.value; renderPreview(); };
+    $('oChroma').onchange = (e) => { o.chroma = e.target.checked; };
+    $('oCColor').oninput = (e) => { o.chromaColor = e.target.value; };
+    $('oCSim').oninput = (e) => { o.chromaSim = +e.target.value; };
     $('oStart').onchange = (e) => { o.start = Math.max(0, +e.target.value); renderTimeline(); renderPreview(); };
     $('oDur').onchange = (e) => { o.duration = Math.min(o.max, +e.target.value); renderTimeline(); renderPreview(); };
     $('oScale').oninput = (e) => { o.scale = +e.target.value; renderPreview(); };

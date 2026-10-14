@@ -146,8 +146,11 @@ function buildFfmpeg(project, outPath) {
     const idx = clips.length + audios.length + k;
     if (o.isImage) args.push('-loop', '1', '-t', String(o.duration), '-i', o.path); else args.push('-i', o.path);
     const trim = o.isImage ? '' : `trim=start=${o.in || 0}:end=${(o.in || 0) + o.duration},`;
-    f.push(`[${idx}:v]${trim}setpts=PTS-STARTPTS+${o.start}/TB,scale=${Math.round(W * o.scale / 100 / 2) * 2}:-2,format=yuva420p,colorchannelmixer=aa=${o.opacity}[ov${k}]`);
-    f.push(`[${last}][ov${k}]overlay=x=(W-w)*${o.x}:y=(H-h)*${o.y}:enable='between(t,${o.start},${o.start + o.duration})':eof_action=pass[o${k}]`);
+    const ck = o.chroma ? `colorkey=color=0x${(o.chromaColor || '#00ff00').slice(1)}:similarity=${o.chromaSim ?? 0.3}:blend=0.1,` : '';
+    f.push(`[${idx}:v]${trim}setpts=PTS-STARTPTS+${o.start}/TB,scale=${Math.round(W * o.scale / 100 / 2) * 2}:-2,${ck}format=yuva420p,colorchannelmixer=aa=${o.opacity}[ov${k}]`);
+    const pr = o.motion ? `min(1,max(0,(t-${o.start})/${o.duration}))` : '0';
+    const ex = o.motion ? `(${o.x}+(${o.x2 ?? o.x}-${o.x})*${pr})` : `${o.x}`, ey = o.motion ? `(${o.y}+(${o.y2 ?? o.y}-${o.y})*${pr})` : `${o.y}`;
+    f.push(`[${last}][ov${k}]overlay=x='(W-w)*${ex}':y='(H-h)*${ey}':enable='between(t,${o.start},${o.start + o.duration})':eof_action=pass[o${k}]`);
     last = `o${k}`;
   });
   (project.texts || []).forEach((t, i) => {
