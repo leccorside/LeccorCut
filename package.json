@@ -4,7 +4,9 @@
   "description": "LeccorCut - editor de vídeo desktop original (Electron + FFmpeg)",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "test": "node tests/export-smoke.js",
+    "dist": "electron-builder --win"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.1",
@@ -12,6 +14,15 @@
     "ffprobe-static": "^3.1.0"
   },
   "devDependencies": {
-    "electron": "^31.0.0"
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  }
+,
+  "build": {
+    "appId": "com.leccorside.leccorcut",
+    "productName": "LeccorCut",
+    "files": ["src/**", "package.json"],
+    "asarUnpack": ["node_modules/ffmpeg-static/**", "node_modules/ffprobe-static/**", "node_modules/onnxruntime-node/**", "node_modules/sharp/**"],
+    "win": { "target": "nsis" }
   }
 }
