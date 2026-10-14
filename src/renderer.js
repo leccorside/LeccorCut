@@ -280,6 +280,24 @@ $('btnSrt').onclick = async () => {
   });
   renderTimeline(); renderPreview(); toast(n + ' legendas importadas');
 };
+$('btnAuto').onclick = async () => {
+  const withAudio = state.clips.map((c, i) => ({ c, i })).filter(x => x.c.hasAudio && !x.c.isImage);
+  if (!withAudio.length) return toast('Nenhum clipe com áudio na timeline');
+  const btn = $('btnAuto'); btn.disabled = true;
+  window.api.onWhisper(m => toast(m));
+  const { starts } = layout(); let n = 0;
+  for (const { c, i } of withAudio) {
+    toast('Preparando áudio...');
+    const r = await window.api.transcribe(c, $('asrLang').value);
+    if (!r.ok) { toast('Erro: ' + r.error.slice(0, 200)); btn.disabled = false; return; }
+    const sp = c.speed || 1;
+    r.chunks.forEach(k => {
+      const s = starts[i] + k.start / sp, d = Math.max(0.5, (k.end - k.start) / sp);
+      state.texts.push({ id: uid++, text: k.text, color: $('txtColor').value, size: +$('txtSize').value, start: s, duration: d }); n++;
+    });
+  }
+  btn.disabled = false; renderTimeline(); renderPreview(); toast(n + ' legendas geradas');
+};
 $('zoom').oninput = (e) => { pxPerSec = +e.target.value; renderTimeline(); };
 $('ruler').onclick = (e) => { state.time = Math.max(0, (e.clientX - $('ruler').getBoundingClientRect().left) / pxPerSec); renderPreview(); };
 document.addEventListener('keydown', (e) => {

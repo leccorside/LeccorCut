@@ -60,6 +60,45 @@ ipcMain.handle('export', async (_e, project) => {
   });
 });
 
+let asrPromise = null;
+async function getAsr() {
+  if (!asrPromise) {
+    asrPromise = (async () => {
+      const { pipeline, env } = await import('@huggingface/transformers');
+      env.cacheDir = path.join(app.getPath('userData'), 'models');
+      return pipeline('automatic-speech-recognition', 'Xenova/whisper-base', {
+        progress_callback: (p) => { if (p.status === 'progress') win.webContents.send('whisper-progress', `Baixando modelo... ${Math.round(p.progress)}%`); }
+      });
+    })().catch((e) => { asrPromise = null; throw e; });
+  }
+  return asrPromise;
+}
+
+function extractPcm(clip) {
+  return new Promise((resolve, reject) => {
+    const sp = clip.speed || 1;
+    const p = spawn(ffmpegPath, ['-v', 'error', '-ss', String(clip.in), '-t', String(clip.duration * sp), '-i', clip.path, '-vn', '-ac', '1', '-ar', '16000', '-f', 'f32le', '-']);
+    const bufs = []; let err = '';
+    p.stdout.on('data', d => bufs.push(d)); p.stderr.on('data', d => err += d);
+    p.on('close', code => {
+      if (code !== 0) return reject(new Error(err.slice(-300)));
+      const b = Buffer.concat(bufs);
+      resolve(new Float32Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.length)));
+    });
+  });
+}
+
+ipcMain.handle('transcribe', async (_e, clip, language) => {
+  try {
+    const asr = await getAsr();
+    win.webContents.send('whisper-progress', 'Transcrevendo...');
+    const audio = await extractPcm(clip);
+    const out = await asr(audio, { return_timestamps: true, chunk_length_s: 30, stride_length_s: 5, language: language || 'portuguese', task: 'transcribe' });
+    const chunks = (out.chunks || []).map(c => ({ text: c.text.trim(), start: c.timestamp[0] || 0, end: c.timestamp[1] ?? (c.timestamp[0] + 2) })).filter(c => c.text);
+    return { ok: true, chunks };
+  } catch (e) { return { ok: false, error: String(e.message || e) }; }
+});
+
 ipcMain.handle('import-srt', async () => {
   const r = await dialog.showOpenDialog(win, { filters: [{ name: 'Legendas SRT', extensions: ['srt'] }], properties: ['openFile'] });
   if (r.canceled) return null;
