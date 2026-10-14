@@ -68,12 +68,26 @@ function syncAudio() {
   if (state.playing && el.paused) el.play().catch(() => {}); else if (!state.playing) el.pause();
 }
 
+let textDrag = null;
+document.addEventListener('mousemove', (e) => {
+  if (!textDrag) return;
+  const r = $('stage').getBoundingClientRect();
+  textDrag.px = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  textDrag.py = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+  renderPreview();
+});
+document.addEventListener('mouseup', () => { if (textDrag) { textDrag = null; renderProps(); } });
+
 function renderPreview() {
   const hit = clipAt(state.time);
   const view = hit ? hit.c : null;
   $('textLayer').innerHTML = '';
   state.texts.filter(t => state.time >= t.start && state.time < t.start + t.duration).forEach(t => {
     const s = document.createElement('span'); s.textContent = t.text; s.style.color = t.color; s.style.fontSize = (t.size / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight)) + 'px';
+    const px = t.px ?? 0.5, py = t.py ?? 0.88;
+    s.style.left = (px * 100) + '%'; s.style.top = (py * 100) + '%'; s.style.transform = `translate(${-px * 100}%, ${-py * 100}%)`;
+    if (state.selected?.id === t.id) s.style.outline = '1px dashed #00e5c3';
+    s.onmousedown = (ev) => { ev.preventDefault(); textDrag = t; if (state.selected?.id !== t.id) select({ kind: 'text', id: t.id }); };
     $('textLayer').appendChild(s);
   });
   if (!view) { player.removeAttribute('src'); img.hidden = true; player.style.visibility = 'hidden'; syncAudio(); updateTime(); return; }
@@ -193,7 +207,16 @@ function renderProps() {
   }
   if (s.kind === 'text') {
     const t = state.texts.find(x => x.id === s.id); if (!t) return;
-    p.innerHTML = `<div class="prop">Duração (s)<input type="number" id="pDur" value="${t.duration}" min="0.5" step="0.5"></div>`;
+    p.innerHTML = `<div class="prop">Texto<input type="text" id="tText" value="${t.text.replace(/"/g, '&quot;')}"></div>`
+      + `<div class="prop">Tamanho<input type="number" id="tSize" value="${t.size}" min="10" max="200"></div>`
+      + `<div class="prop">Cor<input type="color" id="tColor" value="${t.color}"></div>`
+      + `<div class="prop">Início (s)<input type="number" id="pStart" value="${t.start.toFixed(1)}" min="0" step="0.5"></div>`
+      + `<div class="prop">Duração (s)<input type="number" id="pDur" value="${t.duration.toFixed(1)}" min="0.5" step="0.5"></div>`
+      + `<p class="hint">Arraste o texto no preview para posicionar.</p>`;
+    $('tText').oninput = (e) => { t.text = e.target.value; renderTimeline(); renderPreview(); };
+    $('tSize').oninput = (e) => { t.size = +e.target.value || 48; renderPreview(); };
+    $('tColor').oninput = (e) => { t.color = e.target.value; renderPreview(); };
+    $('pStart').onchange = (e) => { t.start = Math.max(0, +e.target.value); renderTimeline(); renderPreview(); };
     $('pDur').onchange = (e) => { t.duration = +e.target.value; renderTimeline(); renderPreview(); };
     return;
   }
@@ -307,12 +330,13 @@ document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   if (e.key === 's' || e.key === 'S') split(); else if (e.key === 'Delete') del(); else if (e.key === ' ') { e.preventDefault(); setPlaying(!state.playing); }
 });
-$('btnSave').onclick = async () => { if (await window.api.saveProject({ media: state.media, clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays })) toast('Projeto salvo'); };
+$('btnSave').onclick = async () => { if (await window.api.saveProject({ media: state.media, clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, settings: { aspect: $('expAspect').value, res: $('expRes').value, fps: $('expFps').value, crf: $('expQ').value } })) toast('Projeto salvo'); };
 $('btnOpen').onclick = async () => {
   const d = await window.api.openProject(); if (!d) return;
   Object.assign(state, { media: d.media, clips: d.clips, texts: d.texts, audios: d.audios || [], overlays: d.overlays || [], selected: null, time: 0 });
   uid = 1 + Math.max(0, ...state.clips.map(c => c.id), ...state.texts.map(t => t.id), ...state.audios.map(a => a.id), ...state.overlays.map(o => o.id));
-  renderMedia(); renderTimeline(); renderProps(); renderPreview();
+  if (d.settings) { $('expAspect').value = d.settings.aspect; $('expRes').value = d.settings.res; $('expFps').value = d.settings.fps; $('expQ').value = d.settings.crf; }
+  renderMedia(); renderTimeline(); renderProps(); applyAspect();
 };
 $('btnExport').onclick = async () => {
   if (!state.clips.length) return toast('Adicione clipes à timeline');

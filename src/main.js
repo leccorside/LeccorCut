@@ -206,7 +206,7 @@ function buildFfmpeg(project, outPath) {
     last = `o${k}`;
   });
   (project.texts || []).forEach((t, i) => {
-    f.push(`[${last}]drawtext=text='${esc(t.text)}':fontcolor=${t.color || 'white'}:fontsize=${Math.round((t.size || 48) * Math.min(W, H) / 720)}:x=(w-text_w)/2:y=${t.y ?? 'h-th-80'}:borderw=2:bordercolor=black:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
+    f.push(`[${last}]drawtext=text='${esc(t.text)}':fontcolor=${t.color || 'white'}:fontsize=${Math.round((t.size || 48) * Math.min(W, H) / 720)}:x=(w-text_w)*${t.px ?? 0.5}:y=(h-text_h)*${t.py ?? 0.88}:borderw=2:bordercolor=black:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
     last = `t${i}`;
   });
   args.push('-filter_complex', f.join(';'), '-map', `[${last}]`, '-map', `[${aOut}]`,
