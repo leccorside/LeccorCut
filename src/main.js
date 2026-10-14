@@ -31,12 +31,25 @@ async function decorateMedia(info) {
     const ss = info.isImage ? 0 : Math.min(1, info.duration / 2);
     const b = await ffBuf(['-v', 'error', '-ss', String(ss), '-i', info.path, '-frames:v', '1', '-vf', 'scale=160:-2', '-f', 'image2pipe', '-c:v', 'mjpeg', '-q:v', '5', '-']);
     if (b.length) info.thumb = 'data:image/jpeg;base64,' + b.toString('base64');
-  } else if (info.hasAudio) {
+  }
+  if (info.hasAudio) {
     const b = await ffBuf(['-v', 'error', '-i', info.path, '-filter_complex', 'aformat=channel_layouts=mono,showwavespic=s=1200x48:colors=0x06121a', '-frames:v', '1', '-f', 'image2pipe', '-c:v', 'png', '-']);
     if (b.length) info.wave = 'data:image/png;base64,' + b.toString('base64');
   }
   return info;
 }
+
+ipcMain.handle('freeze-frame', async (_e, videoPath, timeSec) => {
+  const freezeDir = path.join(app.getPath('userData'), 'freeze');
+  if (!fs.existsSync(freezeDir)) fs.mkdirSync(freezeDir, { recursive: true });
+  const outPath = path.join(freezeDir, `freeze_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.png`);
+  await new Promise((resolve, reject) => {
+    execFile(ffmpegPath, ['-v', 'error', '-ss', String(timeSec), '-i', videoPath, '-frames:v', '1', '-y', outPath], (err) => {
+      if (err) reject(err); else resolve();
+    });
+  });
+  return outPath;
+});
 
 ipcMain.handle('import-media', async () => {
   const r = await dialog.showOpenDialog(win, {

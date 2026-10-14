@@ -26,7 +26,17 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .prop{margin:8px 0;font-size:12px;color:var(--mut)}.prop input[type=range]{padding:0}
 .hint{color:var(--mut);font-size:13px}
 #timelineWrap{height:350px;background:var(--panel);border-top:1px solid var(--line);display:flex;flex-direction:column}
-.tl-tools{display:flex;gap:10px;align-items:center;padding:8px 12px}.tl-tools label{margin-left:auto;display:flex;gap:6px;align-items:center;font-size:12px;color:var(--mut)}
+.tl-tools{display:flex;gap:10px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}.tl-tools label{margin-left:auto;display:flex;gap:6px;align-items:center;font-size:12px;color:var(--mut)}
+#timelineBody{flex:1;display:flex;min-height:0;overflow:hidden}
+#trackHeaders{width:130px;min-width:130px;background:var(--panel2);border-right:1px solid var(--line);padding:0 8px 10px;display:flex;flex-direction:column}
+.track-header-spacer{height:22px;border-bottom:1px solid var(--line)}
+.track-header{height:56px;margin-top:8px;background:rgba(255,255,255,0.03);border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;justify-content:center;padding:4px 8px;gap:4px}
+.track-title{font-size:11px;font-weight:600;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.track-btns{display:flex;gap:4px}
+.th-btn{padding:2px 6px;font-size:11px;border-radius:4px;background:var(--panel);border:1px solid var(--line);cursor:pointer;line-height:1;transition:.15s}
+.th-btn:hover{border-color:var(--a1)}
+.th-btn.off{opacity:0.4;background:transparent;text-decoration:line-through;border-color:transparent}
+.th-btn.active{background:rgba(0,229,195,0.2);border-color:var(--a1);color:var(--a1)}
 #timeline{position:relative;flex:1;overflow:auto;padding:0 12px 10px}
 #ruler{height:22px;position:relative;border-bottom:1px solid var(--line);font-size:10px;color:var(--mut);cursor:pointer}
 .tick{position:absolute;top:0;border-left:1px solid var(--line);padding-left:3px;height:22px}
@@ -44,3 +54,4 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 #snapGuide{position:absolute;top:0;bottom:0;width:2px;background:#ff3366;box-shadow:0 0 8px #ff3366;pointer-events:none;z-index:99}
 button.active{background:rgba(0,229,195,0.15);border-color:var(--a1);color:var(--a1)}
 #toast{position:fixed;bottom:20px;right:20px;background:var(--panel2);border:1px solid var(--a1);padding:12px 18px;border-radius:10px}
+

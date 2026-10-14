@@ -34,8 +34,31 @@ const { args } = buildFfmpeg(project, out);
 try {
   execFileSync(ffmpeg, ['-v', 'error', ...args], { stdio: 'inherit' });
   const size = fs.statSync(out).size;
-  console.log(`OK: exportação gerada (${size} bytes) em ${out}`);
+  console.log(`OK: exportação padrão gerada (${size} bytes) em ${out}`);
 } catch (e) {
-  console.error('FALHA na exportação'); console.error('filter_complex:\n' + args[args.indexOf('-filter_complex') + 1].split(';').join(';\n'));
+  console.error('FALHA na exportação padrão'); console.error('filter_complex:\n' + args[args.indexOf('-filter_complex') + 1].split(';').join(';\n'));
   process.exit(1);
 }
+
+// Teste com controles de trilha (vídeo mudo, PiP oculto, texto oculto, áudio solo)
+const outTracks = path.join(dir, 'out-tracks.mp4');
+const projectWithTracks = {
+  ...project,
+  tracks: {
+    video: { visible: true, mute: true },
+    overlay: { visible: false },
+    text: { visible: false },
+    audio: { mute: false, solo: true }
+  }
+};
+const { args: argsTracks } = buildFfmpeg(projectWithTracks, outTracks);
+try {
+  execFileSync(ffmpeg, ['-v', 'error', ...argsTracks], { stdio: 'inherit' });
+  const size2 = fs.statSync(outTracks).size;
+  console.log(`OK: exportação com controles de trilha gerada (${size2} bytes) em ${outTracks}`);
+} catch (e) {
+  console.error('FALHA na exportação com controles de trilha');
+  console.error('filter_complex:\n' + argsTracks[argsTracks.indexOf('-filter_complex') + 1].split(';').join(';\n'));
+  process.exit(1);
+}
+

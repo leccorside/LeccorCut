@@ -57,17 +57,49 @@
     <button id="btnRedo" title="Refazer (Ctrl+Y)">↷</button>
     <button id="btnSnap" class="active" title="Alinhamento Magnético / Snap (N)">🧲 Snap</button>
     <button id="btnSplit">✂ Dividir (S)</button>
+    <button id="btnFreeze" title="Congelar Quadro no cursor (F)">❄ Congelar (F)</button>
     <button id="btnDelete">🗑 Excluir (Del)</button>
     <label>Zoom <input id="zoom" type="range" min="20" max="200" value="60"></label>
   </div>
-  <div id="timeline">
-    <div id="ruler"></div>
-    <div id="snapGuide" hidden></div>
-    <div id="trackVideo" class="track"></div>
-    <div id="trackOverlay" class="track"></div>
-    <div id="trackText" class="track"></div>
-    <div id="trackAudio" class="track"></div>
-    <div id="playhead"></div>
+  <div id="timelineBody">
+    <div id="trackHeaders">
+      <div class="track-header-spacer"></div>
+      <div class="track-header" id="thGroupVideo">
+        <span class="track-title">🎬 Vídeo</span>
+        <div class="track-btns">
+          <button id="thEyeVideo" class="th-btn" title="Ocultar/Exibir Vídeo">👁</button>
+          <button id="thMuteVideo" class="th-btn" title="Mutar Áudio dos Clipes">🔊</button>
+        </div>
+      </div>
+      <div class="track-header" id="thGroupOverlay">
+        <span class="track-title">🖼 Sobreposição</span>
+        <div class="track-btns">
+          <button id="thEyeOverlay" class="th-btn" title="Ocultar/Exibir PiP">👁</button>
+        </div>
+      </div>
+      <div class="track-header" id="thGroupText">
+        <span class="track-title">🔤 Texto</span>
+        <div class="track-btns">
+          <button id="thEyeText" class="th-btn" title="Ocultar/Exibir Texto">👁</button>
+        </div>
+      </div>
+      <div class="track-header" id="thGroupAudio">
+        <span class="track-title">🎵 Áudio</span>
+        <div class="track-btns">
+          <button id="thMuteAudio" class="th-btn" title="Mutar Áudio">🔊</button>
+          <button id="thSoloAudio" class="th-btn" title="Solo Áudio">🎧</button>
+        </div>
+      </div>
+    </div>
+    <div id="timeline">
+      <div id="ruler"></div>
+      <div id="snapGuide" hidden></div>
+      <div id="trackVideo" class="track"></div>
+      <div id="trackOverlay" class="track"></div>
+      <div id="trackText" class="track"></div>
+      <div id="trackAudio" class="track"></div>
+      <div id="playhead"></div>
+    </div>
   </div>
 </section>
 <audio id="bgAudio"></audio>

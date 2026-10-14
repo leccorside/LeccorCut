@@ -27,6 +27,13 @@ function buildFfmpeg(project, outPath) {
   const [ra, rb] = (S.aspect || '16:9').split(':').map(Number), r = ra / rb, res = S.height || 720;
   const ev = (n) => Math.round(n / 2) * 2;
   const H = r >= 1 ? ev(res) : ev(res / r), W = r >= 1 ? ev(res * r) : ev(res), FPS = S.fps || 30, CRF = S.crf || 18;
+  const tracks = project.tracks || {};
+  const isVideoVisible = tracks.video?.visible !== false;
+  const isVideoMuted = !!tracks.video?.mute || !!tracks.audio?.solo;
+  const isOverlayVisible = tracks.overlay?.visible !== false;
+  const isTextVisible = tracks.text?.visible !== false;
+  const isAudioMuted = !!tracks.audio?.mute;
+
   const clips = project.clips;
   const args = [];
   const f = [];
@@ -51,8 +58,9 @@ function buildFfmpeg(project, outPath) {
     if (fl.grayscale) v += ',hue=s=0';
     if (fl.vignette) v += ',vignette=PI/4';
     if (fl.fade) v += `,fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0, c.duration - 0.5)}:d=0.5`;
+    if (!isVideoVisible) v += ',drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill';
     f.push(v + `[v${i}]`);
-    if (c.hasAudio && !c.isImage) {
+    if (c.hasAudio && !c.isImage && !isVideoMuted) {
       const tempo = speed !== 1 ? `,atempo=${speed}` : '';
       f.push(`[${i}:a]atrim=start=${c.in}:end=${c.in + c.duration * speed},asetpts=PTS-STARTPTS${tempo},volume=${c.volume ?? 1},aresample=44100,aformat=channel_layouts=stereo[a${i}]`);
     } else {
@@ -76,7 +84,7 @@ function buildFfmpeg(project, outPath) {
     }
     f.push(`[${vP}]null[vc]`, `[${aP}]anull[ac0]`);
   }
-  const audios = project.audios || [];
+  const audios = isAudioMuted ? [] : (project.audios || []);
   let aOut = 'ac0';
   if (audios.length) {
     audios.forEach((a, j) => {
@@ -93,7 +101,8 @@ function buildFfmpeg(project, outPath) {
     aOut = 'acm';
   }
   let last = 'vc';
-  (project.overlays || []).forEach((o, k) => {
+  const overlays = isOverlayVisible ? (project.overlays || []) : [];
+  overlays.forEach((o, k) => {
     const idx = clips.length + audios.length + k;
     if (o.isImage) args.push('-loop', '1', '-t', String(o.duration), '-i', o.path); else args.push('-i', o.path);
     const trim = o.isImage ? '' : `trim=start=${o.in || 0}:end=${(o.in || 0) + o.duration},`;
@@ -104,7 +113,8 @@ function buildFfmpeg(project, outPath) {
     f.push(`[${last}][ov${k}]overlay=x='(W-w)*${ex}':y='(H-h)*${ey}':enable='between(t,${o.start},${o.start + o.duration})':eof_action=pass[o${k}]`);
     last = `o${k}`;
   });
-  (project.texts || []).forEach((t, i) => {
+  const texts = isTextVisible ? (project.texts || []) : [];
+  texts.forEach((t, i) => {
     const fs0 = t.fontSize || t.size || 48;
     const fontFile = fontPath(t.font, t.bold !== false);
     const bw = t.outline ?? 2;

@@ -1,5 +1,13 @@
 const $ = (id) => document.getElementById(id);
-const state = { media: [], clips: [], texts: [], audios: [], overlays: [], selected: null, time: 0, playing: false };
+const state = {
+  media: [], clips: [], texts: [], audios: [], overlays: [], selected: null, time: 0, playing: false,
+  tracks: {
+    video: { visible: true, mute: false },
+    overlay: { visible: true },
+    text: { visible: true },
+    audio: { mute: false, solo: false }
+  }
+};
 const player = $('player'), img = $('imgPlayer');
 let pxPerSec = 60, uid = 1, raf = null, lastTs = 0;
 
@@ -38,6 +46,7 @@ function cssTransform(f = {}) {
 
 function syncOverlay() {
   const v = $('ovPlayer'), im = $('ovImg');
+  if (state.tracks.overlay?.visible === false) { v.hidden = im.hidden = true; v.pause(); return; }
   const o = state.overlays.find(x => state.time >= x.start && state.time < x.start + x.duration);
   if (!o) { v.hidden = im.hidden = true; v.pause(); return; }
   const el = o.isImage ? im : v, other = o.isImage ? v : im;
@@ -58,6 +67,7 @@ function syncOverlay() {
 function syncAudio() {
   syncOverlay();
   const el = $('bgAudio');
+  if (state.tracks.audio?.mute) { el.pause(); return; }
   const a = state.audios.find(x => state.time >= x.start && state.time < x.start + x.duration);
   if (!a) { el.pause(); return; }
   const src = fileUrl(a.path);
@@ -86,27 +96,29 @@ function renderPreview() {
   const hit = clipAt(state.time);
   const view = hit ? hit.c : null;
   $('textLayer').innerHTML = '';
-  state.texts.filter(t => state.time >= t.start && state.time < t.start + t.duration).forEach(t => {
-    const s = document.createElement('span'); s.textContent = t.text; s.style.color = t.color; s.style.fontSize = (t.size / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight)) + 'px';
-    const px = t.px ?? 0.5, py = t.py ?? 0.88;
-    s.style.fontFamily = `'${t.font || 'Arial'}', sans-serif`; s.style.fontWeight = t.bold === false ? 400 : 700;
-    const ow = (t.outline ?? 2) / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight);
-    s.style.textShadow = ow > 0 ? `0 0 ${ow * 1.5}px #000, 0 0 ${ow * 1.5}px #000, 0 0 ${ow}px #000` : 'none';
-    if (t.box) { const h = (t.boxColor || '#000000').replace('#', ''); const rgb = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)).join(','); s.style.background = `rgba(${rgb},${t.boxOpacity ?? 0.6})`; s.style.padding = '0.2em 0.5em'; s.style.borderRadius = '4px'; }
-    const anim = t.anim || (t.fade ? 'fade' : 'none');
-    const dt = state.time - t.start, rem = t.start + t.duration - state.time;
-    let animScale = 1, animY = 0, animOp = 1;
-    if (anim === 'fade') animOp = Math.max(0, Math.min(1, dt / 0.3, rem / 0.3));
-    else if (anim === 'slide' && dt < 0.3) { const pr = Math.max(0, dt / 0.3); animY = (1 - pr) * 25; animOp = Math.min(1, dt / 0.2); }
-    else if (anim === 'pop' && dt < 0.25) { const pr = Math.max(0, dt / 0.25); animScale = 0.6 + 0.4 * pr; animOp = Math.min(1, dt / 0.15); }
-    s.style.opacity = animOp;
-    s.style.left = (px * 100) + '%'; s.style.top = (py * 100) + '%';
-    s.style.transform = `translate(${-px * 100}%, ${-py * 100}%) translateY(${animY}px) scale(${animScale})`;
-    if (state.selected?.id === t.id) s.style.outline = '1px dashed #00e5c3';
-    s.onmousedown = (ev) => { ev.preventDefault(); textDrag = t; if (state.selected?.id !== t.id) select({ kind: 'text', id: t.id }); };
-    $('textLayer').appendChild(s);
-  });
-  if (!view) { player.removeAttribute('src'); img.hidden = true; player.style.visibility = 'hidden'; $('vignetteLayer').hidden = true; syncAudio(); updateTime(); return; }
+  if (state.tracks.text?.visible !== false) {
+    state.texts.filter(t => state.time >= t.start && state.time < t.start + t.duration).forEach(t => {
+      const s = document.createElement('span'); s.textContent = t.text; s.style.color = t.color; s.style.fontSize = (t.size / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight)) + 'px';
+      const px = t.px ?? 0.5, py = t.py ?? 0.88;
+      s.style.fontFamily = `'${t.font || 'Arial'}', sans-serif`; s.style.fontWeight = t.bold === false ? 400 : 700;
+      const ow = (t.outline ?? 2) / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight);
+      s.style.textShadow = ow > 0 ? `0 0 ${ow * 1.5}px #000, 0 0 ${ow * 1.5}px #000, 0 0 ${ow}px #000` : 'none';
+      if (t.box) { const h = (t.boxColor || '#000000').replace('#', ''); const rgb = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)).join(','); s.style.background = `rgba(${rgb},${t.boxOpacity ?? 0.6})`; s.style.padding = '0.2em 0.5em'; s.style.borderRadius = '4px'; }
+      const anim = t.anim || (t.fade ? 'fade' : 'none');
+      const dt = state.time - t.start, rem = t.start + t.duration - state.time;
+      let animScale = 1, animY = 0, animOp = 1;
+      if (anim === 'fade') animOp = Math.max(0, Math.min(1, dt / 0.3, rem / 0.3));
+      else if (anim === 'slide' && dt < 0.3) { const pr = Math.max(0, dt / 0.3); animY = (1 - pr) * 25; animOp = Math.min(1, dt / 0.2); }
+      else if (anim === 'pop' && dt < 0.25) { const pr = Math.max(0, dt / 0.25); animScale = 0.6 + 0.4 * pr; animOp = Math.min(1, dt / 0.15); }
+      s.style.opacity = animOp;
+      s.style.left = (px * 100) + '%'; s.style.top = (py * 100) + '%';
+      s.style.transform = `translate(${-px * 100}%, ${-py * 100}%) translateY(${animY}px) scale(${animScale})`;
+      if (state.selected?.id === t.id) s.style.outline = '1px dashed #00e5c3';
+      s.onmousedown = (ev) => { ev.preventDefault(); textDrag = t; if (state.selected?.id !== t.id) select({ kind: 'text', id: t.id }); };
+      $('textLayer').appendChild(s);
+    });
+  }
+  if (!view || state.tracks.video?.visible === false) { player.removeAttribute('src'); img.hidden = true; player.style.visibility = 'hidden'; $('vignetteLayer').hidden = true; syncAudio(); updateTime(); return; }
   $('vignetteLayer').hidden = !view.filters?.vignette;
   player.style.visibility = 'visible';
   const src = fileUrl(view.path);
@@ -116,7 +128,8 @@ function renderPreview() {
     img.hidden = true;
     if (player.dataset.src !== src) { player.src = src; player.dataset.src = src; }
     player.style.filter = f; player.style.transform = cssTransform(view.filters); player.playbackRate = view.speed || 1;
-    player.muted = false; player.volume = Math.min(1, view.volume ?? 1);
+    const isMuted = !!state.tracks.video?.mute || !!state.tracks.audio?.solo;
+    player.muted = isMuted; player.volume = isMuted ? 0 : Math.min(1, view.volume ?? 1);
     const target = view.in + hit.local * (view.speed || 1);
     if (!state.playing || Math.abs(player.currentTime - target) > 0.3) player.currentTime = target;
     if (state.playing && player.paused) player.play().catch(() => {});
@@ -386,8 +399,10 @@ function renderProps() {
        <div class="prop">Filtro de cor<select id="pPreset">${['none', 'sepia', 'vintage', 'warm', 'cool', 'cinematic', 'vivid'].map(v => `<option ${(c.filters.preset || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Transição para o próximo clipe<select id="pTrans">${['none', 'fade', 'dissolve', 'wipeleft', 'slideleft', 'circleopen', 'pixelize'].map(v => `<option ${(c.transition || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Velocidade<select id="pSpeed">${[0.5, 1, 1.5, 2].map(v => `<option ${c.speed === v || (!c.speed && v === 1) ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-       <div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>`;
+       <div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>`
+       + (c.hasAudio && !c.isImage ? `<button id="btnDetach" class="wide">Separar Áudio do Vídeo</button>` : '');
   p.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => { c.filters[i.dataset.k] = +i.value; renderPreview(); });
+  if ($('btnDetach')) $('btnDetach').onclick = () => detachAudio(c);
   $('pGray').onchange = (e) => { c.filters.grayscale = e.target.checked; renderPreview(); };
   $('pVin').onchange = (e) => { c.filters.vignette = e.target.checked; renderPreview(); };
   $('pZoom').oninput = (e) => { c.filters.zoom = +e.target.value; renderPreview(); };
@@ -402,6 +417,71 @@ function renderProps() {
     const sp = +e.target.value, old = c.speed || 1;
     c.duration = c.duration * old / sp; c.speed = sp; renderTimeline(); renderPreview();
   };
+}
+
+function detachAudio(c) {
+  if (!c || !c.hasAudio || c.isImage) return;
+  const { starts } = layout();
+  const idx = state.clips.indexOf(c);
+  const clipStart = starts[idx] || 0;
+  const sp = c.speed || 1;
+  state.audios.push({
+    id: uid++,
+    path: c.path,
+    name: 'Áudio - ' + c.name,
+    wave: c.wave,
+    start: clipStart,
+    in: c.in,
+    duration: c.duration,
+    max: c.srcDur || (c.in + c.duration * sp),
+    volume: c.volume ?? 1,
+    fadeIn: 0,
+    fadeOut: 0
+  });
+  c.hasAudio = false;
+  c.volume = 0;
+  renderTimeline();
+  renderProps();
+  renderPreview();
+  toast('Áudio separado e movido para a trilha de áudio');
+}
+
+async function freezeFrame() {
+  const hit = clipAt(state.time);
+  if (!hit) return toast('Posicione o cursor dentro de um clipe');
+  const c = hit.c;
+  if (c.isImage) return toast('O clipe atual já é uma imagem estática');
+  toast('Extraindo quadro congelado...');
+  const sp = c.speed || 1;
+  const timeInSource = c.in + hit.local * sp;
+  try {
+    const framePath = await window.api.freezeFrame(c.path, timeInSource);
+    const idx = state.clips.indexOf(c);
+    const b = { ...c, id: uid++, filters: { ...(c.filters || {}) }, in: c.in + hit.local * sp, duration: c.duration - hit.local };
+    const freezeClip = {
+      id: uid++,
+      path: framePath,
+      name: '❄ Freeze - ' + c.name,
+      duration: 3,
+      srcDur: 3,
+      in: 0,
+      hasVideo: true,
+      hasAudio: false,
+      isImage: true,
+      filters: { ...(c.filters || {}) },
+      speed: 1,
+      volume: 0,
+      thumb: 'file:///' + framePath.replace(/\\/g, '/')
+    };
+    c.duration = hit.local;
+    c.transition = 'none';
+    state.clips.splice(idx + 1, 0, freezeClip, b);
+    renderTimeline();
+    renderPreview();
+    toast('Quadro congelado inserido (3s)');
+  } catch (err) {
+    toast('Erro ao congelar quadro: ' + (err.message || err));
+  }
 }
 
 function split() {
@@ -441,9 +521,43 @@ function renderMedia() {
   });
 }
 
+function renderTrackHeaders() {
+  const tr = state.tracks;
+  const setBtn = (id, active, isOff) => {
+    const el = $(id); if (!el) return;
+    el.classList.toggle('active', !!active);
+    el.classList.toggle('off', !!isOff);
+  };
+  setBtn('thEyeVideo', false, tr.video.visible === false);
+  setBtn('thMuteVideo', tr.video.mute, tr.video.mute);
+  if ($('thGroupVideo')) $('thGroupVideo').style.opacity = tr.video.visible === false ? '0.5' : '1';
+
+  setBtn('thEyeOverlay', false, tr.overlay.visible === false);
+  if ($('thGroupOverlay')) $('thGroupOverlay').style.opacity = tr.overlay.visible === false ? '0.5' : '1';
+
+  setBtn('thEyeText', false, tr.text.visible === false);
+  if ($('thGroupText')) $('thGroupText').style.opacity = tr.text.visible === false ? '0.5' : '1';
+
+  setBtn('thMuteAudio', tr.audio.mute, tr.audio.mute);
+  setBtn('thSoloAudio', tr.audio.solo, false);
+  if ($('thGroupAudio')) $('thGroupAudio').style.opacity = tr.audio.mute ? '0.5' : '1';
+}
+
+function initTrackHeaders() {
+  if ($('thEyeVideo')) $('thEyeVideo').onclick = () => { state.tracks.video.visible = !(state.tracks.video.visible !== false); renderTrackHeaders(); renderPreview(); };
+  if ($('thMuteVideo')) $('thMuteVideo').onclick = () => { state.tracks.video.mute = !state.tracks.video.mute; renderTrackHeaders(); renderPreview(); };
+  if ($('thEyeOverlay')) $('thEyeOverlay').onclick = () => { state.tracks.overlay.visible = !(state.tracks.overlay.visible !== false); renderTrackHeaders(); renderPreview(); };
+  if ($('thEyeText')) $('thEyeText').onclick = () => { state.tracks.text.visible = !(state.tracks.text.visible !== false); renderTrackHeaders(); renderPreview(); };
+  if ($('thMuteAudio')) $('thMuteAudio').onclick = () => { state.tracks.audio.mute = !state.tracks.audio.mute; renderTrackHeaders(); renderPreview(); };
+  if ($('thSoloAudio')) $('thSoloAudio').onclick = () => { state.tracks.audio.solo = !state.tracks.audio.solo; renderTrackHeaders(); renderPreview(); };
+  renderTrackHeaders();
+}
+
 $('btnImport').onclick = async () => { state.media.push(...await window.api.importMedia()); renderMedia(); };
 $('btnPlay').onclick = () => setPlaying(!state.playing);
-$('btnSplit').onclick = split; $('btnDelete').onclick = del;
+$('btnSplit').onclick = split;
+$('btnFreeze').onclick = freezeFrame;
+$('btnDelete').onclick = del;
 $('btnAddText').onclick = () => {
   const v = $('txtInput').value.trim(); if (!v) return;
   state.texts.push({ id: uid++, text: v, color: $('txtColor').value, size: +$('txtSize').value, start: state.time, duration: 3 });
@@ -481,24 +595,37 @@ $('btnAuto').onclick = async () => {
 $('zoom').oninput = (e) => { pxPerSec = +e.target.value; renderTimeline(); };
 $('ruler').onclick = (e) => { state.time = Math.max(0, (e.clientX - $('ruler').getBoundingClientRect().left) / pxPerSec); renderPreview(); };
 document.addEventListener('keydown', (e) => {
-  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
   if (e.key === 's' || e.key === 'S') split();
   else if (e.key === 'Delete') del();
+  else if (e.key === 'f' || e.key === 'F') freezeFrame();
   else if (e.key === 'n' || e.key === 'N') toggleSnap();
   else if (e.key === ' ') { e.preventDefault(); setPlaying(!state.playing); }
 });
-$('btnSave').onclick = async () => { if (await window.api.saveProject({ media: state.media, clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, settings: { aspect: $('expAspect').value, res: $('expRes').value, fps: $('expFps').value, crf: $('expQ').value } })) toast('Projeto salvo'); };
+$('btnSave').onclick = async () => {
+  if (await window.api.saveProject({
+    media: state.media, clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, tracks: state.tracks,
+    settings: { aspect: $('expAspect').value, res: $('expRes').value, fps: $('expFps').value, crf: $('expQ').value }
+  })) toast('Projeto salvo');
+};
 $('btnOpen').onclick = async () => {
   const d = await window.api.openProject(); if (!d) return;
-  Object.assign(state, { media: d.media, clips: d.clips, texts: d.texts, audios: d.audios || [], overlays: d.overlays || [], selected: null, time: 0 });
+  Object.assign(state, {
+    media: d.media, clips: d.clips, texts: d.texts, audios: d.audios || [], overlays: d.overlays || [],
+    tracks: d.tracks || { video: { visible: true, mute: false }, overlay: { visible: true }, text: { visible: true }, audio: { mute: false, solo: false } },
+    selected: null, time: 0
+  });
   uid = 1 + Math.max(0, ...state.clips.map(c => c.id), ...state.texts.map(t => t.id), ...state.audios.map(a => a.id), ...state.overlays.map(o => o.id));
   if (d.settings) { $('expAspect').value = d.settings.aspect; $('expRes').value = d.settings.res; $('expFps').value = d.settings.fps; $('expQ').value = d.settings.crf; }
-  renderMedia(); renderTimeline(); renderProps(); applyAspect();
+  renderMedia(); renderTrackHeaders(); renderTimeline(); renderProps(); applyAspect();
 };
 $('btnExport').onclick = async () => {
   if (!state.clips.length) return toast('Adicione clipes à timeline');
   toast('Exportando...'); window.api.onProgress(s => toast(`Exportando... ${Math.min(99, Math.round(s / total() * 100))}%`));
-  const r = await window.api.exportVideo({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, settings: { height: +$('expRes').value, fps: +$('expFps').value, crf: +$('expQ').value, aspect: $('expAspect').value } });
+  const r = await window.api.exportVideo({
+    clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, tracks: state.tracks,
+    settings: { height: +$('expRes').value, fps: +$('expFps').value, crf: +$('expQ').value, aspect: $('expAspect').value }
+  });
   toast(r.ok ? 'Exportado: ' + r.path : (r.log ? 'Erro: ' + r.log.slice(-200) : 'Cancelado'));
 };
 
@@ -511,15 +638,19 @@ function applyAspect() {
 $('expAspect').onchange = applyAspect;
 
 // Histórico (desfazer/refazer): detecta mudanças no projeto por comparação de snapshots.
-const snapshot = () => JSON.stringify({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays });
+const snapshot = () => JSON.stringify({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, tracks: state.tracks });
 let hLast = snapshot(); const undoStack = [], redoStack = [];
 function hCheck() {
   const cur = snapshot();
   if (cur !== hLast) { undoStack.push(hLast); if (undoStack.length > 100) undoStack.shift(); redoStack.length = 0; hLast = cur; }
 }
 function hApply(json) {
-  const d = JSON.parse(json); Object.assign(state, d, { selected: null }); hLast = json;
-  renderTimeline(); renderProps(); renderPreview();
+  const d = JSON.parse(json); Object.assign(state, d, { selected: null });
+  if (!state.tracks) {
+    state.tracks = { video: { visible: true, mute: false }, overlay: { visible: true }, text: { visible: true }, audio: { mute: false, solo: false } };
+  }
+  hLast = json;
+  renderTrackHeaders(); renderTimeline(); renderProps(); renderPreview();
 }
 function undo() { hCheck(); if (!undoStack.length) return; redoStack.push(snapshot()); hApply(undoStack.pop()); }
 function redo() { hCheck(); if (!redoStack.length) return; undoStack.push(snapshot()); hApply(redoStack.pop()); }
@@ -531,5 +662,6 @@ document.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); } else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
 });
+initTrackHeaders();
 applyAspect();
 renderTimeline(); renderPreview();

@@ -7,11 +7,14 @@
 ## ✨ Recursos Implementados
 
 ### 🎞️ Linha do Tempo Multi-Trilha
+- **Controles de Trilha (Track Headers)**: cabeçalhos laterais dedicados com botões de visibilidade (👁) e mute (🔊) para a trilha de Vídeo Principal; visibilidade (👁) para Sobreposições (PiP); visibilidade (👁) para Legendas/Texto; e controles de Mute (🔊) e Modo Solo (🎧) para a trilha de Áudio Independente.
+- **Congelar Quadro (Freeze Frame)**: pause a agulha em qualquer instante e congele o quadro atual (`F` ou botão ❄), criando um clipe de 3 segundos com thumbnail e filtros preservados.
+- **Separar Áudio do Vídeo**: desvincule a faixa de áudio de qualquer vídeo da trilha principal com 1 clique, movendo-a diretamente para a trilha de áudio independente com visualização de waveform.
 - **Trilha Principal de Vídeo**: corte preciso (`S`), reorganização por drag-and-drop, redimensionamento/trim pelas alças laterais (`l` e `r`).
 - **Trilha de Sobreposição (PiP - Picture-in-Picture)**: suporte para múltiplos vídeos e imagens sobrepostos, ajuste de escala (10% a 100%), posicionamento contínuo, opacidade e animação linear de posição (*keyframe de início ao fim*).
 - **Chroma Key**: remoção de fundo por cor com seletor de tolerância para vídeos e fotos em PiP.
 - **Trilha de Áudio Independente**: suporte para músicas e efeitos sonoros com visualização de **forma de onda sonora (*waveform*)**, controles de **Fade In / Fade Out**, início, duração e controle de volume dedicado.
-- **Alinhamento Magnético (Snap)**: sistema magnético inteligente que atrai cortes e posições de clipes, áudios, textos e overlays para bordas de outros blocos, para o início (0s) ou para a agulha (playhead), com guia visual em tempo real.
+- **Alinhamento Magnético (Snap)**: sistema magnético inteligente (`N` ou botão 🧲) que atrai cortes e posições de clipes, áudios, textos e overlays para bordas de outros blocos, para o início (0s) ou para a agulha (playhead), com guia visual em tempo real.
 - **Trilha de Texto / Legendas**: textos arrastáveis no preview com escala dinâmica, **animações de entrada (Fade In/Out, Deslizar / Slide Up, Pop / Zoom In)** e estilos avançados.
 
 ### 🤖 IA e Legendas Automáticas
@@ -29,7 +32,7 @@
 ### 📐 Formatos e Exportação
 - **Proporções de Tela Flexíveis**: 16:9 (Horizontal/YouTube), 9:16 (Vertical/TikTok/Reels/Shorts), 1:1 (Quadrado/Feed) e 4:5.
 - **Resoluções e Taxas de Quadro**: 720p, 1080p, 1440p (2K) e 2160p (4K), com 24, 30 ou 60 FPS.
-- **Renderização Rápida via FFmpeg Nativo**: pipeline de filtros otimizado em C++ (`filter_complex`), com codificação H.264/AAC.
+- **Renderização Rápida via FFmpeg Nativo**: pipeline de filtros otimizado em C++ (`filter_complex`), com codificação H.264/AAC e suporte aos filtros e estados de mute/visibilidade de cada trilha.
 - **Histórico Completo de Ações**: `Ctrl+Z` (Desfazer) e `Ctrl+Y` / `Ctrl+Shift+Z` (Refazer) com retenção de até 100 estados.
 - **Projetos Salváveis**: persistência de todo o estado em arquivos `.lccut`.
 
@@ -41,6 +44,7 @@
 | :--- | :--- |
 | `Espaço` | Reproduzir / Pausar timeline |
 | `S` | Dividir clipe selecionado na posição da agulha |
+| `F` | Congelar quadro atual em clipe estático (3s) |
 | `N` | Alternar Alinhamento Magnético (Snap On/Off) |
 | `Delete` | Excluir clipe, texto, áudio ou overlay selecionado |
 | `Ctrl + Z` | Desfazer última alteração |
