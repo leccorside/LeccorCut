@@ -286,14 +286,14 @@
 ## 🎬 Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal Livre
 
 ### 13.1 Timeline Dinâmica Multi-Camadas
-- [ ] Implementar suporte a N trilhas dinâmicas de vídeo, áudio, sobreposição e texto (botões `+ Adicionar Trilha`)
-- [ ] Implementar agrupamento e vinculação de clipes na timeline (Compound Clips / Clipes Compostos)
-- [ ] Implementar bloqueio individual de trilhas (Track Lock) para evitar edições acidentais
+- [x] Implementar suporte a N trilhas dinâmicas de vídeo, áudio, sobreposição e texto (botões `+ Adicionar Trilha`)
+- [x] Implementar agrupamento e vinculação de clipes na timeline (Compound Clips / Clipes Compostos)
+- [x] Implementar bloqueio individual de trilhas (Track Lock) para evitar edições acidentais
 
 ### 13.2 Keyframing Universal Arbitrário
-- [ ] Implementar marcadores visuais de Keyframe (losangos/diamantes) na timeline para qualquer ponto do clipe
-- [ ] Suporte a keyframes para Posição (X, Y), Escala, Rotação, Opacidade e Volume de Áudio
-- [ ] Implementar editor gráfico de curvas de interpolação entre keyframes (Linear, Ease-In, Ease-Out, Curva Bezier Livre)
+- [x] Implementar marcadores visuais de Keyframe (losangos/diamantes) na timeline para qualquer ponto do clipe
+- [x] Suporte a keyframes para Posição (X, Y), Escala, Rotação, Opacidade e Volume de Áudio
+- [x] Implementar editor gráfico de curvas de interpolação entre keyframes (Linear, Ease-In, Ease-Out, Curva Bezier Livre)
 
 ---
 

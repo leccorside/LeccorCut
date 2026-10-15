@@ -9,6 +9,7 @@ const {
   buildCompressorFilter,
   appendAdvancedAudioFilters
 } = require('./audioAdvanced');
+const { buildFfmpegExpression } = require('./keyframeManager');
 const FONTS = {
   'Arial': ['arial.ttf', 'arialbd.ttf'], 'Impact': ['impact.ttf', 'impact.ttf'], 'Segoe UI': ['segoeui.ttf', 'segoeuib.ttf'],
   'Comic Sans MS': ['comic.ttf', 'comicbd.ttf'], 'Times New Roman': ['times.ttf', 'timesbd.ttf'], 'Courier New': ['cour.ttf', 'courbd.ttf']
@@ -433,7 +434,11 @@ function buildFfmpeg(project, outPath) {
       const mf = buildFfmpegMaskFilter(o.mask, targetW, Math.round(H * o.scale / 100 / 2) * 2);
       if (mf) maskF = `,${mf}`;
     }
-    f.push(`[${idx}:v]${trim}scale=${targetW}:-2,${flip}${rot}${ck}${borderFilter}format=yuva420p,colorchannelmixer=aa=${o.opacity ?? 1}${fadeFilter}${maskF},setpts=PTS-STARTPTS+${o.start}/TB[ov${k}]`);
+    let opExpr = `${o.opacity ?? 1}`;
+    if (o.keyframes && o.keyframes.opacity && o.keyframes.opacity.length > 0) {
+      opExpr = buildFfmpegExpression(o.keyframes.opacity, o.opacity ?? 1);
+    }
+    f.push(`[${idx}:v]${trim}scale=${targetW}:-2,${flip}${rot}${ck}${borderFilter}format=yuva420p,colorchannelmixer=aa='${opExpr}'${fadeFilter}${maskF},setpts=PTS-STARTPTS+${o.start}/TB[ov${k}]`);
 
     let pr = o.motion ? `min(1\\,max(0\\,(t-${o.start})/${o.duration}))` : '0';
     if (o.motion && o.easing === 'smooth') {
@@ -441,6 +446,12 @@ function buildFfmpeg(project, outPath) {
     }
     let ex = o.motion ? `(${o.x}+(${o.x2 ?? o.x}-${o.x})*${pr})` : `${o.x}`;
     let ey = o.motion ? `(${o.y}+(${o.y2 ?? o.y}-${o.y})*${pr})` : `${o.y}`;
+    if (o.keyframes && o.keyframes.x && o.keyframes.x.length > 0) {
+      ex = buildFfmpegExpression(o.keyframes.x, o.x ?? 0.5);
+    }
+    if (o.keyframes && o.keyframes.y && o.keyframes.y.length > 0) {
+      ey = buildFfmpegExpression(o.keyframes.y, o.y ?? 0.5);
+    }
 
     if (anim === 'slide_left') {
       ex = `if(lt(t\\,${o.start}+0.4)\\,${ex}-(1-(t-${o.start})/0.4)*0.35\\,${ex})`;

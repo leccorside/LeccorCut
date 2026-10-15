@@ -415,6 +415,8 @@
     <button id="btnRedo" title="Refazer (Ctrl+Y)">↷</button>
     <button id="btnSnap" class="active" title="Alinhamento Magnético / Snap (N)">🧲 Snap</button>
     <button id="btnMarker" title="Adicionar ou Alternar Marcador na agulha (M)">🏷️ Marcador (M)</button>
+    <button id="btnKeyframe" class="kf-btn" title="Inserir ou Alternar Keyframe no cursor (K)">🔷 Keyframe (K)</button>
+    <button id="btnCompound" class="compound-btn" title="Criar ou Desfazer Clipe Composto (Ctrl+G)">📦 Composto</button>
     <button id="btnFlash" class="accent-btn" title="Inserir Flash Branco de Batida / Impacto no cursor (B)">⚡ Flash Batida</button>
     <button id="btnSplit">✂ Dividir (S)</button>
     <button id="btnDetectScenes" class="scene-btn" title="Detecção Automática de Cenas (equivalente ao Shot Detect do CapCut)">🎬 Detectar Cenas</button>
@@ -429,6 +431,7 @@
       <div class="track-header" id="thGroupVideo">
         <span class="track-title">🎬 Vídeo</span>
         <div class="track-btns">
+          <button id="thLockVideo" class="th-btn th-lock-btn" title="Bloquear Trilha de Vídeo (Track Lock)">🔓</button>
           <button id="thEyeVideo" class="th-btn" title="Ocultar/Exibir Vídeo">👁</button>
           <button id="thMuteVideo" class="th-btn" title="Mutar Áudio dos Clipes">🔊</button>
         </div>
@@ -436,18 +439,21 @@
       <div class="track-header" id="thGroupOverlay">
         <span class="track-title">🖼 Sobreposição</span>
         <div class="track-btns">
+          <button id="thLockOverlay" class="th-btn th-lock-btn" title="Bloquear Trilha de Sobreposição (Track Lock)">🔓</button>
           <button id="thEyeOverlay" class="th-btn" title="Ocultar/Exibir PiP">👁</button>
         </div>
       </div>
       <div class="track-header" id="thGroupText">
         <span class="track-title">🔤 Texto</span>
         <div class="track-btns">
+          <button id="thLockText" class="th-btn th-lock-btn" title="Bloquear Trilha de Texto (Track Lock)">🔓</button>
           <button id="thEyeText" class="th-btn" title="Ocultar/Exibir Texto">👁</button>
         </div>
       </div>
       <div class="track-header" id="thGroupAudio">
         <span class="track-title">🎵 Áudio</span>
         <div class="track-btns">
+          <button id="thLockAudio" class="th-btn th-lock-btn" title="Bloquear Trilha de Áudio (Track Lock)">🔓</button>
           <button id="thMuteAudio" class="th-btn" title="Mutar Áudio">🔊</button>
           <button id="thSoloAudio" class="th-btn" title="Solo Áudio">🎧</button>
         </div>

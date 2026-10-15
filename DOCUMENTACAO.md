@@ -1206,31 +1206,29 @@ A Fase 12 foi implementada integralmente com motor de DSP e filtros em `src/audi
 
 ---
 
-### 23.4 Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal Livre
+### 23.4 Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal Livre [CONCLUÍDA]
 *Referência no CapCut: `draft_content.json` com múltiplas tracks por tipo, `timelines` multi-camadas*
 
-No CapCut, o usuário pode empilhar dezenas de trilhas de sobreposição, texto e áudio de forma arbitrária, além de inserir keyframes em qualquer ponto temporal para interpolar posição, rotação, escala e volume.
+Esta fase entregou o sistema de animação temporal universal livre e modularização avançada da timeline no LeccorCut:
 
-#### Lacunas Identificadas no LeccorCut:
-- O LeccorCut possui atualmente uma estrutura de trilhas semi-fixa (1 Trilha de Vídeo Principal, 1 Trilha de Sobreposição/Stickers, 1 Trilha de Áudio Secundário e 1 Trilha de Legendas/Texto).
-- Keyframing de movimento e velocidade está presente via Speed Ramping e Motion Tracking, mas falta um sistema de keyframes livre com marcadores de losango em qualquer propriedade do clipe.
-
-#### Especificação Técnica (Fase 13):
-1. **Arquitetura Dinâmica Multi-Trilhas:**
-   - Estrutura de dados `tracks[]` dinâmica na timeline (`tracks: [{ id, type: 'video'|'audio'|'text', clips: [...] }]`).
-   - Botões de interface para adicionar/remover trilhas superiores e inferiores (`+ Trilha de Vídeo`, `+ Trilha de Áudio`).
-   - Bloqueio de trilha (*Track Lock*) para proteção contra alterações acidentais e ordenação de prioridade z-index por arrasto de cabeçalho.
-2. **Clipes Compostos (Compound Clips):**
-   - Agrupamento de múltiplos clipes selecionados em um único contêiner colapsado na timeline para edição modular e organização de projetos extensos.
-3. **Keyframing Universal Arbitrário:**
-   - Botão de adicionar keyframe (ícone de losango diamond) nas propriedades de:
-     - Posição X e Y
-     - Escala (Zoom)
-     - Rotação Angular
-     - Opacidade / Transparência
-     - Volume de Áudio e Panorâmica Estéreo
-   - Visualização dos marcadores de keyframe diretamente sobre o bloco do clipe na timeline.
-   - Editor de curvas de interpolação temporal (Linear, Ease-In, Ease-Out, Cúbica Bezier).
+#### Componentes Entregues:
+1. **Módulo Central de Keyframes (`src/keyframeManager.js`):**
+   - **Curvas de Interpolação (Easing):** `linear`, `ease_in`, `ease_out`, `smooth` e `bezier` (cúbica suave estilo CapCut / After Effects).
+   - **Cálculo e Interpolação:** `interpolateKeyframes`, `evaluateItemKeyframes`, `setKeyframe`, `removeKeyframe` e `hasKeyframeAtTime`.
+   - **Expressões Dinâmicas para FFmpeg:** `buildFfmpegExpression` converte cadeias de keyframes ordenados em expressões aninhadas condicionais `if(lt(t, t1), v1, if(lte(t, t2), (v1+(v2-v1)*(t-t1)/dur), ...))` compatíveis com filtros nativos de overlay (`ex`, `ey`, `colorchannelmixer`) e volume (`volume='eval=frame:volume=...'`).
+2. **Sistema de Clipes Compostos (Compound Clips):**
+   - `createCompoundClip`: agrupa múltiplos blocos de vídeo selecionados em um container colapsado com metadados e duração total calculada automaticamente.
+   - `expandCompoundClip`: restaura os clipes individuais com cálculo de offset temporal preservando cortes, transições e efeitos.
+   - Atalho de teclado `Ctrl+G` e botão `#btnCompound` na barra de ferramentas e no painel de propriedades.
+3. **Bloqueio Individual de Trilhas (Track Lock):**
+   - Botões de cadeado (`#thLockVideo`, `#thLockOverlay`, `#thLockText`, `#thLockAudio`) no cabeçalho das trilhas (`#trackHeaders`).
+   - Proteção estrita em `startDrag`, `split()` e `del()` impedindo edições acidentais em trilhas travadas pelo usuário.
+4. **Interface e Marcadores Visuais de Keyframe:**
+   - Botão de losango/diamante (`🔷 Keyframe (K)`) na toolbar e nos campos do painel de propriedades (Posição X/Y, Escala, Rotação, Opacidade, Volume).
+   - Marcadores de losango em miniatura (`.keyframe-diamond`) desenhados diretamente sobre os blocos da timeline com pulo de agulha e destaque de keyframe ativo.
+5. **Validação Automatizada:**
+   - Suite `tests/phase13-smoke.js` com 15 testes unitários e de integração cobrindo matemática de curvas, expressões FFmpeg, Compound Clips, Track Lock e integridade de UI.
+   - 100% de aprovação integrada ao script `npm test`.
 
 ---
 

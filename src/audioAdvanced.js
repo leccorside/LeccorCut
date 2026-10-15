@@ -254,6 +254,12 @@ function appendAdvancedAudioFilters(baseAf, item = {}) {
     const cmpf = buildCompressorFilter(true);
     if (cmpf) af = af ? `${af},${cmpf}` : cmpf;
   }
+  if (item.keyframes && item.keyframes.volume && item.keyframes.volume.length > 0) {
+    const { buildFfmpegExpression } = require('./keyframeManager');
+    const volExpr = buildFfmpegExpression(item.keyframes.volume, item.volume ?? 1);
+    const volFilter = `volume='eval=frame:volume=${volExpr}'`;
+    af = af ? `${af},${volFilter}` : volFilter;
+  }
   return af;
 }
 

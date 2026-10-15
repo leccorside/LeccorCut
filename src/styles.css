@@ -258,5 +258,32 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 /* Badges de áudio na timeline */
 .clip-audio-badge{display:inline-block;background:rgba(124,92,255,0.3);border:1px solid rgba(124,92,255,0.6);color:#fff;border-radius:3px;padding:1px 4px;font-size:9px;margin-left:4px;white-space:nowrap}
 
+/* ── Fase 13: Multi-Trilhas Ilimitadas e Keyframing Universal Livre ── */
+.kf-btn{background:rgba(0,229,195,0.12);border:1px solid rgba(0,229,195,0.4);color:var(--a1)}
+.kf-btn:hover{background:var(--a1);color:#000}
+.compound-btn{background:rgba(124,92,255,0.15);border:1px solid rgba(124,92,255,0.4);color:#a29bfe}
+.compound-btn:hover{background:#7c5cff;color:#fff}
+
+.th-lock-btn{font-size:11px;opacity:0.75;padding:2px 4px}
+.th-lock-btn:hover{opacity:1}
+.th-lock-btn.locked{opacity:1;color:#ff3366}
+
+.track.locked{opacity:0.55;background:repeating-linear-gradient(45deg, rgba(0,0,0,0.2), rgba(0,0,0,0.2) 10px, rgba(255,255,255,0.02) 10px, rgba(255,255,255,0.02) 20px);pointer-events:none;border-color:rgba(255,51,102,0.3)}
+
+/* Marcadores de Keyframe na timeline */
+.keyframe-diamond{position:absolute;top:50%;width:8px;height:8px;background:var(--a1);transform:translate(-50%, -50%) rotate(45deg);border:1px solid #000;box-shadow:0 0 4px rgba(0,229,195,0.7);cursor:pointer;z-index:10;transition:transform .1s ease, background .1s ease}
+.keyframe-diamond:hover{transform:translate(-50%, -50%) rotate(45deg) scale(1.4);background:#fff}
+.keyframe-diamond.active{background:#ffeb3b;box-shadow:0 0 6px #ffeb3b}
+
+/* Botão de Keyframe no painel de propriedades */
+.prop-kf-row{display:flex;align-items:center;justify-content:space-between;gap:4px;width:100%}
+.btn-keyframe-prop{background:transparent;border:none;cursor:pointer;font-size:13px;padding:2px 4px;border-radius:3px;opacity:0.5;transition:all .15s ease}
+.btn-keyframe-prop:hover{opacity:1;transform:scale(1.15)}
+.btn-keyframe-prop.has-kf{opacity:1;color:var(--a1);text-shadow:0 0 6px rgba(0,229,195,0.8)}
+
+/* Clipes Compostos (Compound Clips) */
+.clip.compound{background:linear-gradient(135deg, #301b5a, #4834d4) !important;border:1px solid #7c5cff !important;box-shadow:inset 0 0 8px rgba(124,92,255,0.4)}
+.clip.compound .clip-title::before{content:'📦 ';font-size:10px}
+
 
 

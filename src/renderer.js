@@ -2,12 +2,104 @@ const $ = (id) => document.getElementById(id);
 const state = {
   media: [], clips: [], texts: [], audios: [], overlays: [], markers: [], selected: null, time: 0, playing: false,
   tracks: {
-    video: { visible: true, mute: false },
-    overlay: { visible: true },
-    text: { visible: true },
-    audio: { mute: false, solo: false }
+    video: { visible: true, mute: false, locked: false },
+    overlay: { visible: true, locked: false },
+    text: { visible: true, locked: false },
+    audio: { mute: false, solo: false, locked: false }
   }
 };
+
+// ── Fase 13: Helpers de Keyframing Universal, Compound Clips e Track Lock ──
+const EASING_FNS = {
+  linear: (t) => t,
+  ease_in: (t) => t * t,
+  ease_out: (t) => t * (2 - t),
+  smooth: (t) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
+  bezier: (t) => t * t * (3 - 2 * t)
+};
+
+function interpolateKeyframes(keyframes, currentTime, defaultValue = 0) {
+  if (!keyframes || !Array.isArray(keyframes) || keyframes.length === 0) return defaultValue;
+  const sorted = [...keyframes].sort((a, b) => a.time - b.time);
+  if (currentTime <= sorted[0].time) return sorted[0].value;
+  if (currentTime >= sorted[sorted.length - 1].time) return sorted[sorted.length - 1].value;
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const k1 = sorted[i], k2 = sorted[i + 1];
+    if (currentTime >= k1.time && currentTime <= k2.time) {
+      const span = k2.time - k1.time;
+      if (span <= 0) return k2.value;
+      const progress = (currentTime - k1.time) / span;
+      const easeFn = EASING_FNS[k1.easing] || EASING_FNS.linear;
+      return k1.value + (k2.value - k1.value) * easeFn(progress);
+    }
+  }
+  return defaultValue;
+}
+
+function setKeyframe(item, prop, time, value, easing = 'linear') {
+  if (!item) return;
+  if (!item.keyframes) item.keyframes = {};
+  if (!item.keyframes[prop]) item.keyframes[prop] = [];
+  const list = item.keyframes[prop];
+  const roundedTime = Number(time.toFixed(3));
+  const existingIndex = list.findIndex(k => Math.abs(k.time - roundedTime) < 0.04);
+  if (existingIndex >= 0) {
+    list[existingIndex].value = value;
+    list[existingIndex].easing = easing;
+  } else {
+    list.push({ time: roundedTime, value, easing });
+    list.sort((a, b) => a.time - b.time);
+  }
+}
+
+function removeKeyframe(item, prop, time) {
+  if (!item || !item.keyframes || !item.keyframes[prop]) return false;
+  const list = item.keyframes[prop];
+  const len = list.length;
+  item.keyframes[prop] = list.filter(k => Math.abs(k.time - time) >= 0.05);
+  return item.keyframes[prop].length < len;
+}
+
+function hasKeyframeAtTime(item, prop, time) {
+  if (!item || !item.keyframes || !item.keyframes[prop]) return false;
+  return item.keyframes[prop].some(k => Math.abs(k.time - time) < 0.05);
+}
+
+function isTrackLocked(kind) {
+  if (!state.tracks || !state.tracks[kind]) return false;
+  return !!state.tracks[kind].locked;
+}
+
+function createCompoundClip(clips, name = 'Clipe Composto') {
+  if (!clips || clips.length === 0) return null;
+  const sorted = [...clips].sort((a, b) => (a.start ?? 0) - (b.start ?? 0));
+  const startTime = sorted[0].start ?? 0;
+  let maxEndTime = startTime;
+  sorted.forEach(c => {
+    const cEnd = (c.start ?? 0) + (c.duration ?? 0);
+    if (cEnd > maxEndTime) maxEndTime = cEnd;
+  });
+  return {
+    id: uid++,
+    isCompound: true,
+    name,
+    start: startTime,
+    duration: maxEndTime - startTime,
+    originalClips: JSON.parse(JSON.stringify(sorted)),
+    color: '#7c5cff'
+  };
+}
+
+function expandCompoundClip(compoundClip) {
+  if (!compoundClip || !compoundClip.isCompound || !Array.isArray(compoundClip.originalClips)) return [];
+  const offset = compoundClip.start - (compoundClip.originalClips[0]?.start ?? compoundClip.start);
+  return compoundClip.originalClips.map(clip => {
+    const restored = JSON.parse(JSON.stringify(clip));
+    if (restored.start !== undefined) restored.start += offset;
+    return restored;
+  });
+}
+
 const player = $('player'), img = $('imgPlayer');
 let pxPerSec = 60, uid = 1, raf = null, lastTs = 0;
 
@@ -521,7 +613,14 @@ function syncOverlay() {
     ox = o.x + ((o.x2 ?? o.x) - o.x) * pr;
     oy = o.y + ((o.y2 ?? o.y) - o.y) * pr;
   }
+  if (o.keyframes) {
+    if (o.keyframes.x) ox = interpolateKeyframes(o.keyframes.x, dt, ox);
+    if (o.keyframes.y) oy = interpolateKeyframes(o.keyframes.y, dt, oy);
+  }
   let op = o.opacity ?? 1;
+  if (o.keyframes && o.keyframes.opacity) {
+    op = interpolateKeyframes(o.keyframes.opacity, dt, op);
+  }
 
   const anim = o.anim || 'none';
   if (anim === 'fade') {
@@ -538,10 +637,17 @@ function syncOverlay() {
     oy += Math.sin(dt * Math.PI) * 0.03;
   }
 
-  const rot = o.rotate || 0;
+  let rot = o.rotate || 0;
+  if (o.keyframes && o.keyframes.rotate) {
+    rot = interpolateKeyframes(o.keyframes.rotate, dt, rot);
+  }
+  let currentScale = o.scale || 30;
+  if (o.keyframes && o.keyframes.scale) {
+    currentScale = interpolateKeyframes(o.keyframes.scale, dt, currentScale);
+  }
   const flip = o.hflip ? -1 : 1;
 
-  el.style.width = (o.scale || 30) + '%';
+  el.style.width = currentScale + '%';
   el.style.left = (ox * 100) + '%';
   el.style.top = (oy * 100) + '%';
   el.style.transform = `translate(${-ox * 100}%, ${-oy * 100}%) scaleX(${flip}) rotate(${rot}deg)`;
@@ -603,6 +709,9 @@ function syncAudio() {
   if (el.dataset.src !== src) { el.src = src; el.dataset.src = src; }
   let vol = Math.min(1, a.volume ?? 1);
   const local = state.time - a.start;
+  if (a.keyframes && a.keyframes.volume) {
+    vol = interpolateKeyframes(a.keyframes.volume, local, vol);
+  }
   if (a.fadeIn && local < a.fadeIn) vol *= Math.max(0, local / a.fadeIn);
   if (a.fadeOut && local > a.duration - a.fadeOut) vol *= Math.max(0, (a.duration - local) / a.fadeOut);
   el.volume = Math.max(0, Math.min(1, vol));
@@ -768,7 +877,12 @@ function renderPreview() {
     const sample = getClipSample(view, hit.local);
     player.style.filter = f; player.style.transform = cssTransform(view.filters); player.playbackRate = sample.speed;
     const isMuted = !!state.tracks.video?.mute || !!state.tracks.audio?.solo;
-    player.muted = isMuted; player.volume = isMuted ? 0 : Math.min(1, view.volume ?? 1);
+    let clipVol = Math.min(1, view.volume ?? 1);
+    if (view.keyframes && view.keyframes.volume) {
+      clipVol = interpolateKeyframes(view.keyframes.volume, hit.local, clipVol);
+    }
+    player.muted = isMuted;
+    player.volume = isMuted ? 0 : Math.max(0, Math.min(1, clipVol));
     const target = sample.targetTime;
     if (!state.playing || Math.abs(player.currentTime - target) > 0.3) player.currentTime = target;
     if (state.playing && player.paused) player.play().catch(() => {});
@@ -845,6 +959,9 @@ function decorate(e, kind, item) {
 }
 function startDrag(ev, kind, item, mode) {
   ev.preventDefault(); ev.stopPropagation();
+  if (isTrackLocked(kind)) {
+    return toast('🔒 Trilha bloqueada! Desbloqueie a trilha para mover ou redimensionar.');
+  }
   const s0 = kind === 'clip' ? layout().starts[state.clips.indexOf(item)] : item.start;
   select({ kind, id: item.id });
   tlDrag = { kind, item, mode, x0: ev.clientX, s0, o: { start: item.start, duration: item.duration, in: item.in || 0 } };
@@ -905,6 +1022,38 @@ document.addEventListener('mousemove', (ev) => {
 });
 document.addEventListener('mouseup', () => { if (tlDrag) { tlDrag = null; hideSnap(); renderProps(); } });
 
+function renderClipKeyframes(clipEl, item) {
+  if (!item || !item.keyframes) return;
+  const props = ['x', 'y', 'scale', 'rotate', 'opacity', 'volume'];
+  const renderedTimes = new Set();
+  props.forEach(p => {
+    const list = item.keyframes[p];
+    if (Array.isArray(list)) {
+      list.forEach(kf => {
+        const tKey = kf.time.toFixed(2);
+        if (renderedTimes.has(tKey)) return;
+        renderedTimes.add(tKey);
+
+        const dia = document.createElement('div');
+        dia.className = 'keyframe-diamond';
+        dia.style.left = (kf.time * pxPerSec) + 'px';
+        const globalTime = (item.start || 0) + kf.time;
+        if (Math.abs(state.time - globalTime) < 0.1) {
+          dia.classList.add('active');
+        }
+        dia.title = `🔷 Keyframe: ${fmt(globalTime)} (${p}: ${kf.value})`;
+        dia.onclick = (ev) => {
+          ev.stopPropagation();
+          state.time = globalTime;
+          renderPreview();
+          updateTime();
+        };
+        clipEl.appendChild(dia);
+      });
+    }
+  });
+}
+
 function renderTimeline() {
   const tv = $('trackVideo'), to = $('trackOverlay'), tt = $('trackText'), ta = $('trackAudio'), ru = $('ruler');
   tv.innerHTML = to.innerHTML = tt.innerHTML = ta.innerHTML = ru.innerHTML = '';
@@ -923,9 +1072,9 @@ function renderTimeline() {
   const { starts } = layout();
   state.clips.forEach((c, i) => {
     const acc = starts[i];
-    const e = document.createElement('div'); e.className = 'clip' + (state.selected?.id === c.id ? ' sel' : '');
+    const e = document.createElement('div'); e.className = 'clip' + (state.selected?.id === c.id ? ' sel' : '') + (c.isCompound ? ' compound' : '');
     e.style.left = acc * pxPerSec + 'px'; e.style.width = c.duration * pxPerSec + 'px';
-    const baseName = (c.transition && c.transition !== 'none' ? '⇆ ' : '') + c.name;
+    const baseName = (c.isCompound ? '📦 ' : '') + (c.transition && c.transition !== 'none' ? '⇆ ' : '') + c.name;
     let audioBadges = '';
     if (c.voiceEffect && c.voiceEffect !== 'none') audioBadges += `<span class="clip-audio-badge">🎙️ ${c.voiceEffect}</span>`;
     if (c.pitchShift) audioBadges += `<span class="clip-audio-badge">🎚️ ${c.pitchShift > 0 ? '+' : ''}${c.pitchShift}st</span>`;
@@ -939,12 +1088,14 @@ function renderTimeline() {
       e.innerHTML = `<span class="clip-title">${baseName}</span>${audioBadges}`;
     }
     if (c.thumb) { e.style.backgroundImage = `linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.4)),url(${c.thumb})`; e.style.backgroundSize = 'auto 100%'; e.style.backgroundRepeat = 'repeat-x'; }
+    renderClipKeyframes(e, c);
     decorate(e, 'clip', c);
     tv.appendChild(e);
   });
   state.texts.forEach(t => {
     const e = document.createElement('div'); e.className = 'clip text' + (state.selected?.id === t.id ? ' sel' : '');
     e.style.left = t.start * pxPerSec + 'px'; e.style.width = t.duration * pxPerSec + 'px'; e.textContent = 'T: ' + t.text;
+    renderClipKeyframes(e, t);
     decorate(e, 'text', t);
     tt.appendChild(e);
   });
@@ -952,6 +1103,7 @@ function renderTimeline() {
     const e = document.createElement('div'); e.className = 'clip overlay' + (state.selected?.id === o.id ? ' sel' : '');
     e.style.left = o.start * pxPerSec + 'px'; e.style.width = o.duration * pxPerSec + 'px'; e.textContent = 'PiP: ' + o.name;
     if (o.thumb) { e.style.backgroundImage = `linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.4)),url(${o.thumb})`; e.style.backgroundSize = 'auto 100%'; e.style.backgroundRepeat = 'repeat-x'; }
+    renderClipKeyframes(e, o);
     decorate(e, 'overlay', o);
     to.appendChild(e);
   });
@@ -964,6 +1116,7 @@ function renderTimeline() {
     if (a.compressor) audioBadges += `<span class="clip-audio-badge">🗜️ Comp</span>`;
     e.innerHTML = `<span class="clip-title">♪ ${a.name}</span>${audioBadges}`;
     if (a.wave) { e.style.backgroundImage = `url(${a.wave}), linear-gradient(135deg,#00b894,#00e5c3)`; e.style.backgroundSize = `${a.max * pxPerSec}px 100%, 100% 100%`; e.style.backgroundPosition = `${-(a.in || 0) * pxPerSec}px 0, 0 0`; e.style.backgroundRepeat = 'no-repeat'; }
+    renderClipKeyframes(e, a);
     decorate(e, 'audio', a);
     ta.appendChild(e);
   });
@@ -1174,7 +1327,13 @@ function renderProps() {
   if (!s) { p.innerHTML = '<p class="hint">Selecione um clipe na timeline.</p>'; return; }
   if (s.kind === 'overlay') {
     const o = state.overlays.find(x => x.id === s.id); if (!o) return;
-    const r = (id, label, min, max, step, val) => `<div class="prop">${label}<input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
+    const kfBtn = (prop) => {
+      const relTime = Math.max(0, state.time - (o.start || 0));
+      const hasKf = hasKeyframeAtTime(o, prop, relTime);
+      return `<button type="button" class="btn-keyframe-prop ${hasKf ? 'has-kf' : ''}" data-kf-prop="${prop}" title="Alternar Keyframe de ${prop}">🔷</button>`;
+    };
+    const r = (id, label, min, max, step, val, prop) =>
+      `<div class="prop"><div class="prop-kf-row"><span>${label}</span>${prop ? kfBtn(prop) : ''}</div><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
     p.innerHTML = `<div class="prop">Início (s)<input type="number" id="oStart" value="${o.start.toFixed(1)}" min="0" step="0.5"></div>`
       + `<div class="prop">Duração (s)<input type="number" id="oDur" value="${o.duration.toFixed(1)}" min="0.5" step="0.5"></div>`
       + `<button id="btnSmartCutoutOverlay" class="wide primary">✂ Remover Fundo por IA (Smart Cutout)</button>`
@@ -1187,12 +1346,12 @@ function renderProps() {
         <option value="zoom_in" ${o.anim === 'zoom_in' ? 'selected' : ''}>Zoom In (Pop)</option>
         <option value="float" ${o.anim === 'float' ? 'selected' : ''}>Flutuar (Sticker Float)</option>
       </select></div>`
-      + r('oScale', 'Tamanho (%)', 10, 100, 1, o.scale)
-      + r('oRot', 'Rotação (°)', -180, 180, 1, o.rotate || 0)
+      + r('oScale', 'Tamanho (%)', 10, 100, 1, o.scale, 'scale')
+      + r('oRot', 'Rotação (°)', -180, 180, 1, o.rotate || 0, 'rotate')
       + `<div class="prop"><label><input type="checkbox" id="oFlip" ${o.hflip ? 'checked' : ''}> Espelhar horizontalmente</label></div>`
-      + r('oX', 'Posição horizontal', 0, 1, 0.01, o.x)
-      + r('oY', 'Posição vertical', 0, 1, 0.01, o.y)
-      + r('oOp', 'Opacidade', 0.1, 1, 0.05, o.opacity)
+      + r('oX', 'Posição horizontal', 0, 1, 0.01, o.x, 'x')
+      + r('oY', 'Posição vertical', 0, 1, 0.01, o.y, 'y')
+      + r('oOp', 'Opacidade', 0.1, 1, 0.05, o.opacity, 'opacity')
       + (o.motionKeyframes && o.motionKeyframes.length > 0
         ? `<div class="prop" style="color:#00b894;font-size:11px;display:flex;justify-content:space-between;align-items:center;background:#1a2520;padding:6px;border-radius:4px;border:1px solid #00b894;"><span>🎯 Motion Track Ativo (${o.motionKeyframes.length} pts)</span><button id="btnRemoveTrack" style="padding:2px 8px;font-size:10px;">Remover</button></div>`
         : `<button id="btnTrackUnderOverlay" class="wide secondary" style="margin-top:4px;">🎯 Ancorar ao Movimento do Clipe Abaixo</button>`)
@@ -1301,13 +1460,37 @@ function renderProps() {
     $('oX').oninput = (e) => { o.x = +e.target.value; renderPreview(); };
     $('oY').oninput = (e) => { o.y = +e.target.value; renderPreview(); };
     $('oOp').oninput = (e) => { o.opacity = +e.target.value; renderPreview(); };
+    p.querySelectorAll('.btn-keyframe-prop').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const prop = btn.dataset.kfProp;
+        const relTime = Math.max(0, state.time - (o.start || 0));
+        if (hasKeyframeAtTime(o, prop, relTime)) {
+          removeKeyframe(o, prop, relTime);
+          toast(`🔷 Keyframe de ${prop} removido`);
+        } else {
+          const curVal = o[prop] ?? (prop === 'opacity' ? 1 : (prop === 'scale' ? 30 : 0));
+          setKeyframe(o, prop, relTime, curVal, 'linear');
+          toast(`🔷 Keyframe de ${prop} inserido em ${relTime.toFixed(2)}s`);
+        }
+        renderTimeline();
+        renderProps();
+        renderPreview();
+      };
+    });
     return;
   }
   if (s.kind === 'audio') {
     const a = state.audios.find(x => x.id === s.id); if (!a) return;
+    const kfBtnAudio = (prop) => {
+      const relTime = Math.max(0, state.time - (a.start || 0));
+      const hasKf = hasKeyframeAtTime(a, prop, relTime);
+      return `<button type="button" class="btn-keyframe-prop ${hasKf ? 'has-kf' : ''}" data-kf-prop="${prop}" title="Alternar Keyframe de ${prop}">🔷</button>`;
+    };
     p.innerHTML = `<div class="prop">Início (s)<input type="number" id="aStart" value="${a.start.toFixed(1)}" min="0" step="0.5"></div>
       <div class="prop">Duração (s)<input type="number" id="aDur" value="${a.duration.toFixed(1)}" min="0.5" step="0.5"></div>
-      <div class="prop">Volume<input type="range" id="aVol" min="0" max="1" step="0.05" value="${a.volume ?? 1}"></div>
+      <div class="prop"><div class="prop-kf-row"><span>Volume</span>${kfBtnAudio('volume')}</div><input type="range" id="aVol" min="0" max="1" step="0.05" value="${a.volume ?? 1}"></div>
       <div class="prop">Fade in (s)<input type="number" id="aFadeIn" value="${a.fadeIn || 0}" min="0" max="10" step="0.2"></div>
       <div class="prop">Fade out (s)<input type="number" id="aFadeOut" value="${a.fadeOut || 0}" min="0" max="10" step="0.2"></div>
       <div class="prop"><label><input type="checkbox" id="aDenoise" ${a.denoise ? 'checked' : ''}> Redução de ruído (chiado)</label></div>
@@ -1331,6 +1514,25 @@ function renderProps() {
         <button id="btnOpenAudioProFromAudio" class="wide btn-small" style="margin-top:6px;">📊 Abrir Equalizador de 10 Bandas (EQ10)</button>
         <button id="btnSeparate4StemsFromAudio" class="wide secondary" style="margin-top:4px;">🎛️ Separar em 4 Stems (Voz, Bateria, Baixo, Outros)</button>
       </div>`;
+    p.querySelectorAll('.btn-keyframe-prop').forEach(btn => {
+      btn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const prop = btn.dataset.kfProp;
+        const relTime = Math.max(0, state.time - (a.start || 0));
+        if (hasKeyframeAtTime(a, prop, relTime)) {
+          removeKeyframe(a, prop, relTime);
+          toast(`🔷 Keyframe de ${prop} removido`);
+        } else {
+          const curVal = a[prop] ?? 1;
+          setKeyframe(a, prop, relTime, curVal, 'linear');
+          toast(`🔷 Keyframe de ${prop} inserido em ${relTime.toFixed(2)}s`);
+        }
+        renderTimeline();
+        renderProps();
+        renderPreview();
+      };
+    });
     $('aStart').onchange = (e) => { a.start = Math.max(0, +e.target.value); renderTimeline(); };
     $('aDur').onchange = (e) => { a.duration = Math.min(a.max, +e.target.value); renderTimeline(); };
     $('aVol').oninput = (e) => { a.volume = +e.target.value; syncAudio(); };
@@ -1399,6 +1601,25 @@ function renderProps() {
     return;
   }
   const c = state.clips.find(x => x.id === s.id); if (!c) return;
+  if (c.isCompound) {
+    p.innerHTML = `<div class="prop-card" style="border-color:#7c5cff;background:rgba(124,92,255,0.08);">
+      <div class="prop-card-title" style="color:#a29bfe;">📦 Clipe Composto (${c.name || 'Agrupado'})</div>
+      <p style="font-size:11px;color:#aaa;margin-bottom:8px;">Este bloco modular agrupa ${c.originalClips?.length || 0} clipes da timeline.</p>
+      <div class="prop">Duração total: <span>${c.duration.toFixed(2)}s</span></div>
+      <button id="btnUngroupCompound" class="wide primary" style="background:#7c5cff;margin-top:6px;">📦 Desagrupar Clipe Composto</button>
+    </div>`
+    + `<div class="prop">Início (s)<input type="number" id="pCompStart" value="${c.start.toFixed(1)}" min="0" step="0.5"></div>`
+    + `<div class="prop">Duração (s)<input type="number" id="pCompDur" value="${c.duration.toFixed(1)}" min="0.5" step="0.5"></div>`;
+    if ($('btnUngroupCompound')) $('btnUngroupCompound').onclick = toggleCompoundClipAction;
+    if ($('pCompStart')) $('pCompStart').onchange = (e) => { c.start = Math.max(0, +e.target.value); renderTimeline(); renderPreview(); };
+    if ($('pCompDur')) $('pCompDur').onchange = (e) => { c.duration = Math.max(0.1, +e.target.value); renderTimeline(); renderPreview(); };
+    return;
+  }
+  const kfBtnClip = (prop) => {
+    const localTime = Math.max(0, state.time - (c.start || 0));
+    const hasKf = hasKeyframeAtTime(c, prop, localTime);
+    return `<button type="button" class="btn-keyframe-prop ${hasKf ? 'has-kf' : ''}" data-kf-prop="${prop}" title="Alternar Keyframe de ${prop}">🔷</button>`;
+  };
   c.filters = c.filters || {};
   const fillMode = c.filters.fillMode || 'fit';
   const isCurve = !c.isImage && c.speedCurve && c.speedCurve !== 'none' && SPEED_CURVES[c.speedCurve];
@@ -1459,7 +1680,7 @@ function renderProps() {
              </div>
            ` : ''}
          </div>`
-       + `<div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>
+       + `<div class="prop"><div class="prop-kf-row"><span>Volume</span>${kfBtnClip('volume')}</div><input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>
        <div class="prop"><label><input type="checkbox" id="pDenoise" ${c.filters.denoise ? 'checked' : ''}> Redução de ruído (chiado)</label></div>
        <div class="prop"><label><input type="checkbox" id="pLoudnorm" ${c.filters.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>`
         + (c.hasAudio && !c.isImage ? `
@@ -1567,6 +1788,25 @@ function renderProps() {
   if (c.speedCurve === 'custom') {
     setupBezierEditorEvents(c);
   }
+  p.querySelectorAll('.btn-keyframe-prop').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const prop = btn.dataset.kfProp;
+      const localTime = Math.max(0, state.time - (c.start || 0));
+      if (hasKeyframeAtTime(c, prop, localTime)) {
+        removeKeyframe(c, prop, localTime);
+        toast(`🔷 Keyframe de ${prop} removido`);
+      } else {
+        const curVal = c[prop] ?? 1;
+        setKeyframe(c, prop, localTime, curVal, 'linear');
+        toast(`🔷 Keyframe de ${prop} inserido em ${localTime.toFixed(2)}s`);
+      }
+      renderTimeline();
+      renderProps();
+      renderPreview();
+    };
+  });
 }
 
 function detachAudio(c) {
@@ -1671,6 +1911,9 @@ function jumpCut(dir) {
 
 function split() {
   const hit = clipAt(state.time); if (!hit || hit.local < 0.1 || hit.c.duration - hit.local < 0.1) return toast('Posicione o cursor dentro de um clipe');
+  if (isTrackLocked('video')) {
+    return toast('🔒 Trilha de vídeo bloqueada! Desbloqueie a trilha para dividir.');
+  }
   const c = hit.c, idx = state.clips.indexOf(c);
   const sample = getClipSample(c, hit.local);
   const b = { ...c, id: uid++, filters: { ...(c.filters || {}) }, in: sample.targetTime, duration: c.duration - hit.local };
@@ -1678,6 +1921,9 @@ function split() {
 }
 function del() {
   const s = state.selected; if (!s) return;
+  if (isTrackLocked(s.kind)) {
+    return toast('🔒 Trilha bloqueada! Desbloqueie a trilha para excluir o item.');
+  }
   if (s.kind === 'clip') state.clips = state.clips.filter(c => c.id !== s.id);
   else if (s.kind === 'audio') state.audios = state.audios.filter(a => a.id !== s.id);
   else if (s.kind === 'overlay') state.overlays = state.overlays.filter(o => o.id !== s.id);
@@ -1777,22 +2023,53 @@ function renderTrackHeaders() {
     el.classList.toggle('active', !!active);
     el.classList.toggle('off', !!isOff);
   };
+  const setLock = (btnId, trackElemId, isLocked) => {
+    const btn = $(btnId);
+    const trackEl = $(trackElemId);
+    if (btn) {
+      btn.textContent = isLocked ? '🔒' : '🔓';
+      btn.classList.toggle('locked', !!isLocked);
+    }
+    if (trackEl) {
+      trackEl.classList.toggle('locked', !!isLocked);
+    }
+  };
+
   setBtn('thEyeVideo', false, tr.video.visible === false);
   setBtn('thMuteVideo', tr.video.mute, tr.video.mute);
+  setLock('thLockVideo', 'trackVideo', tr.video.locked);
   if ($('thGroupVideo')) $('thGroupVideo').style.opacity = tr.video.visible === false ? '0.5' : '1';
 
   setBtn('thEyeOverlay', false, tr.overlay.visible === false);
+  setLock('thLockOverlay', 'trackOverlay', tr.overlay.locked);
   if ($('thGroupOverlay')) $('thGroupOverlay').style.opacity = tr.overlay.visible === false ? '0.5' : '1';
 
   setBtn('thEyeText', false, tr.text.visible === false);
+  setLock('thLockText', 'trackText', tr.text.locked);
   if ($('thGroupText')) $('thGroupText').style.opacity = tr.text.visible === false ? '0.5' : '1';
 
   setBtn('thMuteAudio', tr.audio.mute, tr.audio.mute);
   setBtn('thSoloAudio', tr.audio.solo, false);
+  setLock('thLockAudio', 'trackAudio', tr.audio.locked);
   if ($('thGroupAudio')) $('thGroupAudio').style.opacity = tr.audio.mute ? '0.5' : '1';
 }
 
 function initTrackHeaders() {
+  const bindLock = (btnId, key) => {
+    const el = $(btnId);
+    if (el) {
+      el.onclick = () => {
+        state.tracks[key].locked = !state.tracks[key].locked;
+        renderTrackHeaders();
+        toast(state.tracks[key].locked ? `🔒 Trilha de ${key} bloqueada` : `🔓 Trilha de ${key} desbloqueada`);
+      };
+    }
+  };
+  bindLock('thLockVideo', 'video');
+  bindLock('thLockOverlay', 'overlay');
+  bindLock('thLockText', 'text');
+  bindLock('thLockAudio', 'audio');
+
   if ($('thEyeVideo')) $('thEyeVideo').onclick = () => { state.tracks.video.visible = !(state.tracks.video.visible !== false); renderTrackHeaders(); renderPreview(); };
   if ($('thMuteVideo')) $('thMuteVideo').onclick = () => { state.tracks.video.mute = !state.tracks.video.mute; renderTrackHeaders(); renderPreview(); };
   if ($('thEyeOverlay')) $('thEyeOverlay').onclick = () => { state.tracks.overlay.visible = !(state.tracks.overlay.visible !== false); renderTrackHeaders(); renderPreview(); };
@@ -1844,9 +2121,100 @@ $('btnAuto').onclick = async () => {
 };
 $('zoom').oninput = (e) => { pxPerSec = +e.target.value; renderTimeline(); };
 $('ruler').onclick = (e) => { state.time = Math.max(0, (e.clientX - $('ruler').getBoundingClientRect().left) / pxPerSec); renderPreview(); };
+function toggleKeyframeAtPlayhead() {
+  const s = state.selected;
+  if (!s) {
+    return toast('Selecione um clipe, sobreposição ou áudio na timeline para alternar keyframes.');
+  }
+  let target = null;
+  let relTime = 0;
+  let prop = 'volume';
+  let defaultVal = 1;
+
+  if (s.kind === 'overlay') {
+    target = state.overlays.find(x => x.id === s.id);
+    if (!target) return;
+    relTime = Math.max(0, state.time - (target.start || 0));
+    prop = 'scale';
+    defaultVal = target.scale || 30;
+  } else if (s.kind === 'audio') {
+    target = state.audios.find(x => x.id === s.id);
+    if (!target) return;
+    relTime = Math.max(0, state.time - (target.start || 0));
+    prop = 'volume';
+    defaultVal = target.volume ?? 1;
+  } else if (s.kind === 'clip') {
+    target = state.clips.find(x => x.id === s.id);
+    if (!target) return;
+    relTime = Math.max(0, state.time - (target.start || 0));
+    prop = 'volume';
+    defaultVal = target.volume ?? 1;
+  } else if (s.kind === 'text') {
+    target = state.texts.find(x => x.id === s.id);
+    if (!target) return;
+    relTime = Math.max(0, state.time - (target.start || 0));
+    prop = 'opacity';
+    defaultVal = 1;
+  }
+
+  if (target) {
+    if (hasKeyframeAtTime(target, prop, relTime)) {
+      removeKeyframe(target, prop, relTime);
+      toast(`🔷 Keyframe de ${prop} removido na agulha`);
+    } else {
+      setKeyframe(target, prop, relTime, defaultVal, 'linear');
+      toast(`🔷 Keyframe de ${prop} inserido na agulha (${relTime.toFixed(2)}s)`);
+    }
+    renderTimeline();
+    renderProps();
+    renderPreview();
+  }
+}
+
+function toggleCompoundClipAction() {
+  const s = state.selected;
+  if (s && s.kind === 'clip') {
+    const c = state.clips.find(x => x.id === s.id);
+    if (c && c.isCompound) {
+      const restored = expandCompoundClip(c);
+      const idx = state.clips.indexOf(c);
+      if (idx >= 0) {
+        state.clips.splice(idx, 1, ...restored);
+        state.selected = restored[0] ? { kind: 'clip', id: restored[0].id } : null;
+        renderTimeline();
+        renderProps();
+        renderPreview();
+        toast('📦 Clipe Composto desagrupado com sucesso!');
+        return;
+      }
+    }
+  }
+
+  if (state.clips.length >= 2) {
+    const comp = createCompoundClip(state.clips, `Clipe Composto ${state.clips.filter(x => x.isCompound).length + 1}`);
+    state.clips = [comp];
+    state.selected = { kind: 'clip', id: comp.id };
+    renderTimeline();
+    renderProps();
+    renderPreview();
+    toast('📦 Clipe Composto criado com sucesso!');
+  } else {
+    toast('Adicione pelo menos 2 clipes na trilha de vídeo para criar um Clipe Composto.');
+  }
+}
+
+if ($('btnKeyframe')) $('btnKeyframe').onclick = toggleKeyframeAtPlayhead;
+if ($('btnCompound')) $('btnCompound').onclick = toggleCompoundClipAction;
 $('btnMarker').onclick = addOrToggleMarker;
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+  // Atalho de Clipe Composto (Ctrl+G)
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'g' || e.key === 'G')) {
+    e.preventDefault();
+    toggleCompoundClipAction();
+    return;
+  }
 
   // Sair do Modo Cinema com Escape
   if (e.key === 'Escape' && $('stage')?.classList.contains('cinema-mode')) {
@@ -1890,7 +2258,13 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Home') { e.preventDefault(); state.time = 0; renderPreview(); }
   else if (e.key === 'End') { e.preventDefault(); state.time = total(); renderPreview(); }
   else if (e.key === 'j' || e.key === 'J') { state.time = Math.max(0, state.time - 2); renderPreview(); }
-  else if (e.key === 'k' || e.key === 'K') { setPlaying(false); }
+  else if (e.key === 'k' || e.key === 'K') {
+    if (state.playing) {
+      setPlaying(false);
+    } else if (state.selected) {
+      toggleKeyframeAtPlayhead();
+    }
+  }
   else if (e.key === 'l' || e.key === 'L') { state.time = Math.min(total(), state.time + 2); renderPreview(); }
 });
 
