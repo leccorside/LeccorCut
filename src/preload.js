@@ -16,5 +16,7 @@ contextBridge.exposeInMainWorld('api', {
   generateFlash: () => ipcRenderer.invoke('generate-flash'),
   importCapCutDraft: () => ipcRenderer.invoke('import-capcut-draft'),
   exportCapCutDraft: (state) => ipcRenderer.invoke('export-capcut-draft', state),
-  detectScenes: (videoPath, threshold) => ipcRenderer.invoke('detect-scenes', videoPath, threshold)
+  detectScenes: (videoPath, threshold) => ipcRenderer.invoke('detect-scenes', videoPath, threshold),
+  videoMatting: (opts) => ipcRenderer.invoke('video-matting', opts),
+  onVideoMattingProgress: (cb) => ipcRenderer.on('video-matting-progress', (_e, data) => cb(data))
 });

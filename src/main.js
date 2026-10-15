@@ -273,6 +273,97 @@ ipcMain.handle('smart-cutout', async (_e, inputPath) => {
   }
 });
 
+ipcMain.handle('video-matting', async (_e, opts = {}) => {
+  const {
+    inputPath,
+    color = '0x00ff00',
+    similarity = 0.25,
+    blend = 0.1,
+    despill = true
+  } = (typeof opts === 'string' ? { inputPath: opts } : opts);
+
+  if (!inputPath || !fs.existsSync(inputPath)) {
+    return { ok: false, error: 'Arquivo de vídeo não encontrado' };
+  }
+
+  const cutoutDir = path.join(app.getPath('userData'), 'cutout');
+  if (!fs.existsSync(cutoutDir)) fs.mkdirSync(cutoutDir, { recursive: true });
+  const outPath = path.join(cutoutDir, `matting_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.webm`);
+
+  win.webContents.send('video-matting-progress', { percent: 0, text: 'Iniciando matting de vídeo contínuo...' });
+
+  let probeInfo = null;
+  try {
+    probeInfo = await probe(inputPath);
+  } catch {}
+
+  const totalDur = (probeInfo && probeInfo.duration) ? probeInfo.duration : 0;
+  const hasAudio = probeInfo && probeInfo.hasAudio;
+
+  // Monta filtro de matting contínuo: colorkey + despill + format=yuva420p
+  let vf = `colorkey=${color}:${similarity}:${blend}`;
+  const hexNorm = String(color).toLowerCase().replace('#', '').replace('0x', '');
+  const isGreen = hexNorm.length === 6 && hexNorm[1] > hexNorm[0] && hexNorm[1] > hexNorm[5];
+  const isBlue = hexNorm.length === 6 && hexNorm[5] > hexNorm[0] && hexNorm[5] > hexNorm[1];
+
+  if (despill) {
+    if (isBlue) {
+      vf += `,despill=type=blue:mix=0.5`;
+    } else {
+      vf += `,despill=type=green:mix=0.5`;
+    }
+  }
+  vf += `,format=yuva420p`;
+
+  const args = [
+    '-v', 'info',
+    '-i', inputPath,
+    '-vf', vf,
+    '-c:v', 'libvpx-vp9',
+    '-pix_fmt', 'yuva420p',
+    '-auto-alt-ref', '0'
+  ];
+
+  if (hasAudio) {
+    args.push('-c:a', 'libopus', '-b:a', '128k');
+  } else {
+    args.push('-an');
+  }
+  args.push('-y', outPath);
+
+  return new Promise((resolve) => {
+    const p = spawn(ffmpegPath, args);
+
+    p.stderr.on('data', (data) => {
+      const text = data.toString();
+      const match = text.match(/time=([0-9:.]+)/);
+      if (match) {
+        const timeStr = match[1];
+        const parts = timeStr.split(':').map(Number);
+        const curSec = (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+        const pct = totalDur > 0 ? Math.min(99, Math.round((curSec / totalDur) * 100)) : 50;
+        win.webContents.send('video-matting-progress', {
+          percent: pct,
+          text: `Processando matting contínuo: ${pct}% (${timeStr})`
+        });
+      }
+    });
+
+    p.on('close', (code) => {
+      if (code === 0 && fs.existsSync(outPath) && fs.statSync(outPath).size > 100) {
+        win.webContents.send('video-matting-progress', { percent: 100, text: 'Matting contínuo concluído com sucesso!' });
+        resolve({ ok: true, path: outPath });
+      } else {
+        resolve({ ok: false, error: `FFmpeg encerrou com código ${code}` });
+      }
+    });
+
+    p.on('error', (err) => {
+      resolve({ ok: false, error: err.message });
+    });
+  });
+});
+
 ipcMain.handle('import-capcut-draft', async () => {
   const r = await dialog.showOpenDialog(win, {
     title: 'Importar Projeto do CapCut (draft_content.json)',

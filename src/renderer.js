@@ -651,6 +651,64 @@ async function executeSmartCutout(itemPath, targetKind, targetItem) {
   }
 }
 
+async function executeVideoMatting(itemPath, targetKind, targetItem) {
+  toast('Iniciando matting de vídeo contínuo...');
+  window.api.onVideoMattingProgress(data => toast(data.text || `Matting: ${data.percent}%`));
+  try {
+    const color = (targetItem && targetItem.chromaColor) ? targetItem.chromaColor : '0x00ff00';
+    const similarity = (targetItem && targetItem.chromaSim) ? targetItem.chromaSim : 0.25;
+    const res = await window.api.videoMatting({
+      inputPath: itemPath,
+      color,
+      similarity,
+      blend: 0.1,
+      despill: true
+    });
+    if (!res.ok) {
+      return toast('Erro no matting de vídeo: ' + (res.error || 'Falha ao processar'));
+    }
+    const transparentVideoPath = res.path;
+    const matName = '✂ ' + (targetItem?.name || 'Vídeo Transparente');
+
+    if (targetKind === 'overlay' && targetItem) {
+      targetItem.path = transparentVideoPath;
+      targetItem.isImage = false;
+      targetItem.chroma = false;
+      renderPreview();
+      renderProps();
+      toast('Vídeo de sobreposição atualizado com transparência contínua!');
+    } else {
+      const newOv = {
+        id: uid++,
+        path: transparentVideoPath,
+        name: matName,
+        isImage: false,
+        start: state.time,
+        in: 0,
+        duration: targetItem ? targetItem.duration : 5,
+        max: targetItem ? (targetItem.max || targetItem.duration) : 999,
+        scale: 50,
+        rotate: 0,
+        hflip: false,
+        x: 0.5,
+        y: 0.5,
+        opacity: 1,
+        motion: false,
+        anim: 'none',
+        chroma: false
+      };
+      state.overlays.push(newOv);
+      select({ kind: 'overlay', id: newOv.id });
+      renderTimeline();
+      renderProps();
+      renderPreview();
+      toast('Vídeo com transparência contínua adicionado à trilha de sobreposição (PiP)!');
+    }
+  } catch (err) {
+    toast('Erro no matting: ' + (err.message || err));
+  }
+}
+
 function renderProps() {
   const p = $('props'); const s = state.selected;
   if (!s) { p.innerHTML = '<p class="hint">Selecione um clipe na timeline.</p>'; return; }
@@ -660,6 +718,7 @@ function renderProps() {
     p.innerHTML = `<div class="prop">Início (s)<input type="number" id="oStart" value="${o.start.toFixed(1)}" min="0" step="0.5"></div>`
       + `<div class="prop">Duração (s)<input type="number" id="oDur" value="${o.duration.toFixed(1)}" min="0.5" step="0.5"></div>`
       + `<button id="btnSmartCutoutOverlay" class="wide primary">✂ Remover Fundo por IA (Smart Cutout)</button>`
+      + (!o.isImage ? `<button id="btnVideoMattingOverlay" class="wide secondary" style="margin-top:4px;">✂ Matting de Vídeo Contínuo (Remover Fundo)</button>` : '')
       + `<div class="prop">Animação<select id="oAnim">
         <option value="none" ${(o.anim || 'none') === 'none' ? 'selected' : ''}>Nenhuma</option>
         <option value="fade" ${o.anim === 'fade' ? 'selected' : ''}>Fade In / Out</option>
@@ -685,6 +744,7 @@ function renderProps() {
       + `<div class="prop">Cor<input type="color" id="oCColor" value="${o.chromaColor || '#00ff00'}"></div>`
       + r('oCSim', 'Tolerância', 0.05, 0.6, 0.01, o.chromaSim ?? 0.3);
     if ($('btnSmartCutoutOverlay')) $('btnSmartCutoutOverlay').onclick = () => executeSmartCutout(o.path, 'overlay', o);
+    if ($('btnVideoMattingOverlay')) $('btnVideoMattingOverlay').onclick = () => executeVideoMatting(o.path, 'overlay', o);
     $('oAnim').onchange = (e) => { o.anim = e.target.value; renderPreview(); };
     $('oRot').oninput = (e) => { o.rotate = +e.target.value; renderPreview(); };
     $('oFlip').onchange = (e) => { o.hflip = e.target.checked; renderPreview(); };
@@ -818,10 +878,12 @@ function renderProps() {
        <div class="prop"><label><input type="checkbox" id="pDenoise" ${c.filters.denoise ? 'checked' : ''}> Redução de ruído (chiado)</label></div>
        <div class="prop"><label><input type="checkbox" id="pLoudnorm" ${c.filters.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>`
        + `<button id="btnSmartCutoutClip" class="wide primary">✂ Extrair Objeto com IA para Sobreposição (PiP)</button>`
+       + (!c.isImage ? `<button id="btnVideoMattingClip" class="wide secondary" style="margin-top:4px;">✂ Matting de Vídeo Contínuo (Extrair Vídeo Transparente PiP)</button>` : '')
        + (c.hasAudio && !c.isImage ? `<button id="btnDetach" class="wide">Separar Áudio do Vídeo</button>` : '');
   p.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => { c.filters[i.dataset.k] = +i.value; renderPreview(); });
   $('pFill').onchange = (e) => { c.filters.fillMode = e.target.value; renderPreview(); };
   if ($('btnSmartCutoutClip')) $('btnSmartCutoutClip').onclick = () => executeSmartCutout(c.path, 'clip', c);
+  if ($('btnVideoMattingClip')) $('btnVideoMattingClip').onclick = () => executeVideoMatting(c.path, 'clip', c);
   if ($('btnDetach')) $('btnDetach').onclick = () => detachAudio(c);
   $('pDenoise').onchange = (e) => { c.filters.denoise = e.target.checked; };
   $('pLoudnorm').onchange = (e) => { c.filters.loudnorm = e.target.checked; };

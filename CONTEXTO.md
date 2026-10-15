@@ -194,6 +194,8 @@ O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
 - ✅ Legendas Palavra por Palavra (Acumulativo)
 - ✅ Estilo Viral / Hormozi (Single Word)
 - ✅ Smart Cutout (remoção de fundo por IA — briaai/RMBG-1.4)
+- ✅ Matting de Vídeo Contínuo (Remoção de fundo e extração de canal alfa temporal WebM VP9 yuva420p com despill e colorkey)
+- ✅ Detecção Automática de Cenas (equivalente ao `jy_compressShotDetect` via FFmpeg `gt(scene,0.35)`)
 - ✅ Importação de `.srt`
 - ✅ Estilização em massa de legendas
 
@@ -225,7 +227,6 @@ O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
 ### Funcionalidades de Edição
 - [ ] Speed ramping com keyframes individuais (curvas customizadas, não apenas presets)
 - [ ] Rastreamento de objetos (Object Tracking) na timeline
-- [ ] Matting de vídeo em tempo real (Background Removal em vídeo contínuo)
 - [ ] Efeitos de face em tempo real (beautify, stickers faciais)
 - [ ] Estabilização de vídeo (Video Stabilization)
 - [ ] Redimensionamento inteligente (Smart Crop / Auto Reframe)
@@ -240,7 +241,6 @@ O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
 ### Recursos de Mídia
 - [ ] Biblioteca de templates de efeitos
 - [ ] Biblioteca de stickers e assets
-- [ ] Importação de projetos CapCut (`.capcut` / draft)
 - [ ] Exportação para formatos adicionais (WebM, ProRes, etc.)
 - [ ] Suporte a múltiplas câmeras / multicam
 

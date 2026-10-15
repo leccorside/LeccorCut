@@ -181,7 +181,7 @@
 ### 5.2 Integração de Modelos de IA
 - [x] Integrar Whisper para transcrição/legendas offline (`Xenova/whisper-base` com exportação para legendas na timeline)
 - [x] Integrar remoção de fundo por IA (Smart Cutout) (`briaai/RMBG-1.4` via Transformers.js com fallback colorkey)
-- [ ] Integrar matting de vídeo offline (equivalente ao `mattingBlend`) — contínuo
+- [x] Integrar matting de vídeo offline (equivalente ao `mattingBlend`) — contínuo (geração de stream de vídeo com canal alfa yuva420p / VP9, despill e colorkey adaptativo com composição em PiP)
 - [x] Integrar interpolação de frames offline (equivalente ao `umvfi`) (filtro `minterpolate=mi_mode=mci:mc_mode=aobmc` ativado pelo checkbox "Câmera lenta suave")
 - [x] Integrar detecção de cenas (equivalente ao `jy_compressShotDetect`) (filtro FFmpeg `gt(scene,0.35)` com botão "🎬 Detectar Cenas" gerando marcadores e cortes automáticos)
 
@@ -200,7 +200,7 @@
 | Fase 2 — Arquitetura e Componentes | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 3 — Rede e APIs | ✅ Concluída (parte estática 19/20; MITM feito na Fase 4) | 🟡 Média |
 | Fase 4 — Análise Dinâmica | ✅ Concluída no escopo definido (comportamento, crash, MITM); circunvenção de TLS/licença fora de escopo | 🟡 Média |
-| Fase 5 — Aplicação ao LeccorCut | ✅ Concluída (90% - funcionalidades e importador integrados; matting de vídeo contínuo) | 🟢 Contínuo |
+| Fase 5 — Aplicação ao LeccorCut | ✅ Concluída (100% - replicação core, modelos de IA, matting de vídeo contínuo e conversor bidirecional CapCut) | 🟢 Concluída |
 
 ---
 
