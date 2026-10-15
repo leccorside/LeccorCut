@@ -19,12 +19,12 @@ run(['-f', 'lavfi', '-i', 'color=c=red:size=320x240:duration=1', '-frames:v', '1
 const mk = (id, p, extra = {}) => ({ id, path: p, name: path.basename(p), duration: 3, srcDur: 4, in: 0.5, hasVideo: true, hasAudio: true, isImage: false, filters: {}, speed: 1, volume: 1, ...extra });
 const project = {
   clips: [
-    mk(1, a, { transition: 'dissolve', filters: { fillMode: 'blur', preset: 'vintage', zoom: 1.1, hflip: true, vignette: true } }),
+    mk(1, a, { transition: 'dissolve', filters: { fillMode: 'blur', denoise: true, loudnorm: true, preset: 'vintage', zoom: 1.1, hflip: true, vignette: true } }),
     mk(2, b, { transition: 'wipeleft', speed: 1.5, duration: 2, filters: { fillMode: 'crop', brightness: 10, fade: true } }),
     mk(3, img, { isImage: true, hasAudio: false, duration: 2 })
   ],
   texts: [{ id: 4, text: "Olá: mundo's 100%", color: '#ffffff', size: 48, start: 0.5, duration: 3, px: 0.5, py: 0.2, font: 'Impact', bold: false, box: true, boxColor: '#000000', boxOpacity: 0.5, outline: 3, anim: 'slide' }],
-  audios: [{ id: 5, path: au, name: 'music.wav', start: 1, in: 0, duration: 4, max: 6, volume: 0.5, fadeIn: 0.8, fadeOut: 1.0 }],
+  audios: [{ id: 5, path: au, name: 'music.wav', start: 1, in: 0, duration: 4, max: 6, volume: 0.5, fadeIn: 0.8, fadeOut: 1.0, denoise: true, loudnorm: true }],
   overlays: [{ id: 6, path: ov, name: 'ov.mp4', isImage: false, start: 1, in: 0, duration: 2.5, max: 3, x: 0, y: 0, x2: 1, y2: 1, motion: true, easing: 'smooth', anim: 'slide_left', rotate: 15, hflip: true, scale: 25, opacity: 0.9, chroma: true, chromaColor: '#00ff00', chromaSim: 0.3 }],
   settings: { height: 360, fps: 30, crf: 28, aspect: '9:16' }
 };

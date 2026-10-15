@@ -82,7 +82,11 @@ function buildFfmpeg(project, outPath) {
     f.push(`${inLabel}${allFilters.join(',')}[v${i}]`);
     if (c.hasAudio && !c.isImage && !isVideoMuted) {
       const tempo = speed !== 1 ? `,atempo=${speed}` : '';
-      f.push(`[${i}:a]atrim=start=${c.in}:end=${c.in + c.duration * speed},asetpts=PTS-STARTPTS${tempo},volume=${c.volume ?? 1},aresample=44100,aformat=channel_layouts=stereo[a${i}]`);
+      let af = `atrim=start=${c.in}:end=${c.in + c.duration * speed},asetpts=PTS-STARTPTS${tempo},volume=${c.volume ?? 1}`;
+      if (fl.denoise) af += ',afftdn=nf=-25';
+      if (fl.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
+      af += ',aresample=44100,aformat=channel_layouts=stereo';
+      f.push(`[${i}:a]${af}[a${i}]`);
     } else {
       f.push(`anullsrc=r=44100:cl=stereo,atrim=duration=${c.duration}[a${i}]`);
     }
@@ -113,6 +117,8 @@ function buildFfmpeg(project, outPath) {
       let af = `atrim=start=${a.in || 0}:end=${(a.in || 0) + a.duration},asetpts=PTS-STARTPTS,volume=${a.volume ?? 1}`;
       if (a.fadeIn) af += `,afade=t=in:st=0:d=${a.fadeIn}`;
       if (a.fadeOut) af += `,afade=t=out:st=${Math.max(0, a.duration - a.fadeOut)}:d=${a.fadeOut}`;
+      if (a.denoise) af += ',afftdn=nf=-25';
+      if (a.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
       af += `,aresample=44100,aformat=channel_layouts=stereo,adelay=${ms}|${ms}`;
       f.push(`[${idx}:a]${af}[m${j}]`);
     });

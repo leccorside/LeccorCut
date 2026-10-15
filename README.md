@@ -13,7 +13,7 @@
 - **Trilha Principal de Vídeo**: corte preciso (`S`), reorganização por drag-and-drop, redimensionamento/trim pelas alças laterais (`l` e `r`).
 - **Trilha de Sobreposição (PiP - Picture-in-Picture)**: suporte para múltiplos vídeos e imagens sobrepostos, ajuste de escala (10% a 100%), posicionamento contínuo, opacidade, **rotação angular (-180° a +180°)**, **espelhamento horizontal (Flip)**, **animações de entrada e movimento** (*Fade In/Out, Deslizar da Esquerda, Deslizar da Direita, Zoom In, Flutuar / Sticker Float*) e **suavização cinemática (*Smoothstep*)** na interpolação de posição.
 - **Chroma Key**: remoção de fundo por cor com seletor de tolerância para vídeos e fotos em PiP.
-- **Trilha de Áudio Independente**: suporte para músicas e efeitos sonoros com visualização de **forma de onda sonora (*waveform*)**, controles de **Fade In / Fade Out**, início, duração e controle de volume dedicado.
+- **Trilha de Áudio Independente & Masterização**: suporte para músicas e efeitos sonoros com visualização de **forma de onda sonora (*waveform*)**, controles de **Fade In / Fade Out**, início, duração, controle de volume dedicado, **Redução de Ruído de Fundo (*Denoise / afftdn*)** e **Normalização de Volume Inteligente EBU R128 (*loudnorm* a -14 LUFS)** para atingir o padrão ideal do YouTube, TikTok e Reels.
 - **Marcadores na Linha do Tempo (Markers)**: adicione pinos/marcadores com o atalho `M` ou botão `🏷️ Marcador` para sincronizar batidas sonoras e cortes. Os marcadores atraem o snap magnético, navegam para a posição com 1 clique e podem ser excluídos com duplo clique.
 - **Alinhamento Magnético (Snap)**: sistema magnético inteligente (`N` ou botão 🧲) que atrai cortes e posições de clipes, áudios, textos, overlays e marcadores para bordas de outros blocos, para o início (0s) ou para a agulha (playhead), com guia visual em tempo real.
 - **Trilha de Texto / Legendas**: textos arrastáveis no preview com escala dinâmica, **animações de entrada (Fade In/Out, Deslizar / Slide Up, Pop / Zoom In)** e estilos avançados.
@@ -31,7 +31,7 @@
 - **Transições Suaves entre Clipes**: `fade`, `dissolve`, `wipeleft`, `slideleft`, `circleopen`, `pixelize` processados via `xfade`/`acrossfade`.
 - **Filtros e Presets de Cor**: `sepia`, `vintage`, `warm`, `cool`, `cinematic`, `vivid`.
 - **Efeito Vinheta Cinematográfica**: escurecimento elegante das bordas do vídeo com preview instantâneo e processamento nativo FFmpeg.
-- **Ajustes Finos de Imagem**: brilho, contraste, saturação, desfoque gaussiano, preto e branco (P&B) e velocidade de reprodução (0.5x até 2x com ajuste de pitch).
+- **Ajustes Finos de Imagem e Áudio**: brilho, contraste, saturação, desfoque gaussiano, preto e branco (P&B), velocidade de reprodução (0.5x até 2x), redução de ruído de chiado e normalização de volume.
 - **Transformações**: espelhamento horizontal, vertical, rotações (90°, 180°, 270°) e zoom digital.
 
 ### 📐 Formatos e Exportação
@@ -49,6 +49,9 @@
 | Atalho | Ação |
 | :--- | :--- |
 | `Espaço` | Reproduzir / Pausar timeline |
+| `←` / `→` | Navegar 1 quadro para trás / frente (`Shift`: 1 segundo) |
+| `↑` / `↓` | Pular para o ponto de corte ou marcador anterior / próximo |
+| `J` / `K` / `L` | Retroceder 2s / Pausar / Avançar 2s (Shuttle) |
 | `S` | Dividir clipe selecionado na posição da agulha |
 | `F` | Congelar quadro atual em clipe estático (3s) |
 | `M` | Adicionar ou alternar marcador na agulha |

@@ -432,12 +432,16 @@ function renderProps() {
       <div class="prop">Duração (s)<input type="number" id="aDur" value="${a.duration.toFixed(1)}" min="0.5" step="0.5"></div>
       <div class="prop">Volume<input type="range" id="aVol" min="0" max="1" step="0.05" value="${a.volume ?? 1}"></div>
       <div class="prop">Fade in (s)<input type="number" id="aFadeIn" value="${a.fadeIn || 0}" min="0" max="10" step="0.2"></div>
-      <div class="prop">Fade out (s)<input type="number" id="aFadeOut" value="${a.fadeOut || 0}" min="0" max="10" step="0.2"></div>`;
+      <div class="prop">Fade out (s)<input type="number" id="aFadeOut" value="${a.fadeOut || 0}" min="0" max="10" step="0.2"></div>
+      <div class="prop"><label><input type="checkbox" id="aDenoise" ${a.denoise ? 'checked' : ''}> Redução de ruído (chiado)</label></div>
+      <div class="prop"><label><input type="checkbox" id="aLoudnorm" ${a.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>`;
     $('aStart').onchange = (e) => { a.start = Math.max(0, +e.target.value); renderTimeline(); };
     $('aDur').onchange = (e) => { a.duration = Math.min(a.max, +e.target.value); renderTimeline(); };
     $('aVol').oninput = (e) => { a.volume = +e.target.value; syncAudio(); };
     $('aFadeIn').onchange = (e) => { a.fadeIn = Math.max(0, +e.target.value); };
     $('aFadeOut').onchange = (e) => { a.fadeOut = Math.max(0, +e.target.value); };
+    $('aDenoise').onchange = (e) => { a.denoise = e.target.checked; };
+    $('aLoudnorm').onchange = (e) => { a.loudnorm = e.target.checked; };
     return;
   }
   if (s.kind === 'text') {
@@ -498,11 +502,15 @@ function renderProps() {
        <div class="prop">Filtro de cor<select id="pPreset">${['none', 'sepia', 'vintage', 'warm', 'cool', 'cinematic', 'vivid'].map(v => `<option ${(c.filters.preset || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Transição para o próximo clipe<select id="pTrans">${['none', 'fade', 'dissolve', 'wipeleft', 'slideleft', 'circleopen', 'pixelize'].map(v => `<option ${(c.transition || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Velocidade<select id="pSpeed">${[0.5, 1, 1.5, 2].map(v => `<option ${c.speed === v || (!c.speed && v === 1) ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-       <div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>`
+       <div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>
+       <div class="prop"><label><input type="checkbox" id="pDenoise" ${c.filters.denoise ? 'checked' : ''}> Redução de ruído (chiado)</label></div>
+       <div class="prop"><label><input type="checkbox" id="pLoudnorm" ${c.filters.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>`
        + (c.hasAudio && !c.isImage ? `<button id="btnDetach" class="wide">Separar Áudio do Vídeo</button>` : '');
   p.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => { c.filters[i.dataset.k] = +i.value; renderPreview(); });
   $('pFill').onchange = (e) => { c.filters.fillMode = e.target.value; renderPreview(); };
   if ($('btnDetach')) $('btnDetach').onclick = () => detachAudio(c);
+  $('pDenoise').onchange = (e) => { c.filters.denoise = e.target.checked; };
+  $('pLoudnorm').onchange = (e) => { c.filters.loudnorm = e.target.checked; };
   $('pGray').onchange = (e) => { c.filters.grayscale = e.target.checked; renderPreview(); };
   $('pVin').onchange = (e) => { c.filters.vignette = e.target.checked; renderPreview(); };
   $('pZoom').oninput = (e) => { c.filters.zoom = +e.target.value; renderPreview(); };
@@ -601,6 +609,22 @@ function removeMarker(id) {
   state.markers = (state.markers || []).filter(m => m.id !== id);
   renderTimeline();
   toast('Marcador removido');
+}
+
+function jumpCut(dir) {
+  const { starts } = layout();
+  const cuts = [0];
+  state.clips.forEach((c, i) => { cuts.push(starts[i], starts[i] + c.duration); });
+  (state.markers || []).forEach(m => cuts.push(m.time));
+  const sorted = [...new Set(cuts.map(n => Math.round(n * 100) / 100))].sort((a, b) => a - b);
+  if (dir < 0) {
+    const prev = sorted.filter(t => t < state.time - 0.05);
+    state.time = prev.length ? prev[prev.length - 1] : 0;
+  } else {
+    const next = sorted.find(t => t > state.time + 0.05);
+    state.time = next !== undefined ? next : total();
+  }
+  renderPreview();
 }
 
 function split() {
@@ -716,11 +740,20 @@ $('ruler').onclick = (e) => { state.time = Math.max(0, (e.clientX - $('ruler').g
 $('btnMarker').onclick = addOrToggleMarker;
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+  const fps = +$('expFps').value || 30;
+  const frameDur = 1 / fps;
   if (e.key === 's' || e.key === 'S') split();
   else if (e.key === 'Delete') del();
   else if (e.key === 'f' || e.key === 'F') freezeFrame();
   else if (e.key === 'm' || e.key === 'M') addOrToggleMarker();
   else if (e.key === 'n' || e.key === 'N') toggleSnap();
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); state.time = Math.max(0, state.time - (e.shiftKey ? 1 : frameDur)); renderPreview(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); state.time = Math.min(total(), state.time + (e.shiftKey ? 1 : frameDur)); renderPreview(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); jumpCut(-1); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); jumpCut(1); }
+  else if (e.key === 'j' || e.key === 'J') { state.time = Math.max(0, state.time - 2); renderPreview(); }
+  else if (e.key === 'k' || e.key === 'K') { setPlaying(false); }
+  else if (e.key === 'l' || e.key === 'L') { state.time = Math.min(total(), state.time + 2); renderPreview(); }
   else if (e.key === ' ') { e.preventDefault(); setPlaying(!state.playing); }
 });
 
