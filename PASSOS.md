@@ -192,6 +192,53 @@
 
 ---
 
+## 🚀 Fase 6 — Edição Avançada e Processamento Visual
+
+### 6.1 Estabilização e Enquadramento
+- [x] Implementar Estabilização de Vídeo offline (`vidstabdetect` + `vidstabtransform` via FFmpeg para redução de trepidação)
+- [ ] Implementar Redimensionamento Inteligente / Auto Reframe (enquadramento dinâmico 9:16 com detecção de sujeito/foco)
+- [ ] Implementar Rastreamento de Movimento (Motion/Object Tracking para ancorar textos, stickers e sobreposições a objetos do vídeo)
+
+### 6.2 Curvas de Velocidade e Shaders Visuais
+- [ ] Implementar Speed Ramping com editor de Curva Bezier Livre (adição de keyframes customizados, arrasto livre e interpolação)
+- [ ] Implementar Retoque Facial / Efeito Beauty offline (suavização bilateral de pele e realce de iluminação via shaders)
+- [ ] Implementar Estilização de Bordas e Glow/Neon em Sobreposições (PiP)
+
+---
+
+## 🧠 Fase 7 — IA Avançada Local (100% Offline)
+
+### 7.1 Processamento de Áudio por IA
+- [ ] Integrar Separação de Stems de Áudio (isolamento de voz humana e trilha instrumental)
+- [ ] Integrar Detecção de Batidas Musicais (Beat Detection / Audio Wave Peak para snapping e cortes automáticos no ritmo)
+- [ ] Integrar Text-to-Speech (TTS) offline para dublagem e narração sintética local
+
+### 7.2 IA de Tradução e Super-Resolução
+- [ ] Integrar Tradução Automática Offline de Legendas (tradução multilingue direta das marcações geradas pelo Whisper)
+- [ ] Integrar Super-resolução / Upscale de Vídeo por IA (Real-ESRGAN / FSR para upscaling 720p → 1080p / 4K)
+
+---
+
+## 📦 Fase 8 — Exportação Profissional e Codecs Adicionais
+
+### 8.1 Codecs e Contêineres de Entrega
+- [ ] Implementar seletor de formato na exportação: MP4 (H.264), WebM (VP9 com suporte nativo a canal alfa transparente) e QuickTime MOV (Apple ProRes 422 / 4444)
+- [ ] Implementar controle fino de Bitrate (CBR, VBR 2-pass e controle de CRF customizado)
+- [ ] Implementar suporte a perfis de cor e HDR (conversão Rec.709 e BT.2020)
+- [ ] Implementar exportação independente de áudio (.wav / .mp3 / .aac) diretamente da timeline
+
+---
+
+## 🎨 Fase 9 — UX, Produtividade e Assets
+
+### 9.1 Produtividade e Modos de Visualização
+- [ ] Implementar Modo Cinema / Tela Cheia (`F11` / `Ctrl+F` para pré-visualização ampliada sem distrações de UI)
+- [ ] Implementar Biblioteca Integrada de Assets e Stickers (setas, badges, molduras, stickers animados e overlays vetoriais)
+- [ ] Implementar Histórico Visual de Versões e Backups Automáticos do Projeto (.lccut snapshots a cada X minutos)
+- [ ] Implementar Painel de Customização de Atalhos de Teclado (remapeamento de hotkeys de corte, split e navegação)
+
+---
+
 ## 📊 Status Geral
 
 | Fase | Progresso | Prioridade |
@@ -199,9 +246,14 @@
 | Fase 1 — Reconhecimento Estático | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 2 — Arquitetura e Componentes | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 3 — Rede e APIs | ✅ Concluída (parte estática 19/20; MITM feito na Fase 4) | 🟡 Média |
-| Fase 4 — Análise Dinâmica | ✅ Concluída no escopo definido (comportamento, crash, MITM); circunvenção de TLS/licença fora de escopo | 🟡 Média |
-| Fase 5 — Aplicação ao LeccorCut | ✅ Concluída (100% - replicação core, modelos de IA, matting de vídeo contínuo e conversor bidirecional CapCut) | 🟢 Concluída |
+| Fase 4 — Análise Dinâmica | ✅ Concluída no escopo definido | 🟡 Média |
+| Fase 5 — Aplicação Core ao LeccorCut | ✅ Concluída (100%) | 🟢 Concluída |
+| Fase 6 — Edição Avançada e Processamento Visual | 🔄 Em Progresso (17% - estabilização concluída) | 🔴 Alta |
+| Fase 7 — IA Avançada Local (100% Offline) | ⏳ A Fazer (0%) | 🟡 Média |
+| Fase 8 — Exportação Profissional e Codecs Adicionais | ⏳ A Fazer (0%) | 🔴 Alta |
+| Fase 9 — UX, Produtividade e Assets | ⏳ A Fazer (0%) | 🟢 Média |
 
 ---
 
 *Última atualização: 2026-10-15 | Ferramenta: REA v6.4.0 + Ghidra 12.1.4 + monitoramento de FS (FileSystemWatcher)*
+

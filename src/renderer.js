@@ -709,6 +709,26 @@ async function executeVideoMatting(itemPath, targetKind, targetItem) {
   }
 }
 
+async function executeStabilizeVideo(clip) {
+  if (!clip || clip.isImage) return;
+  toast('Iniciando estabilização de vídeo (2 passos via FFmpeg)...');
+  window.api.onStabilizeProgress(data => toast(data.text));
+  try {
+    const res = await window.api.stabilizeVideo({ inputPath: clip.path, shakiness: 8, smoothing: 30 });
+    if (!res.ok) {
+      return toast('Erro na estabilização: ' + (res.error || 'Falha ao processar'));
+    }
+    clip.path = res.path;
+    clip.name = '🎥 ' + clip.name.replace(/^🎥\s*/, '');
+    renderTimeline();
+    renderProps();
+    renderPreview();
+    toast('Vídeo estabilizado com sucesso!');
+  } catch (err) {
+    toast('Erro: ' + (err.message || err));
+  }
+}
+
 function renderProps() {
   const p = $('props'); const s = state.selected;
   if (!s) { p.innerHTML = '<p class="hint">Selecione um clipe na timeline.</p>'; return; }
@@ -879,11 +899,13 @@ function renderProps() {
        <div class="prop"><label><input type="checkbox" id="pLoudnorm" ${c.filters.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>`
        + `<button id="btnSmartCutoutClip" class="wide primary">✂ Extrair Objeto com IA para Sobreposição (PiP)</button>`
        + (!c.isImage ? `<button id="btnVideoMattingClip" class="wide secondary" style="margin-top:4px;">✂ Matting de Vídeo Contínuo (Extrair Vídeo Transparente PiP)</button>` : '')
+       + (!c.isImage ? `<button id="btnStabilizeClip" class="wide" style="margin-top:4px;">🎥 Estabilizar Vídeo (Reduzir Trepidação)</button>` : '')
        + (c.hasAudio && !c.isImage ? `<button id="btnDetach" class="wide">Separar Áudio do Vídeo</button>` : '');
   p.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => { c.filters[i.dataset.k] = +i.value; renderPreview(); });
   $('pFill').onchange = (e) => { c.filters.fillMode = e.target.value; renderPreview(); };
   if ($('btnSmartCutoutClip')) $('btnSmartCutoutClip').onclick = () => executeSmartCutout(c.path, 'clip', c);
   if ($('btnVideoMattingClip')) $('btnVideoMattingClip').onclick = () => executeVideoMatting(c.path, 'clip', c);
+  if ($('btnStabilizeClip')) $('btnStabilizeClip').onclick = () => executeStabilizeVideo(c);
   if ($('btnDetach')) $('btnDetach').onclick = () => detachAudio(c);
   $('pDenoise').onchange = (e) => { c.filters.denoise = e.target.checked; };
   $('pLoudnorm').onchange = (e) => { c.filters.loudnorm = e.target.checked; };

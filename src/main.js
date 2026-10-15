@@ -468,3 +468,73 @@ ipcMain.handle('detect-scenes', async (_e, videoPath, threshold = 0.35) => {
   });
 });
 
+ipcMain.handle('stabilize-video', async (_e, opts = {}) => {
+  const { inputPath, shakiness = 8, smoothing = 30 } = (typeof opts === 'string' ? { inputPath: opts } : opts);
+
+  if (!inputPath || !fs.existsSync(inputPath)) {
+    return { ok: false, error: 'Arquivo de vídeo não encontrado' };
+  }
+
+  const stabDir = path.join(app.getPath('userData'), 'stabilize');
+  if (!fs.existsSync(stabDir)) fs.mkdirSync(stabDir, { recursive: true });
+  const uid = `${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+  const trfFile = `transforms_${uid}.trf`;
+  const outPath = path.join(stabDir, `stabilized_${uid}.mp4`);
+
+  win.webContents.send('stabilize-progress', { step: 1, text: 'Passo 1/2: Analisando trepidação e movimento do vídeo...' });
+
+  try {
+    // Passo 1: Detecta vetores de movimento
+    await new Promise((resolve, reject) => {
+      const p1 = spawn(ffmpegPath, [
+        '-v', 'error',
+        '-y',
+        '-i', inputPath,
+        '-vf', `vidstabdetect=stepsize=6:shakiness=${shakiness}:accuracy=15:result=${trfFile}`,
+        '-f', 'null',
+        '-'
+      ], { cwd: stabDir });
+
+      p1.on('close', (code) => {
+        if (code === 0) resolve(); else reject(new Error(`Falha na detecção de trepidação (código ${code})`));
+      });
+      p1.on('error', reject);
+    });
+
+    win.webContents.send('stabilize-progress', { step: 2, text: 'Passo 2/2: Aplicando estabilização e suavização de câmera...' });
+
+    // Passo 2: Aplica estabilização e interpolação
+    await new Promise((resolve, reject) => {
+      const p2 = spawn(ffmpegPath, [
+        '-v', 'error',
+        '-y',
+        '-i', inputPath,
+        '-vf', `vidstabtransform=input=${trfFile}:smoothing=${smoothing}:optalgo=gauss:interpol=bicubic:zoom=2`,
+        '-c:v', 'libx264',
+        '-preset', 'fast',
+        '-crf', '18',
+        '-pix_fmt', 'yuv420p',
+        '-c:a', 'copy',
+        outPath
+      ], { cwd: stabDir });
+
+      p2.on('close', (code) => {
+        if (code === 0) resolve(); else reject(new Error(`Falha ao aplicar estabilização (código ${code})`));
+      });
+      p2.on('error', reject);
+    });
+
+    // Limpa arquivo .trf temporário
+    const fullTrf = path.join(stabDir, trfFile);
+    if (fs.existsSync(fullTrf)) {
+      try { fs.unlinkSync(fullTrf); } catch {}
+    }
+
+    win.webContents.send('stabilize-progress', { step: 2, text: 'Estabilização de vídeo concluída com sucesso!' });
+    return { ok: true, path: outPath };
+  } catch (err) {
+    return { ok: false, error: err.message || String(err) };
+  }
+});
+
+

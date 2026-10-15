@@ -207,6 +207,7 @@ O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
 - ✅ Filtros e presets de cor (sepia, vintage, warm, cool, cinematic, vivid)
 - ✅ Vinheta cinematográfica
 - ✅ Canvas Blur (enquadramento com desfoque de fundo para Reels/Shorts)
+- ✅ Estabilização de Vídeo offline (2 passos com `vidstabdetect` e `vidstabtransform` para redução de trepidação)
 - ✅ Brilho, contraste, saturação, desfoque, P&B, velocidade linear
 - ✅ Espelhamento H/V, rotações 90°/180°/270°, zoom digital
 
@@ -228,7 +229,6 @@ O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
 - [ ] Speed ramping com keyframes individuais (curvas customizadas, não apenas presets)
 - [ ] Rastreamento de objetos (Object Tracking) na timeline
 - [ ] Efeitos de face em tempo real (beautify, stickers faciais)
-- [ ] Estabilização de vídeo (Video Stabilization)
 - [ ] Redimensionamento inteligente (Smart Crop / Auto Reframe)
 
 ### IA Avançada (Local)
