@@ -289,6 +289,60 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .pro-btn{background:rgba(0,184,148,0.18);border:1px solid rgba(0,184,148,0.45);color:#55efc4;font-weight:600;transition:all .15s ease}
 .pro-btn:hover{background:rgba(0,184,148,0.32);border-color:#00b894;color:#fff;transform:translateY(-1px)}
 
+/* ── Fase 15: Gravação Direta na Timeline: Voiceover & Webcam PiP ── */
+.rec-btn{background:rgba(255,71,87,0.15);border:1px solid rgba(255,71,87,0.45);color:#ff6b81;font-weight:600;transition:all .15s ease}
+.rec-btn:hover{background:rgba(255,71,87,0.3);border-color:#ff4757;color:#fff;transform:translateY(-1px)}
+
+.modal-box--recording{max-width:520px;width:95%}
+.modal-box--webcam{max-width:680px;width:95%}
+
+.rec-field-group{margin-bottom:12px}
+.rec-fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.rec-label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:#c0c0d0;font-weight:500}
+.rec-select{background:#1a1a24;border:1px solid #333348;color:#e6e6f0;border-radius:6px;padding:7px 10px;font-size:12px}
+.rec-checkbox-group{display:flex;flex-direction:column;gap:6px;margin:12px 0;font-size:12px;color:#a0a0b8}
+
+/* VU Meter Profissional */
+.vu-meter-section{background:#111118;border:1px solid #28283a;border-radius:8px;padding:12px;margin:14px 0}
+.vu-meter-header{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#8a8aa3;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px}
+.vu-meter-indicators{display:flex;align-items:center;gap:10px}
+.vu-meter-db{font-family:monospace;font-size:12px;color:var(--a1);font-weight:bold}
+.vu-clip-led{font-size:10px;font-weight:bold;padding:1px 6px;border-radius:3px;background:#2a1118;color:#55222b;border:1px solid #441a24;transition:all .1s ease}
+.vu-clip-led.active{background:#ff2a2a;color:#fff;border-color:#ff4d4d;box-shadow:0 0 10px rgba(255,42,42,0.9);animation:clipBlink .3s infinite alternate}
+
+@keyframes clipBlink{from{opacity:0.8}to{opacity:1}}
+
+.vu-meter-bar-outer{width:100%;height:16px;background:#181824;border-radius:4px;overflow:hidden;border:1px solid #28283a;position:relative}
+.vu-meter-bar-inner{height:100%;background:linear-gradient(90deg, #00b894 0%, #00e5c3 65%, #fdcb6e 82%, #ff4757 95%);width:0%;border-radius:3px;transition:width 0.05s linear;box-shadow:0 0 8px rgba(0,229,195,0.4)}
+.vu-scale-ticks{display:flex;justify-content:space-between;font-size:9px;color:#55556a;font-family:monospace;margin-top:4px;padding:0 2px}
+
+/* Display de Timer */
+.rec-timer-wrap{text-align:center;margin:16px 0 12px 0}
+.rec-timer{font-family:monospace;font-size:36px;font-weight:bold;color:#fff;letter-spacing:1px;text-shadow:0 0 12px rgba(255,71,87,0.3)}
+.rec-timer.recording{color:#ff4757;text-shadow:0 0 15px rgba(255,71,87,0.6);animation:pulseText 1s infinite alternate}
+@keyframes pulseText{from{opacity:0.85}to{opacity:1}}
+.rec-status{font-size:12px;color:#8a8aa3;margin-top:4px}
+
+/* Ações e Botão Principal */
+.rec-actions{display:flex;justify-content:center;margin-top:14px}
+.btn-rec-main{display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 28px;background:linear-gradient(135deg, #ff4757, #d63031);border:none;border-radius:24px;color:#fff;font-size:14px;font-weight:bold;cursor:pointer;box-shadow:0 4px 15px rgba(255,71,87,0.4);transition:all .15s ease}
+.btn-rec-main:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,71,87,0.6)}
+.btn-rec-main.recording{background:linear-gradient(135deg, #2d3436, #1e272e);border:1px solid #ff4757;color:#ff6b81;box-shadow:0 0 15px rgba(255,71,87,0.5)}
+
+.rec-icon-circle{width:12px;height:12px;background:#fff;border-radius:50%;display:inline-block;transition:all .2s ease}
+.btn-rec-main.recording .rec-icon-circle{background:#ff4757;border-radius:2px;animation:recDotBlink 1s infinite}
+@keyframes recDotBlink{0%,100%{opacity:1}50%{opacity:0.2}}
+
+/* Contagem Regressiva 3..2..1 */
+.rec-countdown-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(10,10,16,0.92);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;border-radius:12px}
+.rec-countdown-number{font-size:96px;font-weight:900;color:var(--a1);line-height:1;text-shadow:0 0 30px rgba(0,229,195,0.8);animation:scalePop .8s ease infinite}
+@keyframes scalePop{0%{transform:scale(0.7);opacity:0.6}50%{transform:scale(1.1);opacity:1}100%{transform:scale(1);opacity:0.9}}
+.rec-countdown-sub{font-size:14px;color:#c0c0d0;margin-top:14px;font-weight:500}
+
+/* Webcam Preview */
+.webcam-preview-container{width:100%;height:260px;background:#0d0d12;border:1px solid #28283a;border-radius:10px;overflow:hidden;position:relative;margin-bottom:14px;display:flex;align-items:center;justify-content:center}
+.cam-preview-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);border-radius:8px}
+
 
 
 

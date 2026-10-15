@@ -2245,6 +2245,12 @@ document.addEventListener('keydown', (e) => {
   };
 
   if (matchAction('split', 's')) split();
+  else if (matchAction('voiceover', 'r') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (typeof openVoiceoverModal === 'function') openVoiceoverModal();
+  }
+  else if (matchAction('webcam', 'w') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (typeof openWebcamModal === 'function') openWebcamModal();
+  }
   else if (matchAction('delete', 'Delete') || k === 'Backspace') del();
   else if (matchAction('freeze', 'f') && !e.ctrlKey) freezeFrame();
   else if (matchAction('flash', 'b') && !e.ctrlKey) addFlashEffect();
@@ -3266,7 +3272,9 @@ const DEFAULT_SHORTCUTS = {
   flash: { key: 'b', label: 'B', name: 'Flash de Batida' },
   marker: { key: 'm', label: 'M', name: 'Marcador de Batida' },
   snap: { key: 'n', label: 'N', name: 'Alternar Snap Magnético' },
-  cinema: { key: 'F11', label: 'F11', name: 'Modo Cinema / Tela Cheia' }
+  cinema: { key: 'F11', label: 'F11', name: 'Modo Cinema / Tela Cheia' },
+  voiceover: { key: 'r', label: 'R', name: 'Gravar Locução / Voiceover' },
+  webcam: { key: 'w', label: 'W', name: 'Gravar Câmera / Webcam PiP' }
 };
 
 let activeShortcuts = { ...DEFAULT_SHORTCUTS };
@@ -4121,5 +4129,586 @@ function initAudioPro() {
 }
 
 initAudioPro();
+
+// ─── Fase 15: Gravação Direta na Timeline: Voiceover & Webcam PiP ───────────
+let openVoiceoverModal = () => {};
+let openWebcamModal = () => {};
+
+function initTimelineRecording() {
+  // ── 15.1: Gravador de Locução / Voiceover ──────────────────────────
+  const voiceModal = $('voiceoverModal');
+  const btnVoiceover = $('btnVoiceover');
+  const btnCloseVoice = $('btnCloseVoiceover');
+  const voiceMicSelect = $('voiceMicSelect');
+  const voiceMuteProjectCheck = $('voiceMuteProjectCheck');
+  const voiceEchoCancelCheck = $('voiceEchoCancelCheck');
+  const vuMeterBar = $('vuMeterBar');
+  const vuMeterDb = $('vuMeterDb');
+  const vuClipLed = $('vuClipLed');
+  const voiceTimerEl = $('voiceRecordTimer');
+  const voiceStatusEl = $('voiceRecordStatus');
+  const btnToggleVoice = $('btnToggleVoiceRecord');
+  const voiceRecBtnText = $('voiceRecBtnText');
+  const voiceCountdownOverlay = $('voiceCountdownOverlay');
+  const voiceCountdownNumber = $('voiceCountdownNumber');
+
+  let voiceStream = null;
+  let voiceAudioCtx = null;
+  let voiceAnalyser = null;
+  let voiceSourceNode = null;
+  let voiceRecorder = null;
+  let voiceChunks = [];
+  let voiceRafId = null;
+  let isVoiceRecording = false;
+  let voiceStartAgulhaTime = 0;
+  let voiceRecordStartTime = 0;
+  let voiceTimerInterval = null;
+  let wasAudioMutedBeforeRecord = false;
+  let clipLedTimeout = null;
+
+  async function enumerateAudioDevices() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(d => d.kind === 'audioinput');
+      if (voiceMicSelect) {
+        voiceMicSelect.innerHTML = '';
+        if (audioInputs.length === 0) {
+          voiceMicSelect.innerHTML = '<option value="default">Microfone Padrão</option>';
+        } else {
+          audioInputs.forEach((dev, idx) => {
+            const opt = document.createElement('option');
+            opt.value = dev.deviceId;
+            opt.textContent = dev.label || `Microfone ${idx + 1}`;
+            voiceMicSelect.appendChild(opt);
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao listar microfones:', err);
+    }
+  }
+
+  async function startVoiceMonitor() {
+    stopVoiceMonitor();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (voiceStatusEl) voiceStatusEl.textContent = 'API de captura de áudio indisponível neste ambiente.';
+      return;
+    }
+    const deviceId = voiceMicSelect ? voiceMicSelect.value : 'default';
+    const echoCancel = voiceEchoCancelCheck ? voiceEchoCancelCheck.checked : true;
+    try {
+      const constraints = {
+        audio: {
+          deviceId: deviceId !== 'default' ? { exact: deviceId } : undefined,
+          echoCancellation: echoCancel,
+          noiseSuppression: echoCancel
+        }
+      };
+      voiceStream = await navigator.mediaDevices.getUserMedia(constraints);
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        voiceAudioCtx = new AudioContextClass();
+        voiceSourceNode = voiceAudioCtx.createMediaStreamSource(voiceStream);
+        voiceAnalyser = voiceAudioCtx.createAnalyser();
+        voiceAnalyser.fftSize = 512;
+        voiceSourceNode.connect(voiceAnalyser);
+
+        const dataArray = new Uint8Array(voiceAnalyser.frequencyBinCount);
+        const updateVu = () => {
+          if (!voiceAnalyser) return;
+          voiceAnalyser.getByteTimeDomainData(dataArray);
+          let sumSquares = 0;
+          let peak = 0;
+          for (let i = 0; i < dataArray.length; i++) {
+            const norm = (dataArray[i] - 128) / 128;
+            sumSquares += norm * norm;
+            const abs = Math.abs(norm);
+            if (abs > peak) peak = abs;
+          }
+          const rms = Math.sqrt(sumSquares / dataArray.length);
+          let db = 20 * Math.log10(rms || 0.0001);
+          db = Math.max(-60, Math.min(0, db));
+
+          const pct = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+          if (vuMeterBar) vuMeterBar.style.width = pct.toFixed(1) + '%';
+          if (vuMeterDb) vuMeterDb.textContent = db <= -59.5 ? '-inf dB' : `${db.toFixed(1)} dB`;
+
+          if (peak >= 0.96 && vuClipLed) {
+            vuClipLed.classList.add('active');
+            clearTimeout(clipLedTimeout);
+            clipLedTimeout = setTimeout(() => {
+              if (vuClipLed) vuClipLed.classList.remove('active');
+            }, 350);
+          }
+          voiceRafId = requestAnimationFrame(updateVu);
+        };
+        voiceRafId = requestAnimationFrame(updateVu);
+      }
+      if (voiceStatusEl && !isVoiceRecording) {
+        voiceStatusEl.textContent = 'Microfone conectado. Pronto para gravar na agulha.';
+      }
+    } catch (err) {
+      console.warn('Falha ao acessar microfone:', err);
+      if (voiceStatusEl) voiceStatusEl.textContent = 'Microfone não detectado ou permissão negada.';
+    }
+  }
+
+  function stopVoiceMonitor() {
+    if (voiceRafId) { cancelAnimationFrame(voiceRafId); voiceRafId = null; }
+    if (voiceAudioCtx) { voiceAudioCtx.close().catch(() => {}); voiceAudioCtx = null; }
+    if (voiceStream) {
+      voiceStream.getTracks().forEach(t => t.stop());
+      voiceStream = null;
+    }
+    if (vuMeterBar) vuMeterBar.style.width = '0%';
+    if (vuMeterDb) vuMeterDb.textContent = '-inf dB';
+    if (vuClipLed) vuClipLed.classList.remove('active');
+  }
+
+  openVoiceoverModal = async () => {
+    if (!voiceModal) return;
+    voiceModal.hidden = false;
+    await enumerateAudioDevices();
+    await startVoiceMonitor();
+    if (voiceTimerEl) voiceTimerEl.textContent = '00:00.0';
+    if (voiceStatusEl) voiceStatusEl.textContent = `Pronto para gravar no cursor (${fmt(state.time)}).`;
+  };
+
+  const closeVoiceoverModal = () => {
+    if (isVoiceRecording) stopVoiceRecording();
+    stopVoiceMonitor();
+    if (voiceModal) voiceModal.hidden = true;
+  };
+
+  if (btnVoiceover) btnVoiceover.onclick = openVoiceoverModal;
+  if (btnCloseVoice) btnCloseVoice.onclick = closeVoiceoverModal;
+  if (voiceModal) {
+    voiceModal.onclick = (e) => { if (e.target === voiceModal) closeVoiceoverModal(); };
+  }
+  if (voiceMicSelect) voiceMicSelect.onchange = () => startVoiceMonitor();
+  if (voiceEchoCancelCheck) voiceEchoCancelCheck.onchange = () => startVoiceMonitor();
+
+  async function startVoiceRecording() {
+    if (!voiceStream) await startVoiceMonitor();
+    if (!voiceStream) {
+      toast('Não foi possível iniciar: nenhum microfone disponível.');
+      return;
+    }
+
+    // Contagem Regressiva 3..2..1
+    if (voiceCountdownOverlay && voiceCountdownNumber) {
+      voiceCountdownOverlay.hidden = false;
+      for (let count = 3; count >= 1; count--) {
+        voiceCountdownNumber.textContent = count;
+        await new Promise(r => setTimeout(r, 700));
+      }
+      voiceCountdownOverlay.hidden = true;
+    }
+
+    voiceChunks = [];
+    voiceStartAgulhaTime = state.time;
+    voiceRecordStartTime = Date.now();
+
+    // Muta projeto se solicitado para não vazar
+    if (voiceMuteProjectCheck && voiceMuteProjectCheck.checked) {
+      wasAudioMutedBeforeRecord = !!(state.tracks.audio?.mute);
+      if (state.tracks.audio) state.tracks.audio.mute = true;
+    }
+
+    try {
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+      voiceRecorder = new MediaRecorder(voiceStream, { mimeType: mime });
+    } catch (_) {
+      voiceRecorder = new MediaRecorder(voiceStream);
+    }
+
+    voiceRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) voiceChunks.push(e.data);
+    };
+
+    voiceRecorder.onstop = async () => {
+      // Restaura áudio do projeto
+      if (voiceMuteProjectCheck && voiceMuteProjectCheck.checked && state.tracks.audio) {
+        state.tracks.audio.mute = wasAudioMutedBeforeRecord;
+      }
+      setPlaying(false);
+
+      if (voiceChunks.length === 0) {
+        toast('Nenhum dado de áudio gravado.');
+        return;
+      }
+
+      if (voiceStatusEl) voiceStatusEl.textContent = 'Processando e convertendo áudio WAV em alta fidelidade...';
+      try {
+        const audioBlob = new Blob(voiceChunks, { type: 'audio/webm' });
+        const arrayBuffer = await audioBlob.arrayBuffer();
+        const res = await window.api.saveAudioRecording(arrayBuffer, 'locucao_');
+
+        if (res && res.success && res.media) {
+          state.media.push(res.media);
+          const recDuration = res.media.duration || Math.max(0.5, (Date.now() - voiceRecordStartTime) / 1000);
+          state.audios.push({
+            id: uid++,
+            path: res.media.path,
+            name: res.media.name || '🎙️ Locução Gravada',
+            wave: res.media.wave || [],
+            start: voiceStartAgulhaTime,
+            in: 0,
+            duration: recDuration,
+            max: recDuration,
+            volume: 1
+          });
+          renderMediaList();
+          renderTimeline();
+          toast(`🎙️ Locução gravada e inserida na timeline (${fmt(voiceStartAgulhaTime)})!`);
+          closeVoiceoverModal();
+        } else {
+          toast('Erro ao processar gravação de locução.');
+          if (voiceStatusEl) voiceStatusEl.textContent = 'Falha ao salvar gravação.';
+        }
+      } catch (err) {
+        console.error('Erro ao finalizar gravação de voz:', err);
+        toast('Erro ao converter arquivo de áudio gravado.');
+      }
+    };
+
+    voiceRecorder.start(200);
+    isVoiceRecording = true;
+
+    if (btnToggleVoice) btnToggleVoice.classList.add('recording');
+    if (voiceRecBtnText) voiceRecBtnText.textContent = 'Parar Gravação';
+    if (voiceTimerEl) voiceTimerEl.classList.add('recording');
+    if (voiceStatusEl) voiceStatusEl.textContent = '● Gravando locução ao vivo na timeline...';
+
+    // Reproduz timeline simultaneamente para sincronização
+    setPlaying(true);
+
+    clearInterval(voiceTimerInterval);
+    voiceTimerInterval = setInterval(() => {
+      const elapsed = (Date.now() - voiceRecordStartTime) / 1000;
+      if (voiceTimerEl) voiceTimerEl.textContent = fmt(elapsed);
+    }, 100);
+  }
+
+  function stopVoiceRecording() {
+    if (!isVoiceRecording || !voiceRecorder) return;
+    isVoiceRecording = false;
+    clearInterval(voiceTimerInterval);
+    if (btnToggleVoice) btnToggleVoice.classList.remove('recording');
+    if (voiceRecBtnText) voiceRecBtnText.textContent = 'Iniciar Gravação (3s)';
+    if (voiceTimerEl) voiceTimerEl.classList.remove('recording');
+    try {
+      if (voiceRecorder.state !== 'inactive') voiceRecorder.stop();
+    } catch (e) {
+      console.warn('Erro ao parar voiceRecorder:', e);
+    }
+  }
+
+  if (btnToggleVoice) {
+    btnToggleVoice.onclick = () => {
+      if (isVoiceRecording) {
+        stopVoiceRecording();
+      } else {
+        startVoiceRecording();
+      }
+    };
+  }
+
+  // ── 15.2: Captura de Webcam para Picture-in-Picture (PiP) ─────────
+  const camModal = $('webcamModal');
+  const btnWebcamPiP = $('btnWebcamPiP');
+  const btnCloseCam = $('btnCloseWebcam');
+  const camDeviceSelect = $('camDeviceSelect');
+  const camMicSelect = $('camMicSelect');
+  const camLivePreview = $('camLivePreview');
+  const camMaskSelect = $('camMaskSelect');
+  const camPipPosition = $('camPipPosition');
+  const camPipScale = $('camPipScale');
+  const camPipScaleVal = $('camPipScaleVal');
+  const camMuteProjectCheck = $('camMuteProjectCheck');
+  const camTimerEl = $('camRecordTimer');
+  const camStatusEl = $('camRecordStatus');
+  const btnToggleCam = $('btnToggleCamRecord');
+  const camRecBtnText = $('camRecBtnText');
+  const camCountdownOverlay = $('camCountdownOverlay');
+  const camCountdownNumber = $('camCountdownNumber');
+
+  let camStream = null;
+  let camRecorder = null;
+  let camChunks = [];
+  let isCamRecording = false;
+  let camStartAgulhaTime = 0;
+  let camRecordStartTime = 0;
+  let camTimerInterval = null;
+  let wasCamAudioMuted = false;
+
+  if (camPipScale && camPipScaleVal) {
+    camPipScale.oninput = (e) => {
+      camPipScaleVal.textContent = `${e.target.value}%`;
+    };
+  }
+
+  async function enumerateVideoDevices() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return;
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoInputs = devices.filter(d => d.kind === 'videoinput');
+      const audioInputs = devices.filter(d => d.kind === 'audioinput');
+
+      if (camDeviceSelect) {
+        camDeviceSelect.innerHTML = '';
+        if (videoInputs.length === 0) {
+          camDeviceSelect.innerHTML = '<option value="default">Câmera Padrão</option>';
+        } else {
+          videoInputs.forEach((dev, idx) => {
+            const opt = document.createElement('option');
+            opt.value = dev.deviceId;
+            opt.textContent = dev.label || `Câmera ${idx + 1}`;
+            camDeviceSelect.appendChild(opt);
+          });
+        }
+      }
+
+      if (camMicSelect) {
+        camMicSelect.innerHTML = '';
+        if (audioInputs.length === 0) {
+          camMicSelect.innerHTML = '<option value="default">Microfone Padrão</option>';
+        } else {
+          audioInputs.forEach((dev, idx) => {
+            const opt = document.createElement('option');
+            opt.value = dev.deviceId;
+            opt.textContent = dev.label || `Microfone ${idx + 1}`;
+            camMicSelect.appendChild(opt);
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao listar câmeras e microfones:', err);
+    }
+  }
+
+  async function startCamPreview() {
+    stopCamPreview();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (camStatusEl) camStatusEl.textContent = 'API de captura de câmera indisponível.';
+      return;
+    }
+    const videoDeviceId = camDeviceSelect ? camDeviceSelect.value : 'default';
+    const audioDeviceId = camMicSelect ? camMicSelect.value : 'default';
+    try {
+      const constraints = {
+        video: {
+          deviceId: videoDeviceId !== 'default' ? { exact: videoDeviceId } : undefined,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        },
+        audio: {
+          deviceId: audioDeviceId !== 'default' ? { exact: audioDeviceId } : undefined,
+          echoCancellation: true,
+          noiseSuppression: true
+        }
+      };
+      camStream = await navigator.mediaDevices.getUserMedia(constraints);
+      if (camLivePreview) {
+        camLivePreview.srcObject = camStream;
+        camLivePreview.play().catch(() => {});
+      }
+      if (camStatusEl && !isCamRecording) {
+        camStatusEl.textContent = 'Câmera conectada. Pronto para gravar reação PiP.';
+      }
+    } catch (err) {
+      console.warn('Falha ao acessar câmera:', err);
+      if (camStatusEl) camStatusEl.textContent = 'Câmera não detectada ou acesso não concedido.';
+    }
+  }
+
+  function stopCamPreview() {
+    if (camLivePreview) {
+      camLivePreview.pause();
+      camLivePreview.srcObject = null;
+    }
+    if (camStream) {
+      camStream.getTracks().forEach(t => t.stop());
+      camStream = null;
+    }
+  }
+
+  openWebcamModal = async () => {
+    if (!camModal) return;
+    camModal.hidden = false;
+    await enumerateVideoDevices();
+    await startCamPreview();
+    if (camTimerEl) camTimerEl.textContent = '00:00.0';
+    if (camStatusEl) camStatusEl.textContent = `Pronto para gravar PiP no cursor (${fmt(state.time)}).`;
+  };
+
+  const closeWebcamModal = () => {
+    if (isCamRecording) stopCamRecording();
+    stopCamPreview();
+    if (camModal) camModal.hidden = true;
+  };
+
+  if (btnWebcamPiP) btnWebcamPiP.onclick = openWebcamModal;
+  if (btnCloseCam) btnCloseCam.onclick = closeWebcamModal;
+  if (camModal) {
+    camModal.onclick = (e) => { if (e.target === camModal) closeWebcamModal(); };
+  }
+  if (camDeviceSelect) camDeviceSelect.onchange = () => startCamPreview();
+  if (camMicSelect) camMicSelect.onchange = () => startCamPreview();
+
+  async function startCamRecording() {
+    if (!camStream) await startCamPreview();
+    if (!camStream) {
+      toast('Não foi possível iniciar: câmera ou microfone indisponível.');
+      return;
+    }
+
+    // Contagem Regressiva 3..2..1
+    if (camCountdownOverlay && camCountdownNumber) {
+      camCountdownOverlay.hidden = false;
+      for (let count = 3; count >= 1; count--) {
+        camCountdownNumber.textContent = count;
+        await new Promise(r => setTimeout(r, 700));
+      }
+      camCountdownOverlay.hidden = true;
+    }
+
+    camChunks = [];
+    camStartAgulhaTime = state.time;
+    camRecordStartTime = Date.now();
+
+    if (camMuteProjectCheck && camMuteProjectCheck.checked) {
+      wasCamAudioMuted = !!(state.tracks.audio?.mute);
+      if (state.tracks.audio) state.tracks.audio.mute = true;
+    }
+
+    try {
+      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+        ? 'video/webm;codecs=vp8,opus'
+        : 'video/webm';
+      camRecorder = new MediaRecorder(camStream, { mimeType: mime });
+    } catch (_) {
+      camRecorder = new MediaRecorder(camStream);
+    }
+
+    camRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) camChunks.push(e.data);
+    };
+
+    camRecorder.onstop = async () => {
+      if (camMuteProjectCheck && camMuteProjectCheck.checked && state.tracks.audio) {
+        state.tracks.audio.mute = wasCamAudioMuted;
+      }
+      setPlaying(false);
+
+      if (camChunks.length === 0) {
+        toast('Nenhum dado de vídeo gravado.');
+        return;
+      }
+
+      if (camStatusEl) camStatusEl.textContent = 'Processando vídeo MP4 H.264 e gerando miniatura...';
+      try {
+        const videoBlob = new Blob(camChunks, { type: 'video/webm' });
+        const arrayBuffer = await videoBlob.arrayBuffer();
+        const res = await window.api.saveVideoRecording(arrayBuffer, 'webcam_pip_');
+
+        if (res && res.success && res.media) {
+          state.media.push(res.media);
+          const recDuration = res.media.duration || Math.max(0.5, (Date.now() - camRecordStartTime) / 1000);
+
+          // Posição PiP
+          const posMode = camPipPosition ? camPipPosition.value : 'bottom-right';
+          let posX = 0.85, posY = 0.85;
+          if (posMode === 'bottom-left') { posX = 0.15; posY = 0.85; }
+          else if (posMode === 'top-right') { posX = 0.85; posY = 0.15; }
+          else if (posMode === 'top-left') { posX = 0.15; posY = 0.15; }
+
+          // Formato e Máscara
+          const maskMode = camMaskSelect ? camMaskSelect.value : 'circle';
+          const maskConfig = maskMode === 'circle'
+            ? { type: 'circle', size: 80 }
+            : { type: 'rectangle', size: 90 };
+
+          const pipScale = camPipScale ? +camPipScale.value : 30;
+
+          state.overlays.push({
+            id: uid++,
+            path: res.media.path,
+            name: res.media.name || '📷 Webcam PiP',
+            thumb: res.media.thumb,
+            isImage: false,
+            start: camStartAgulhaTime,
+            in: 0,
+            duration: recDuration,
+            max: recDuration,
+            x: posX,
+            y: posY,
+            scale: pipScale,
+            opacity: 1,
+            mask: maskConfig,
+            borderRadius: maskMode === 'circle' ? 9999 : 6
+          });
+
+          renderMediaList();
+          renderTimeline();
+          toast(`📷 Reação PiP gravada e inserida na timeline (${fmt(camStartAgulhaTime)})!`);
+          closeWebcamModal();
+        } else {
+          toast('Erro ao processar gravação de webcam.');
+          if (camStatusEl) camStatusEl.textContent = 'Falha ao salvar gravação de vídeo.';
+        }
+      } catch (err) {
+        console.error('Erro ao finalizar gravação de webcam:', err);
+        toast('Erro ao converter vídeo gravado.');
+      }
+    };
+
+    camRecorder.start(200);
+    isCamRecording = true;
+
+    if (btnToggleCam) btnToggleCam.classList.add('recording');
+    if (camRecBtnText) camRecBtnText.textContent = 'Parar Gravação PiP';
+    if (camTimerEl) camTimerEl.classList.add('recording');
+    if (camStatusEl) camStatusEl.textContent = '● Gravando reação de webcam ao vivo...';
+
+    setPlaying(true);
+
+    clearInterval(camTimerInterval);
+    camTimerInterval = setInterval(() => {
+      const elapsed = (Date.now() - camRecordStartTime) / 1000;
+      if (camTimerEl) camTimerEl.textContent = fmt(elapsed);
+    }, 100);
+  }
+
+  function stopCamRecording() {
+    if (!isCamRecording || !camRecorder) return;
+    isCamRecording = false;
+    clearInterval(camTimerInterval);
+    if (btnToggleCam) btnToggleCam.classList.remove('recording');
+    if (camRecBtnText) camRecBtnText.textContent = 'Iniciar Gravação PiP';
+    if (camTimerEl) camTimerEl.classList.remove('recording');
+    try {
+      if (camRecorder.state !== 'inactive') camRecorder.stop();
+    } catch (e) {
+      console.warn('Erro ao parar camRecorder:', e);
+    }
+  }
+
+  if (btnToggleCam) {
+    btnToggleCam.onclick = () => {
+      if (isCamRecording) {
+        stopCamRecording();
+      } else {
+        startCamRecording();
+      }
+    };
+  }
+}
+
+initTimelineRecording();
 
 

@@ -425,6 +425,8 @@
     <button id="btnDetectScenes" class="scene-btn" title="Detecção Automática de Cenas (equivalente ao Shot Detect do CapCut)">🎬 Detectar Cenas</button>
     <button id="btnBeatMarks" class="beat-btn" title="Detectar Batidas Musicais e Gerar Marcadores na Timeline (Fase 7)">🥁 BeatMarks</button>
     <button id="btnFreeze" title="Congelar Quadro no cursor (F)">❄ Congelar (F)</button>
+    <button id="btnVoiceover" class="rec-btn" title="Gravar Locução / Voiceover na agulha (R)">🎙️ Locução (R)</button>
+    <button id="btnWebcamPiP" class="rec-btn" title="Gravar Câmera / Webcam PiP na agulha (W)">📷 Webcam (W)</button>
     <button id="btnDelete">🗑 Excluir (Del)</button>
     <label>Zoom <input id="zoom" type="range" min="20" max="200" value="60"></label>
   </div>
@@ -572,6 +574,148 @@
         <div class="proxy-progress-bar-outer">
           <div class="proxy-progress-bar-inner" id="proxyProgressBar" style="width:0%"></div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fase 15: Modal de Gravação de Locução / Voiceover ──────────── -->
+<div id="voiceoverModal" class="modal-overlay" hidden>
+  <div class="modal-box modal-box--recording">
+    <div class="modal-header">
+      <h3>🎙️ Gravação de Locução / Voiceover</h3>
+      <button id="btnCloseVoiceover" class="modal-close" title="Fechar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">
+        Grave áudio diretamente na agulha da timeline com monitoramento VU Meter em tempo real e inserção automática na trilha de áudio.
+      </p>
+
+      <div class="rec-field-group">
+        <label class="rec-label">Dispositivo de Microfone:
+          <select id="voiceMicSelect" class="rec-select">
+            <option value="default">Microfone Padrão do Sistema</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="rec-checkbox-group">
+        <label><input type="checkbox" id="voiceMuteProjectCheck" checked> Mutar áudio do projeto durante a gravação</label>
+        <label><input type="checkbox" id="voiceEchoCancelCheck" checked> Cancelamento de eco e supressão de ruído</label>
+      </div>
+
+      <!-- VU Meter em Tempo Real -->
+      <div class="vu-meter-section">
+        <div class="vu-meter-header">
+          <span>Nível de Entrada (VU Meter)</span>
+          <div class="vu-meter-indicators">
+            <span id="vuMeterDb" class="vu-meter-db">-inf dB</span>
+            <span id="vuClipLed" class="vu-clip-led" title="Indicador de Clipping / Distorção">CLIP</span>
+          </div>
+        </div>
+        <div class="vu-meter-bar-outer">
+          <div id="vuMeterBar" class="vu-meter-bar-inner" style="width: 0%;"></div>
+        </div>
+        <div class="vu-scale-ticks">
+          <span>-60</span><span>-40</span><span>-20</span><span>-12</span><span>-6</span><span>0 dB</span>
+        </div>
+      </div>
+
+      <!-- Display de Duração da Gravação -->
+      <div class="rec-timer-wrap">
+        <div id="voiceRecordTimer" class="rec-timer">00:00.0</div>
+        <div id="voiceRecordStatus" class="rec-status">Pronto para gravar no ponto atual da agulha.</div>
+      </div>
+
+      <!-- Ações de Gravação -->
+      <div class="rec-actions">
+        <button id="btnToggleVoiceRecord" class="btn-rec-main">
+          <span class="rec-icon-circle"></span> <span id="voiceRecBtnText">Iniciar Gravação (3s)</span>
+        </button>
+      </div>
+
+      <!-- Overlay de Contagem Regressiva -->
+      <div id="voiceCountdownOverlay" class="rec-countdown-overlay" hidden>
+        <div id="voiceCountdownNumber" class="rec-countdown-number">3</div>
+        <div class="rec-countdown-sub">Prepare-se para falar...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fase 15: Modal de Gravação de Câmera / Webcam PiP ─────────── -->
+<div id="webcamModal" class="modal-overlay" hidden>
+  <div class="modal-box modal-box--webcam">
+    <div class="modal-header">
+      <h3>📷 Gravação de Câmera / Webcam (Picture-in-Picture)</h3>
+      <button id="btnCloseWebcam" class="modal-close" title="Fechar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">
+        Grave webcam simultaneamente para reacts, tutoriais ou narrações visuais com inserção automática na trilha de sobreposição (PiP).
+      </p>
+
+      <div class="webcam-preview-container">
+        <video id="camLivePreview" autoplay playsinline muted class="cam-preview-video"></video>
+        <!-- Overlay de Contagem Regressiva Webcam -->
+        <div id="camCountdownOverlay" class="rec-countdown-overlay" hidden>
+          <div id="camCountdownNumber" class="rec-countdown-number">3</div>
+          <div class="rec-countdown-sub">Gravando em instantes...</div>
+        </div>
+      </div>
+
+      <div class="rec-fields-grid">
+        <label class="rec-label">Câmera de Vídeo:
+          <select id="camDeviceSelect" class="rec-select">
+            <option value="default">Câmera Padrão</option>
+          </select>
+        </label>
+        <label class="rec-label">Microfone de Áudio:
+          <select id="camMicSelect" class="rec-select">
+            <option value="default">Microfone Padrão</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="rec-fields-grid">
+        <label class="rec-label">Formato de Máscara PiP:
+          <select id="camMaskSelect" class="rec-select">
+            <option value="circle" selected>Círculo / Avatar (80%)</option>
+            <option value="rectangle">Retângulo Padrão</option>
+          </select>
+        </label>
+        <label class="rec-label">Posicionamento na Tela:
+          <select id="camPipPosition" class="rec-select">
+            <option value="bottom-right" selected>↘ Canto Inferior Direito</option>
+            <option value="bottom-left">↙ Canto Inferior Esquerdo</option>
+            <option value="top-right">↗ Canto Superior Direito</option>
+            <option value="top-left">↖ Canto Superior Esquerdo</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="rec-field-group">
+        <label class="rec-label">Escala / Dimensão PiP:
+          <input type="range" id="camPipScale" min="15" max="60" value="30" step="5">
+          <span id="camPipScaleVal">30%</span>
+        </label>
+      </div>
+
+      <div class="rec-checkbox-group">
+        <label><input type="checkbox" id="camMuteProjectCheck" checked> Mutar áudio do projeto durante a gravação</label>
+      </div>
+
+      <!-- Display de Duração da Gravação de Vídeo -->
+      <div class="rec-timer-wrap">
+        <div id="camRecordTimer" class="rec-timer">00:00.0</div>
+        <div id="camRecordStatus" class="rec-status">Aguardando início da gravação...</div>
+      </div>
+
+      <!-- Ações de Gravação de Vídeo -->
+      <div class="rec-actions">
+        <button id="btnToggleCamRecord" class="btn-rec-main">
+          <span class="rec-icon-circle"></span> <span id="camRecBtnText">Iniciar Gravação PiP</span>
+        </button>
       </div>
     </div>
   </div>

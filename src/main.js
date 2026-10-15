@@ -24,6 +24,8 @@ const {
 } = require('./audioAdvanced');
 // ── Fase 14: Interoperabilidade Pro (FCPXML, EDL e Project Bundling) ──────────
 const { exportEdl, exportFcpxml, bundleProject } = require('./proExporters');
+// ── Fase 15: Gravação Direta na Timeline (Voiceover & Webcam PiP) ──────────────
+const { processAudioRecording, processVideoRecording } = require('./recorderManager');
 
 let win;
 function createWindow() {
@@ -375,6 +377,29 @@ ipcMain.handle('bundle-project', async (_e, projectData) => {
   try {
     const result = await bundleProject(projectData, targetDir);
     return result;
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+// ── Fase 15: Handlers de Gravação Direta na Timeline (Voiceover & Webcam PiP) ──
+ipcMain.handle('save-audio-recording', async (_e, { arrayBuffer, namePrefix }) => {
+  try {
+    const buffer = Buffer.from(arrayBuffer);
+    const result = await processAudioRecording(ffmpegPath, app.getPath('userData'), buffer, namePrefix || 'locucao');
+    const mediaInfo = await decorateMedia(await probe(result.path));
+    return { ok: true, media: mediaInfo, path: result.path };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('save-video-recording', async (_e, { arrayBuffer, namePrefix }) => {
+  try {
+    const buffer = Buffer.from(arrayBuffer);
+    const result = await processVideoRecording(ffmpegPath, app.getPath('userData'), buffer, namePrefix || 'webcam_pip');
+    const mediaInfo = await decorateMedia(await probe(result.path));
+    return { ok: true, media: mediaInfo, path: result.path };
   } catch (err) {
     return { ok: false, error: err.message };
   }

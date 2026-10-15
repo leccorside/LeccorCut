@@ -74,7 +74,10 @@ contextBridge.exposeInMainWorld('api', {
   // ── Fase 14: Interoperabilidade Pro (FCPXML, EDL e Project Bundling) ──────────
   exportEdl: (projectData) => ipcRenderer.invoke('export-edl', projectData),
   exportFcpxml: (projectData) => ipcRenderer.invoke('export-fcpxml', projectData),
-  bundleProject: (projectData) => ipcRenderer.invoke('bundle-project', projectData)
+  bundleProject: (projectData) => ipcRenderer.invoke('bundle-project', projectData),
+  // ── Fase 15: Gravação Direta na Timeline (Voiceover & Webcam PiP) ──────────────
+  saveAudioRecording: (arrayBuffer, namePrefix) => ipcRenderer.invoke('save-audio-recording', { arrayBuffer, namePrefix }),
+  saveVideoRecording: (arrayBuffer, namePrefix) => ipcRenderer.invoke('save-video-recording', { arrayBuffer, namePrefix })
 });
 
 

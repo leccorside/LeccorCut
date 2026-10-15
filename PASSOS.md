@@ -324,7 +324,7 @@
 | Fase 12 — Áudio Avançado, Voice Changers e Separação Neural | ✅ Concluída (100%) | 🟡 Média |
 | Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal Livre | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 14 — Interoperabilidade Pro (FCPXML / EDL / Bundler) | ✅ Concluída (100%) | 🟢 Concluída |
-| Fase 15 — Gravação Direta na Timeline (Voiceover, Mic & Webcam PiP) | ⏳ A Fazer (0%) | 🟠 Alta |
+| Fase 15 — Gravação Direta na Timeline (Voiceover, Mic & Webcam PiP) | ✅ Concluída (100%) | 🟢 Concluída |
 | Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync) | ⏳ A Fazer (0%) | 🟡 Média |
 | Fase 17 — Dublagem Neural e Conversão Texto-em-Fala (TTS Local & Legendas Bilíngues) | ⏳ A Fazer (0%) | 🟡 Média |
 | Fase 18 — Exportador de Animações Web e Stickers (GIF / WebP Animado) | ⏳ A Fazer (0%) | 🟢 Baixa |
@@ -334,13 +334,13 @@
 ## 🎙️ Fase 15 — Gravação Direta na Timeline (Voiceover, Microfone & Webcam PiP)
 
 ### 15.1 Gravação de Áudio e Locução (Voiceover)
-- [ ] Implementar gravador de voz nativo com contagem regressiva 3..2..1 e inserção automática na agulha
-- [ ] Implementar medidor visual de nível de áudio (VU Meter em tempo real) com detecção de clipping
-- [ ] Implementar seleção de dispositivo de entrada de microfone e cancelamento de eco
+- [x] Implementar gravador de voz nativo com contagem regressiva 3..2..1 e inserção automática na agulha
+- [x] Implementar medidor visual de nível de áudio (VU Meter em tempo real) com detecção de clipping
+- [x] Implementar seleção de dispositivo de entrada de microfone e cancelamento de eco
 
 ### 15.2 Captura de Webcam para Picture-in-Picture
-- [ ] Implementar gravação simultânea de câmera frontal para criação de reacts, tutoriais e gameplays
-- [ ] Inserção automática da gravação de webcam na trilha de sobreposição (PiP) com máscara circular/retangular
+- [x] Implementar gravação simultânea de câmera frontal para criação de reacts, tutoriais e gameplays
+- [x] Inserção automática da gravação de webcam na trilha de sobreposição (PiP) com máscara circular/retangular
 
 ---
 
@@ -376,6 +376,6 @@
 
 ---
 
-*Última atualização: 2026-10-15 — Fases 1 a 14 100% concluídas (260+ testes passando) | Mapeamento expandido de recursos avançados com paridade total ao CapCut v9.6.0.4097*
+*Última atualização: 2026-10-15 — Fases 1 a 15 100% concluídas (270+ testes passando) | Mapeamento expandido de recursos avançados com paridade total ao CapCut v9.6.0.4097*
 
 

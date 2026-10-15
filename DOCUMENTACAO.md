@@ -1260,31 +1260,70 @@ Esta fase integrou recursos avançados de intercâmbio de timeline e portabilida
 
 ---
 
-## 24. Roadmap de Expansões Futuras (Fases 15 a 18)
+## 25. Fase 15 — Gravação Direta na Timeline (Voiceover & Webcam PiP)
+
+*Status: 100% Concluída | Data de Implementação: 2026-10-15 | Testes: `tests/phase15-smoke.js` (11 testes automatizados passando)*
+
+### 25.1 Gravação de Áudio e Locução (Voiceover)
+- **Módulo de Suporte (`src/recorderManager.js`):**
+  - **Conversão de Áudio com FFmpeg:** O navegador captura áudio via `MediaRecorder` preferencialmente em WebM/Opus. O método `processAudioRecording()` salva os chunks em arquivo temporário e converte imediatamente via FFmpeg para **WAV PCM 16-bit 44.1kHz estéreo sem perdas** (`-acodec pcm_s16le -ar 44100 -ac 2`), garantindo compatibilidade imediata com toda a pipeline da timeline, equalizador de 10 bandas e filtros de áudio do LeccorCut.
+  - **Métricas Acústicas (`calculateAudioMetrics`):** Processamento matemático de amostras PCM calculando valor RMS (*Root Mean Square*), valor de pico (*Peak*), decibéis precisos (`20 * Math.log10(rms)`) com clamp inferior em -100 dB, e detecção de saturação (*clipping*) quando `peak >= 0.99`.
+- **Monitoramento em Tempo Real (VU Meter):**
+  - Integração com Web Audio API (`AudioContext`, `createMediaStreamSource`, `createAnalyser` com `fftSize = 512`).
+  - Loop contínuo a 60 FPS via `requestAnimationFrame` que atualiza a barra de gradiente triplo (verde 0 a -12 dB, amarelo -12 a -3 dB e vermelho > -3 dB), display digital em decibéis (`-inf dB` a `0.0 dB`) e LED indicador de clipping com brilho neon pulsante.
+- **Fluxo de Trabalho e Experiência do Criador:**
+  - Atalho de teclado rápido `R` ou botão `🎙️ Locução (R)` na toolbar da timeline.
+  - Seleção dinâmica de dispositivos de microfone via `navigator.mediaDevices.enumerateDevices()`.
+  - Opções configuráveis: mutar áudio do projeto durante a gravação (para não vazar no microfone) e cancelamento de eco/supressão de ruído nativa.
+  - Contagem regressiva visual 3..2..1 antes da gravação para preparação do locutor.
+  - Reprodução automática sincronizada da timeline durante a gravação, permitindo dublagem e reação exata ao vídeo.
+  - Inserção automática do clipe gravado na agulha da timeline (`start: voiceStartAgulhaTime`) na trilha de áudio com cálculo de forma de onda (*waveform*).
+
+### 25.2 Captura de Webcam para Picture-in-Picture (PiP / Facecam)
+- **Módulo de Suporte (`processVideoRecording`):**
+  - Gravação de vídeo e áudio combinados da webcam.
+  - Conversão via FFmpeg para **MP4 H.264 / AAC** com flag `-movflags +faststart`, movendo o átomo `moov` para o início do arquivo e permitindo seek instantâneo sem buffering no Electron/Chromium.
+  - Extração automática de miniatura (*thumbnail*) em alta resolução do frame inicial (`-vframes 1 -vf scale=160:-1`).
+- **Composição PiP Direta na Timeline:**
+  - Atalho de teclado rápido `W` ou botão `📷 Webcam (W)` na toolbar da timeline.
+  - Monitoramento ao vivo da câmera em elemento `<video>` espelhado.
+  - Seleção independente de câmera de vídeo e microfone de entrada.
+  - Seleção de posicionamento PiP automático: Canto Inferior Direito (padrão), Canto Inferior Esquerdo, Canto Superior Direito e Canto Superior Esquerdo.
+  - Controle de escala PiP contínuo (15% a 60%, padrão 30%).
+  - Suporte a máscara geométrica circular (`mask: { type: 'circle', size: 80 }` com `border-radius: 9999px`) estilo avatar moderno ou retangular normal.
+  - Inserção direta na trilha de sobreposição (`state.overlays`) exatamente na agulha da timeline.
+
+### 25.3 Componentes Entregues
+1. `src/recorderManager.js`: Métodos `getRecordingsDir()`, `calculateAudioMetrics()`, `processAudioRecording()` e `processVideoRecording()`.
+2. `src/main.js`: Handlers IPC `save-audio-recording` e `save-video-recording` com integração a `decorateMedia` e `probe`.
+3. `src/preload.js`: APIs `window.api.saveAudioRecording` e `window.api.saveVideoRecording`.
+4. `src/index.html`: Botões `#btnVoiceover` e `#btnWebcamPiP`, modais `#voiceoverModal` e `#webcamModal` com VU meter, preview de câmera, timers e contagem regressiva.
+5. `src/styles.css`: Estilização profissional para botões de gravação `.rec-btn`, barra de VU meter `.vu-meter-bar-inner`, display de decibéis, LED de clipping, contagem 3..2..1 e preview de webcam.
+6. `src/renderer.js`: Funções `initTimelineRecording()`, `openVoiceoverModal()`, `openWebcamModal()` e listeners de atalho `R` e `W`.
+7. `tests/phase15-smoke.js`: Suíte de 11 testes automatizados com 100% de aprovação.
+
+---
+
+## 26. Roadmap de Expansões Futuras (Fases 16 a 18)
 
 Mapeamento de recursos identificados no binário do CapCut v9.6.0.4097 (`VECreator.dll`, `audioeffect.dll`, `videoeditor.dll`, `cccreator.dll`) para implementação nas próximas fases do LeccorCut:
 
-### 24.1 Fase 15 — Gravação Direta na Timeline (Voiceover, Microfone & Webcam PiP)
-*Referência no CapCut: `audio_record_manager`, `record_controller`, `mic_stream_input`*
-- Gravador nativo de áudio para locução (*Voiceover*) com contagem regressiva 3..2..1, medidor visual de nível de áudio (VU Meter em tempo real) com detecção de clipping e inserção automática na agulha.
-- Captura de Webcam para Picture-in-Picture (PiP / Facecam) permitindo gravação simultânea de reações, tutoriais e gameplays na trilha de sobreposição com máscara circular/retangular.
-
-### 24.2 Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync)
+### 26.1 Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync)
 *Referência no CapCut: `silence_detector`, `beat_detect_model`, `audio_transient_detector`*
 - Removedor de Silêncio Automático (*Smart Silence Remover*): Análise acústica de faixas de voz com limiar configurável de ruído de fundo (-35dB a -50dB) e remoção automática de pausas e gagueiras com corte limpo e transições suaves de áudio.
 - Sincronização Automática com a Batida (*Auto Beat Sync*): Detector de transientes e batidas rítmicas com inserção de marcadores automáticos na timeline e recurso de "Ajustar Cortes à Música" para alinhar transições de cena aos picos rítmicos.
 
-### 24.3 Fase 17 — Dublagem Neural e Conversão Texto-em-Fala (TTS Local & Legendas Bilíngues)
+### 26.2 Fase 17 — Dublagem Neural e Conversão Texto-em-Fala (TTS Local & Legendas Bilíngues)
 *Referência no CapCut: `tts_stream_synthesizer`, `bilingual_subtitle_generator`, `sam_voice_models`*
 - Síntese de Voz Offline (*Text-to-Speech*): Motor TTS neural local para converter legendas e textos em faixas de áudio faladas, com seleção de timbres naturais masculinos e femininos em português e inglês.
 - Legendas Bilíngues com Tradução Simultânea: Exibição simultânea de legendas no idioma original e traduzido (estilo conteúdo viral internacional) com estilização visual independente para o texto principal e a tradução.
 
-### 24.4 Fase 18 — Exportador de Animações Web e Stickers (GIF / WebP Animado)
+### 26.3 Fase 18 — Exportador de Animações Web e Stickers (GIF / WebP Animado)
 *Referência no CapCut: `gif_palette_generator`, `webp_animated_encoder`*
 - Exportação Direta de Memes e Stickers: Exportação de trechos selecionados para GIF animado com otimização de paleta adaptativa (`palettegen` / `paletteuse`) e exportação para WebP animado com suporte a canal alfa transparente para figurinhas de mensageiros.
 
 ---
 
-*Documentação consolidada em: 2026-10-15 | Todas as Fases 1 a 14 100% concluídas (260+ testes passando) | Fases 15 a 18 catalogadas com fidelidade à arquitetura do CapCut v9.6.0.4097*
+*Documentação consolidada em: 2026-10-15 | Todas as Fases 1 a 15 100% concluídas (270+ testes passando) | Fases 16 a 18 catalogadas com fidelidade à arquitetura do CapCut v9.6.0.4097*
 
 
