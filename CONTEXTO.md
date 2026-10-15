@@ -124,6 +124,7 @@ via engenharia reversa estática com as ferramentas **REA v6.4.0** + **Ghidra 12
 ### Arquivos Gerados
 - [PASSOS.md](file:///d:/0000000-PROJETOS/LeccorCut/PASSOS.md) — Roteiro com checkboxes (Fases 1 e 2 concluídas; Fase 3 estática concluída; Fase 4 só com MITM pendente)
 - [DOCUMENTACAO.md](file:///d:/0000000-PROJETOS/LeccorCut/DOCUMENTACAO.md) — Documentação técnica completa (Seções 1 a 18; rede/APIs em 9.3–9.9; proteções em 10.4–10.8; dinâmica em 18)
+- [FASE4_MITM.md](file:///d:/0000000-PROJETOS/LeccorCut/FASE4_MITM.md) — Runbook de captura MITM (último item pendente da Fase 4); inclui instalação do mitmproxy, CA temporário, proxy, coleta, **limpeza obrigatória** e análise. Escopo: só inventário de endpoints/telemetria visível, sem bypass de pinning/assinatura.
 - [CONTEXTO.md](file:///d:/0000000-PROJETOS/LeccorCut/CONTEXTO.md) — Memória de contexto atualizada
 
 ---
