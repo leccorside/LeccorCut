@@ -173,3 +173,44 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .shortcut-key-badge{font-family:monospace;font-size:11px;font-weight:700;background:rgba(0,229,195,0.15);color:var(--a1);border:1px solid rgba(0,229,195,0.35);padding:3px 8px;border-radius:4px;cursor:pointer}
 .shortcut-key-badge.recording{background:#ff3366;color:#fff;border-color:#ff0033}
 
+/* ── Fase 10: GPU Badge & Modal Proxy ────────────────────────── */
+.gpu-badge{font-size:11px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(0,229,195,0.12);color:var(--a1);border:1px solid rgba(0,229,195,0.3);margin-left:4px;vertical-align:middle;display:inline-block}
+.gpu-badge.cpu{background:rgba(140,160,180,0.12);color:var(--mut);border-color:var(--line)}
+.gpu-badge.gpu-active{background:rgba(0,229,195,0.2);color:var(--a1);border-color:var(--a1)}
+
+.modal-box--wide{max-width:640px;width:95%}
+
+.proxy-gpu-info{display:flex;align-items:center;gap:10px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-bottom:12px}
+.proxy-label{font-size:12px;color:var(--mut);font-weight:500}
+.proxy-value{font-size:12px;color:var(--txt);font-weight:600;flex:1}
+
+.proxy-stats-row{display:flex;gap:8px;margin-bottom:12px}
+.proxy-stat{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.proxy-stat-label{font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:0.5px}
+.proxy-stat-value{font-size:13px;font-weight:700;color:var(--txt)}
+.proxy-stat--dir .proxy-stat-value{font-size:10px;font-family:monospace;word-break:break-all;color:var(--mut)}
+
+.proxy-config-row{display:flex;gap:14px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.proxy-config-label{font-size:12px;color:var(--txt);display:flex;align-items:center;gap:6px}
+.proxy-config-label select, .proxy-config-label input{background:var(--panel2);border:1px solid var(--line);border-radius:4px;color:var(--txt);padding:3px 6px;font-size:11px}
+
+.proxy-actions-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+
+.btn-small{padding:3px 8px;font-size:11px;border-radius:4px;background:var(--panel2);border:1px solid var(--line);color:var(--txt);cursor:pointer}
+.btn-small:hover{border-color:var(--a1);color:var(--a1)}
+
+.btn-danger{background:rgba(255,51,102,0.12);border:1px solid rgba(255,51,102,0.35);color:#ff3366;cursor:pointer}
+.btn-danger:hover{background:#ff3366;color:#fff}
+
+.proxy-list{max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;border:1px solid var(--line);border-radius:6px;padding:6px;background:var(--bg);margin-bottom:10px}
+.proxy-list-item{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:var(--panel2);border-radius:4px;font-size:11px}
+.proxy-list-item-name{font-weight:500;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px}
+.proxy-list-item-meta{color:var(--mut);font-size:10px}
+.proxy-list-item-actions{display:flex;gap:4px}
+
+.proxy-progress-wrap{margin-top:10px}
+.proxy-progress-label{font-size:11px;color:var(--mut);margin-bottom:4px}
+.proxy-progress-bar-outer{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;border:1px solid var(--line)}
+.proxy-progress-bar-inner{height:100%;background:linear-gradient(90deg, var(--a1), var(--a2));border-radius:3px;transition:width .15s ease}
+
+

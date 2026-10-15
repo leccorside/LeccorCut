@@ -10,6 +10,9 @@ const { buildFfmpeg, buildAudioOnlyFfmpeg, buildCodecArgs } = require('./ffmpegB
 const { capcutToLeccor, leccorToCapcut } = require('./capcutConverter');
 const { getAssetsList, getAssetById, ensureAssetFile } = require('./assetsLibrary');
 const backupManager = require('./backupManager');
+// ── Fase 10: Aceleração GPU e Proxy ─────────────────────────────────────────
+const { detectGpuEncoders, resolveEncoderArgs } = require('./gpuDetector');
+const proxyManager = require('./proxyManager');
 
 let win;
 function createWindow() {
@@ -22,6 +25,12 @@ function createWindow() {
   });
   win.setMenuBarVisibility(false);
   backupManager.setBackupsDir(path.join(app.getPath('userData'), 'backups'));
+  // Fase 10: inicializa o gerenciador de proxies com o diretório de cache
+  proxyManager.init(ffmpegPath, app.getPath('userData'));
+  // Repassa progresso de geração de proxy para o renderer
+  proxyManager.on('proxy-progress', (data) => {
+    if (win && !win.isDestroyed()) win.webContents.send('proxy-progress', data);
+  });
   win.loadFile(path.join(__dirname, 'index.html'));
 }
 app.whenReady().then(createWindow);
@@ -172,6 +181,18 @@ ipcMain.handle('export', async (_e, project) => {
     ]
   });
   if (r.canceled) return { ok: false };
+
+  // Fase 10: Se aceleração GPU foi solicitada, resolve os argumentos de hardware
+  if (S.accel && S.accel !== 'cpu') {
+    try {
+      const gpuInfo = await detectGpuEncoders(ffmpegPath);
+      const resolved = resolveEncoderArgs(gpuInfo, S.accel, fmt, S.colorProfile);
+      if (resolved && resolved.isGpu) {
+        project.settings.gpuEncoder = resolved;
+      }
+    } catch (_) {}
+  }
+
   const ffmpegRes = buildFfmpeg(project, r.filePath);
 
   if (ffmpegRes.isTwoPass) {
@@ -1268,5 +1289,85 @@ ipcMain.handle('toggle-fullscreen', async () => {
     return nextState;
   }
   return false;
+});
+
+// ── Fase 10: Aceleração GPU e Sistema de Proxy ─────────────────────────────────
+
+/**
+ * Detecta os encoders acelerados por GPU disponíveis no sistema.
+ * Usa cache em memória para evitar sondagens repetidas dentro da sessão.
+ */
+ipcMain.handle('detect-gpu', async (_e, forceRefresh) => {
+  return detectGpuEncoders(ffmpegPath, !!forceRefresh);
+});
+
+/**
+ * Gera o arquivo proxy em background para um arquivo de mídia pesado.
+ * Emite eventos 'proxy-progress' durante o processo.
+ */
+ipcMain.handle('generate-proxy', async (_e, opts) => {
+  const { srcPath, targetHeight, crf } = opts || {};
+  if (!srcPath || !fs.existsSync(srcPath)) {
+    return { ok: false, error: 'Arquivo de origem não encontrado' };
+  }
+  try {
+    const proxyPath = await proxyManager.generateProxy(srcPath, { targetHeight, crf });
+    return { ok: true, proxyPath };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+/**
+ * Verifica se já existe proxy disponível para um arquivo de mídia.
+ */
+ipcMain.handle('has-proxy', async (_e, srcPath) => {
+  return { hasProxy: proxyManager.hasProxy(srcPath), proxyPath: proxyManager.getProxyPath(srcPath) };
+});
+
+/**
+ * Resolve o caminho de reprodução: retorna proxy se disponível, original caso contrário.
+ */
+ipcMain.handle('resolve-playback-path', async (_e, srcPath) => {
+  return proxyManager.resolvePlaybackPath(srcPath);
+});
+
+/**
+ * Retorna estatísticas do cache de proxies (tamanho, contagem, diretório).
+ */
+ipcMain.handle('proxy-cache-stats', async () => {
+  return proxyManager.getCacheStats();
+});
+
+/**
+ * Lista todos os arquivos proxy existentes em cache.
+ */
+ipcMain.handle('list-proxies', async () => {
+  return proxyManager.listProxies();
+});
+
+/**
+ * Remove todos os proxies do cache (limpeza completa).
+ */
+ipcMain.handle('clear-proxy-cache', async () => {
+  return proxyManager.clearCache();
+});
+
+/**
+ * Remove o proxy de um arquivo específico.
+ */
+ipcMain.handle('delete-proxy', async (_e, srcPath) => {
+  proxyManager.deleteProxy(srcPath);
+  return { ok: true };
+});
+
+/**
+ * Resolve os argumentos de encoder GPU para o formato e perfil de cor especificados.
+ * Usado pelo renderer para exibir o encoder ativo antes de exportar.
+ */
+ipcMain.handle('resolve-encoder-args', async (_e, opts) => {
+  const { userPref, format, colorProfile } = opts || {};
+  const gpuInfo = await detectGpuEncoders(ffmpegPath);
+  return resolveEncoderArgs(gpuInfo, userPref || 'auto', format || 'mp4', colorProfile || 'bt709');
 });
 

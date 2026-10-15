@@ -46,7 +46,18 @@ contextBridge.exposeInMainWorld('api', {
   listBackups: () => ipcRenderer.invoke('list-backups'),
   restoreBackup: (id) => ipcRenderer.invoke('restore-backup', id),
   deleteBackup: (id) => ipcRenderer.invoke('delete-backup', id),
-  toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen')
+  toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen'),
+  // ── Fase 10: Aceleração GPU e Sistema de Mídia Proxy ────────────────────────
+  detectGpu: (forceRefresh) => ipcRenderer.invoke('detect-gpu', forceRefresh),
+  generateProxy: (opts) => ipcRenderer.invoke('generate-proxy', opts),
+  onProxyProgress: (cb) => ipcRenderer.on('proxy-progress', (_e, data) => cb(data)),
+  hasProxy: (srcPath) => ipcRenderer.invoke('has-proxy', srcPath),
+  resolvePlaybackPath: (srcPath) => ipcRenderer.invoke('resolve-playback-path', srcPath),
+  proxyCacheStats: () => ipcRenderer.invoke('proxy-cache-stats'),
+  listProxies: () => ipcRenderer.invoke('list-proxies'),
+  clearProxyCache: () => ipcRenderer.invoke('clear-proxy-cache'),
+  deleteProxy: (srcPath) => ipcRenderer.invoke('delete-proxy', srcPath),
+  resolveEncoderArgs: (opts) => ipcRenderer.invoke('resolve-encoder-args', opts)
 });
 
 

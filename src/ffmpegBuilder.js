@@ -166,8 +166,12 @@ function buildCodecArgs(settings, outPath, passNum = 0, passLogPrefix = null) {
     vArgs.push('-pix_fmt', 'yuva444p10le');
     aArgs.push('-c:a', 'pcm_s16le');
   } else {
-    // mp4 (H.264)
-    vArgs.push('-c:v', 'libx264', '-preset', 'medium');
+    // mp4 (H.264 / HEVC via GPU ou libx264)
+    if (S.gpuEncoder && Array.isArray(S.gpuEncoder.codecArgs) && S.gpuEncoder.codecArgs.length) {
+      vArgs.push(...S.gpuEncoder.codecArgs);
+    } else {
+      vArgs.push('-c:v', 'libx264', '-preset', 'medium');
+    }
     if (colorProfile === 'bt2020') {
       vArgs.push('-pix_fmt', 'yuv420p10le');
     } else {
@@ -201,7 +205,7 @@ function buildCodecArgs(settings, outPath, passNum = 0, passLogPrefix = null) {
     // Modo CRF (Qualidade Constante)
     if (fmt === 'webm') {
       vArgs.push('-crf', String(crf), '-b:v', '0');
-    } else {
+    } else if (!S.gpuEncoder || !S.gpuEncoder.isGpu) {
       vArgs.push('-crf', String(crf));
     }
   }

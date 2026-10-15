@@ -38,10 +38,20 @@
       <option value="bt709" selected>Rec.709 (SDR)</option>
       <option value="bt2020">BT.2020 (HDR 10-bit)</option>
     </select>
+    <!-- Fase 10: Seletor de Aceleração por Hardware GPU -->
+    <select id="expAccel" title="Aceleração por Hardware GPU (NVENC / QSV / AMF)">
+      <option value="auto" selected>⚡ GPU: Auto</option>
+      <option value="nvenc">🟢 NVENC (NVIDIA)</option>
+      <option value="qsv">🔵 QuickSync (Intel)</option>
+      <option value="amf">🔴 AMF (AMD)</option>
+      <option value="cpu">🖥️ CPU (libx264)</option>
+    </select>
+    <span id="gpuStatusBadge" class="gpu-badge" title="Status do encoder ativo" hidden></span>
     <button id="btnOpen">Abrir</button>
     <button id="btnSave">Salvar</button>
     <button id="btnHistory" title="Histórico de Versões e Backups Automáticos (.lccut)">⏱️ Versões</button>
     <button id="btnShortcuts" title="Configurar Atalhos de Teclado">⌨️ Atalhos</button>
+    <button id="btnProxy" title="Gerenciar Mídia Proxy (Fase 10)">🔁 Proxy</button>
     <button id="btnImportCapcut" class="capcut-btn" title="Importar Projeto do CapCut (draft_content.json)">📥 CapCut</button>
     <button id="btnExportCapcut" class="capcut-btn" title="Exportar Projeto para CapCut (draft_content.json)">📤 CapCut</button>
     <button id="btnExportAudio" title="Exportar Áudio Independente da Timeline (.wav, .mp3, .aac)">🎵 Áudio</button>
@@ -285,6 +295,71 @@
       <div class="modal-footer-row">
         <button id="btnResetShortcuts">Restaurar Padrões</button>
         <button id="btnSaveShortcuts" class="primary">Salvar Atalhos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fase 10: Modal de Gerenciamento de Mídia Proxy ─────────────── -->
+<div id="proxyModal" class="modal-overlay" hidden>
+  <div class="modal-box modal-box--wide">
+    <div class="modal-header">
+      <h3>🔁 Gerenciador de Mídia Proxy</h3>
+      <button id="btnCloseProxy" class="modal-close" title="Fechar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">
+        Arquivos proxy são versões leves (720p, H.264 ultrafast) geradas em segundo plano para mídias pesadas (4K/8K),
+        garantindo reprodução fluida na timeline. O arquivo original é sempre usado na exportação final.
+      </p>
+      <!-- Status de GPU detectada -->
+      <div id="gpuDetectResult" class="proxy-gpu-info">
+        <span class="proxy-label">🔍 GPU detectada:</span>
+        <span id="gpuDetectText" class="proxy-value">Verificando...</span>
+        <button id="btnRefreshGpu" class="btn-small">↺ Rescanear</button>
+      </div>
+      <!-- Estatísticas do cache -->
+      <div class="proxy-stats-row">
+        <div class="proxy-stat">
+          <span class="proxy-stat-label">Arquivos em Cache</span>
+          <span id="proxyCacheCount" class="proxy-stat-value">0</span>
+        </div>
+        <div class="proxy-stat">
+          <span class="proxy-stat-label">Espaço Usado</span>
+          <span id="proxyCacheMB" class="proxy-stat-value">0 MB</span>
+        </div>
+        <div class="proxy-stat proxy-stat--dir">
+          <span class="proxy-stat-label">Diretório</span>
+          <span id="proxyCacheDir" class="proxy-stat-value">—</span>
+        </div>
+      </div>
+      <!-- Configurações de geração de proxy -->
+      <div class="proxy-config-row">
+        <label class="proxy-config-label">Resolução do Proxy:
+          <select id="proxyTargetHeight">
+            <option value="720" selected>720p (Recomendado)</option>
+            <option value="540">540p (Mais leve)</option>
+            <option value="480">480p (Ultra leve)</option>
+          </select>
+        </label>
+        <label class="proxy-config-label">Qualidade (CRF):
+          <input type="number" id="proxyCrf" value="28" min="18" max="40" step="1" style="width:55px">
+        </label>
+      </div>
+      <!-- Ações -->
+      <div class="proxy-actions-row">
+        <button id="btnGenerateProxies" class="primary">⚡ Gerar Proxies para Todos os Clipes</button>
+        <button id="btnClearProxyCache" class="btn-danger">🗑️ Limpar Cache de Proxies</button>
+        <button id="btnRefreshProxyStats">↺ Atualizar</button>
+      </div>
+      <!-- Lista de proxies gerados -->
+      <div id="proxyList" class="proxy-list"></div>
+      <!-- Barra de progresso global de geração -->
+      <div id="proxyProgressWrap" class="proxy-progress-wrap" hidden>
+        <div class="proxy-progress-label" id="proxyProgressLabel">Gerando proxy...</div>
+        <div class="proxy-progress-bar-outer">
+          <div class="proxy-progress-bar-inner" id="proxyProgressBar" style="width:0%"></div>
+        </div>
       </div>
     </div>
   </div>

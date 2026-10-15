@@ -1895,6 +1895,7 @@ $('btnExport').onclick = async () => {
   const bitrateMode = $('expBitrateMode') ? $('expBitrateMode').value : 'crf';
   const bitrate = $('expBitrate') ? +$('expBitrate').value : 8000;
   const colorProfile = $('expColorProfile') ? $('expColorProfile').value : 'bt709';
+  const accel = $('expAccel') ? $('expAccel').value : 'auto';
 
   const r = await window.api.exportVideo({
     clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, tracks: state.tracks,
@@ -1906,7 +1907,8 @@ $('btnExport').onclick = async () => {
       format,
       bitrateMode,
       bitrate,
-      colorProfile
+      colorProfile,
+      accel
     }
   });
   toast(r.ok ? 'Exportado com sucesso: ' + r.path : (r.log ? 'Erro: ' + r.log.slice(-200) : 'Cancelado'));
@@ -2787,3 +2789,179 @@ initCinemaMode();
 initAssetsTab();
 initBackups();
 initShortcuts();
+
+// ─── Fase 10: Detecção de GPU e Aceleração por Hardware ──────────────────────
+async function initGpuDetection() {
+  const badge = $('gpuStatusBadge');
+  const accelSel = $('expAccel');
+  const gpuDetectText = $('gpuDetectText');
+  const btnRefreshGpu = $('btnRefreshGpu');
+
+  if (!window.api || !window.api.detectGpu) return;
+
+  async function updateGpuStatus(forceRefresh = false) {
+    try {
+      const gpuInfo = await window.api.detectGpu(forceRefresh);
+      const userPref = accelSel ? accelSel.value : 'auto';
+      const format = $('expFormat') ? $('expFormat').value : 'mp4';
+      const colorProfile = $('expColorProfile') ? $('expColorProfile').value : 'bt709';
+
+      const resolved = await window.api.resolveEncoderArgs({ userPref, format, colorProfile });
+
+      if (badge) {
+        badge.hidden = false;
+        if (resolved.isGpu) {
+          badge.className = 'gpu-badge gpu-active';
+          badge.textContent = `⚡ ${resolved.label}`;
+          badge.title = `Encoder ativo: ${resolved.label} (${resolved.codecArgs.join(' ')})`;
+        } else {
+          badge.className = 'gpu-badge cpu';
+          badge.textContent = `🖥️ CPU`;
+          badge.title = 'Renderização por software (libx264)';
+        }
+      }
+
+      if (gpuDetectText) {
+        if (gpuInfo.available && gpuInfo.available.length > 0) {
+          const names = gpuInfo.available.map(k => gpuInfo.encoders[k]?.label || k).join(', ');
+          gpuDetectText.textContent = `${names} (${gpuInfo.hwaccelFlag || 'd3d11va'})`;
+        } else {
+          gpuDetectText.textContent = 'Nenhuma GPU compatível detectada — Usando CPU (libx264)';
+        }
+      }
+    } catch (e) {
+      if (gpuDetectText) gpuDetectText.textContent = 'Erro ao sondar GPU: ' + e.message;
+    }
+  }
+
+  if (accelSel) accelSel.onchange = () => updateGpuStatus(false);
+  if ($('expFormat')) {
+    const origFmtChange = $('expFormat').onchange;
+    $('expFormat').onchange = (e) => {
+      if (origFmtChange) origFmtChange(e);
+      updateGpuStatus(false);
+    };
+  }
+  if (btnRefreshGpu) btnRefreshGpu.onclick = () => {
+    toast('Rescaneando encoders de hardware...');
+    updateGpuStatus(true);
+  };
+
+  await updateGpuStatus(false);
+}
+
+// ─── Fase 10: Gerenciador de Mídia Proxy e Pré-Render ───────────────────────
+function initProxyManagerUI() {
+  const modal = $('proxyModal');
+  const btnProxy = $('btnProxy');
+  const btnClose = $('btnCloseProxy');
+  const btnRefresh = $('btnRefreshProxyStats');
+  const btnClear = $('btnClearProxyCache');
+  const btnGenerate = $('btnGenerateProxies');
+  const listEl = $('proxyList');
+  const countEl = $('proxyCacheCount');
+  const mbEl = $('proxyCacheMB');
+  const dirEl = $('proxyCacheDir');
+  const progressWrap = $('proxyProgressWrap');
+  const progressLabel = $('proxyProgressLabel');
+  const progressBar = $('proxyProgressBar');
+
+  if (!window.api || !window.api.generateProxy) return;
+
+  async function refreshStats() {
+    try {
+      const stats = await window.api.proxyCacheStats();
+      if (countEl) countEl.textContent = stats.count;
+      if (mbEl) mbEl.textContent = `${stats.totalMB} MB`;
+      if (dirEl) dirEl.textContent = stats.dir ? stats.dir.split(/[\\/]/).slice(-2).join('/') : '—';
+
+      const proxies = await window.api.listProxies();
+      if (listEl) {
+        listEl.innerHTML = '';
+        if (!proxies || !proxies.length) {
+          listEl.innerHTML = '<p class="hint" style="text-align:center;padding:12px;">Nenhum arquivo proxy em cache.</p>';
+        } else {
+          proxies.forEach(p => {
+            const row = document.createElement('div');
+            row.className = 'proxy-list-item';
+            row.innerHTML = `
+              <span class="proxy-list-item-name" title="${p.proxyPath}">${p.srcHash}.mp4</span>
+              <span class="proxy-list-item-meta">${p.sizeMB} MB</span>
+              <div class="proxy-list-item-actions">
+                <button class="btn-small btn-danger del-proxy-btn" title="Excluir proxy">🗑</button>
+              </div>
+            `;
+            row.querySelector('.del-proxy-btn').onclick = async () => {
+              await window.api.deleteProxy(p.proxyPath);
+              refreshStats();
+            };
+            listEl.appendChild(row);
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (btnProxy) {
+    btnProxy.onclick = () => {
+      if (modal) modal.hidden = false;
+      refreshStats();
+    };
+  }
+  if (btnClose) btnClose.onclick = () => { if (modal) modal.hidden = true; };
+  if (modal) modal.onclick = (e) => { if (e.target === modal) modal.hidden = true; };
+  if (btnRefresh) btnRefresh.onclick = refreshStats;
+
+  if (btnClear) {
+    btnClear.onclick = async () => {
+      if (!confirm('Deseja limpar todo o cache de mídia proxy? Os vídeos originais não serão afetados.')) return;
+      const res = await window.api.clearProxyCache();
+      toast(`Cache de proxy limpo (${res.removed || 0} arquivos removidos)`);
+      refreshStats();
+    };
+  }
+
+  if (btnGenerate) {
+    btnGenerate.onclick = async () => {
+      const videoClips = (state.clips || []).filter(c => !c.isImage && c.path);
+      if (!videoClips.length) return toast('Nenhum clipe de vídeo na timeline para gerar proxy');
+
+      const targetHeight = $('proxyTargetHeight') ? +$('proxyTargetHeight').value : 720;
+      const crf = $('proxyCrf') ? +$('proxyCrf').value : 28;
+
+      if (progressWrap) progressWrap.hidden = false;
+      btnGenerate.disabled = true;
+
+      for (let i = 0; i < videoClips.length; i++) {
+        const c = videoClips[i];
+        if (progressLabel) progressLabel.textContent = `Gerando proxy (${i + 1}/${videoClips.length}): ${c.name || 'Vídeo'}...`;
+        if (progressBar) progressBar.style.width = '0%';
+        try {
+          await window.api.generateProxy({ srcPath: c.path, targetHeight, crf });
+        } catch (e) {
+          toast(`Falha no proxy de ${c.name}: ${e.message}`);
+        }
+      }
+
+      btnGenerate.disabled = false;
+      if (progressWrap) progressWrap.hidden = true;
+      refreshStats();
+      toast('Processamento de proxies concluído com sucesso!');
+    };
+  }
+
+  if (window.api.onProxyProgress) {
+    window.api.onProxyProgress((data) => {
+      if (progressBar && data.percent !== undefined) {
+        progressBar.style.width = `${data.percent}%`;
+      }
+      if (progressLabel && data.done) {
+        progressLabel.textContent = data.error ? `Erro: ${data.error}` : 'Proxy concluído!';
+      }
+    });
+  }
+}
+
+initGpuDetection();
+initProxyManagerUI();
+

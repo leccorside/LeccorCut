@@ -150,106 +150,93 @@ via engenharia reversa estática com as ferramentas **REA v6.4.0** + **Ghidra 12
 
 ---
 
-## ✅ O que já foi implementado no LeccorCut
+## ✅ O que já foi implementado no LeccorCut (Fases 5 a 9 — 100% Concluídas)
 
-O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
+O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa com 100% de integridade e 55 testes automatizados:
 
-### Timeline e Edição
-- ✅ Timeline multi-trilha: Vídeo Principal, Sobreposição (PiP), Áudio, Texto/Legendas
+### Timeline, Edição e Movimento (Fases 5 e 6)
+- ✅ Timeline multi-trilha: Vídeo Principal, Sobreposição (PiP / Stickers), Áudio Secundário, Texto/Legendas
 - ✅ Track headers com botões de visibilidade e mute
-- ✅ Corte preciso (`S`), split na agulha
-- ✅ Detecção automática de cenas (Shot Detection, botão `🎬 Detectar Cenas`) com inserção de marcadores
-- ✅ Reorganização por drag-and-drop
-- ✅ Redimensionamento/trim pelas alças laterais
-- ✅ Congelar quadro (Freeze Frame, tecla `F`)
-- ✅ Separar áudio do vídeo (unlink)
-- ✅ Alinhamento magnético / Snap (tecla `N`)
-- ✅ Marcadores na timeline (tecla `M`)
+- ✅ Corte preciso (`S`), split na agulha, reorganização por drag-and-drop e trim pelas alças laterais
+- ✅ Congelar quadro (Freeze Frame, tecla `F`) e separação de áudio do vídeo (unlink)
+- ✅ Alinhamento magnético / Snap magnético (tecla `N`) e marcadores de timeline (tecla `M`)
 - ✅ Histórico completo: Undo/Redo até 100 estados (`Ctrl+Z`, `Ctrl+Y`)
-
-### Sobreposição e PiP
-- ✅ Múltiplos vídeos e imagens sobrepostos
-- ✅ Escala (10%–100%), posicionamento, opacidade
-- ✅ Rotação angular (-180° a +180°)
-- ✅ Espelhamento horizontal (Flip)
-- ✅ Animações de entrada e movimento (Fade In/Out, Slide, Zoom In, Float)
-- ✅ Suavização Smoothstep
-- ✅ Chroma Key (remoção por cor)
-
-### Áudio
-- ✅ Trilha de áudio independente com waveform
-- ✅ Fade In / Fade Out
-- ✅ Redução de ruído (Denoise / afftdn)
-- ✅ Normalização EBU R128 (-14 LUFS)
-- ✅ Controle de volume dedicado
-
-### Texto e Legendas
-- ✅ Trilha de texto/legendas arrastável no preview
-- ✅ Animações (Fade, Slide Up, Pop/Zoom In)
-- ✅ Estilos avançados
-
-### IA e Transcrição
-- ✅ Transcrição local com Whisper (OpenAI / Transformers.js) — 100% offline
-- ✅ Legendas Karaokê (Word Highlight)
-- ✅ Legendas Palavra por Palavra (Acumulativo)
-- ✅ Estilo Viral / Hormozi (Single Word)
-- ✅ Smart Cutout (remoção de fundo por IA — briaai/RMBG-1.4)
-- ✅ Matting de Vídeo Contínuo (Remoção de fundo e extração de canal alfa temporal WebM VP9 yuva420p com despill e colorkey)
-- ✅ Detecção Automática de Cenas (equivalente ao `jy_compressShotDetect` via FFmpeg `gt(scene,0.35)`)
-- ✅ Importação de `.srt`
-- ✅ Estilização em massa de legendas
-
-### Efeitos e Ajustes
-- ✅ Speed Ramping com curvas (Heroico, Bala, Montagem, Flash In, Flash Out)
+- ✅ Rastreamento de Movimento (Motion / Object Tracking com análise `mestimate` + interpolação temporal de keyframes)
+- ✅ Speed Ramping com editor de Curva Bezier Livre (inserção de keyframes customizados, arrasto interativo e interpolação cúbica)
+- ✅ Redimensionamento Inteligente (Auto Reframe 9:16, 1:1, 4:5, 16:9 com foco dinâmico e filtro Lanczos)
+- ✅ Estabilização de Vídeo offline em 2 passos via `vidstabdetect` e `vidstabtransform`
 - ✅ Câmera lenta suave com Interpolação de Quadros (Optical Flow via FFmpeg `minterpolate`)
-- ✅ Gráfico SVG de curva de velocidade em tempo real
-- ✅ Transições: fade, dissolve, wipeleft, slideleft, circleopen, pixelize
-- ✅ Filtros e presets de cor (sepia, vintage, warm, cool, cinematic, vivid)
-- ✅ Vinheta cinematográfica
-- ✅ Canvas Blur (enquadramento com desfoque de fundo para Reels/Shorts)
-- ✅ Estabilização de Vídeo offline (2 passos com `vidstabdetect` e `vidstabtransform` para redução de trepidação)
-- ✅ Brilho, contraste, saturação, desfoque, P&B, velocidade linear
-- ✅ Espelhamento H/V, rotações 90°/180°/270°, zoom digital
+- ✅ Detecção automática de cenas (Shot Detection via FFmpeg `gt(scene,0.35)`)
 
-### Exportação e Formatos
-- ✅ Importação e Exportação bidirecional com CapCut (`draft_content.json` com escala temporal em microsegundos)
-- ✅ Quick Presets: TikTok/Reels/Shorts (9:16), YouTube (16:9), Feed (1:1), Retrato (4:5)
-- ✅ Resoluções: 720p, 1080p, 1440p (2K), 2160p (4K)
-- ✅ FPS: 24, 30, 60
-- ✅ Renderização via FFmpeg nativo (H.264/AAC)
-- ✅ Pipeline filter_complex modular (ffmpegBuilder.js)
-- ✅ Projetos salváveis em `.lccut`
-- ✅ Atalhos de teclado completos
+### Sobreposição, PiP, Estilização e Efeitos (Fase 6)
+- ✅ Múltiplos vídeos, imagens e stickers sobrepostos
+- ✅ Escala (10%–100%), posicionamento livre, opacidade, rotação (-180° a +180°) e espelhamento (Flip H/V)
+- ✅ Animações de entrada e movimento: Fade In/Out, Slide, Zoom In, Pop, Float com suavização Smoothstep
+- ✅ Chroma Key profissional e Smart Cutout (remoção de fundo por IA — RMBG-1.4)
+- ✅ Matting de Vídeo Contínuo com canal alfa WebM VP9 (`yuva420p`)
+- ✅ Retoque Facial / Efeito Beauty offline (suavização bilateral via `smartblur` + realce `unsharp` + `eq`)
+- ✅ Estilização de Bordas e Glow/Neon em Sobreposições (espessura, arredondamento, cor e presets Neon Ciano, Pink, Dourado, Roxo)
+- ✅ Vinheta cinematográfica, Canvas Blur e transições de corte (fade, dissolve, wipeleft, slideleft, circleopen, pixelize)
+
+### Áudio e IA Local 100% Offline (Fase 7)
+- ✅ Separação de Stems de Áudio (isolamento de voz humana e trilha instrumental via matriz M/S e EQ adaptativo)
+- ✅ Detecção de Batidas Musicais (Beat Detection via transientes/silencedetect, estimativa de BPM e geração de marcadores 🥁)
+- ✅ Text-to-Speech (TTS) offline para dublagem e narração sintética local (SpeechT5 via Transformers.js + síntese algorítmica)
+- ✅ Tradução Automática Offline de Legendas (Helsinki-NLP opus-mt multilingue com atualização inline na timeline)
+- ✅ Super-resolução / Upscale de Vídeo por IA (pipeline adaptativo Real-ESRGAN com hqdn3d + lanczos + unsharp 2x/4x)
+- ✅ Transcrição offline com Whisper (OpenAI / Transformers.js)
+- ✅ Legendas Karaokê (Word Highlight), Palavra por Palavra e Estilo Viral / Hormozi
+
+### Exportação Profissional e Codecs (Fase 8)
+- ✅ Multi-formatos: MP4 (`libx264`), WebM (`libvpx-vp9` com canal alfa transparente) e Apple ProRes 422 / 4444 (`prores_ks` em contêiner `.mov`)
+- ✅ Controle fino de Bitrate: CRF (qualidade constante), CBR (taxa fixa de streaming) e VBR 2-Pass (máxima eficiência estatística)
+- ✅ Perfis de cor cinematográficos e HDR: Rec.709 (SDR) e BT.2020 (HDR 10-bit PQ)
+- ✅ Exportação independente de áudio direto da timeline (`.wav` PCM, `.mp3` 320k, `.aac` 256k)
+- ✅ Importação e Exportação bidirecional de projetos CapCut (`draft_content.json` em microsegundos)
+
+### UX, Produtividade e Assets (Fase 9)
+- ✅ Modo Cinema e Pré-Visualização em Tela Cheia (`F11` / `Ctrl+F` com controles flutuantes glassmorphism)
+- ✅ Biblioteca Integrada de Assets e Stickers (15 stickers vetoriais nativos + gerador de PNG RGBA com zlib)
+- ✅ Histórico Visual de Versões e Backups Automáticos do Projeto (.lccut snapshots a cada 2 min com rotação das 50 versões mais recentes)
+- ✅ Painel de Customização de Atalhos de Teclado (remapeamento interativo com persistência local)
 
 ---
 
-## ❌ O que falta implementar no LeccorCut
+## ❌ O que falta implementar no LeccorCut (Roadmap Fases 10 a 14)
 
-### Funcionalidades de Edição
-- [ ] Speed ramping com keyframes individuais (curvas customizadas, não apenas presets)
-- [ ] Rastreamento de objetos (Object Tracking) na timeline
-- [ ] Efeitos de face em tempo real (beautify, stickers faciais)
-- [ ] Redimensionamento inteligente (Smart Crop / Auto Reframe)
+### 🚀 Fase 10 — Aceleração por Hardware GPU e Mídia Proxy
+- [ ] Sondagem automática de GPUs ativas no sistema (NVIDIA NVENC, Intel QuickSync QSV, AMD AMF)
+- [ ] Encoders acelerados por hardware no FFmpeg (`h264_nvenc`, `hevc_nvenc`, `h264_qsv`, `h264_amf`)
+- [ ] Decodificação acelerada por hardware na leitura de mídias (`-hwaccel d3d11va` / `auto`)
+- [ ] Geração automática de arquivos Proxy em background para mídias 4K/8K (720p/540p com codificação ultrafast)
+- [ ] Alternância inteligente na timeline (playback fluido via proxy, render final em resolução total)
+- [ ] Gerenciador de cache e limpeza de proxies temporários
 
-### IA Avançada (Local)
-- [ ] Separação de stems de áudio (voz + fundo musical)
-- [ ] Dubbing / Clonagem de voz por IA
-- [ ] Tradução automática de legendas
-- [ ] Geração de música por IA (Music2Vibes / AI beats)
-- [ ] Super-resolução / Upscale de vídeo
+### 🎭 Fase 11 — Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs
+- [ ] Modos de Mesclagem de Camada (Screen / Tela, Multiply / Multiplicar, Overlay / Sobrepor, Lighten, Darken, Add)
+- [ ] Máscaras de Forma Geométrica (Retangular, Circular, Linear/Split, Espelho com suavização *feather* e inversão)
+- [ ] Efeitos de Estilização de Vídeo (Glitch / RGB Split, Camera Shake, Film Grain / Ruído de Película, Lens Flare)
+- [ ] Suporte a Color Grading cinematográfico via tabelas 3D LUT (`.cube` e `.3dl` através do filtro FFmpeg `lut3d`)
+- [ ] Controles de graduação tonal fina (Highlights, Shadows, Midtones, Temperatura, Matiz e Curvas RGB)
 
-### Recursos de Mídia
-- [ ] Biblioteca de templates de efeitos
-- [ ] Biblioteca de stickers e assets
-- [ ] Exportação para formatos adicionais (WebM, ProRes, etc.)
-- [ ] Suporte a múltiplas câmeras / multicam
+### 🎙️ Fase 12 — Áudio Avançado, Voice Changers e Separação Neural
+- [ ] Moduladores de Efeito de Voz (Voz Grave/Monstro, Voz Aguda/Chipmunk, Robô Cibernético, Megafone/Rádio, Eco Espacial)
+- [ ] Pitch Shifter contínuo (-12 a +12 semitons) com preservação de formantes e tempo original
+- [ ] Equalizador Paramétrico de 10 bandas (EQ10) e Compressor Dinâmico de Áudio
+- [ ] Separação neural de áudio em 4 stems independentes (Voz, Bateria, Baixo, Outros instrumentos)
+- [ ] Visualizador de onda estéreo de alta fidelidade na timeline inspirado no `WaveformVisualizer`
 
-### UX e Interface
-- [ ] Preview de alta qualidade em tempo real (GPU-accelerated)
-- [ ] Painel de propriedades contextual completo
-- [ ] Histórico visual de versões do projeto
-- [ ] Integração com cloud storage
-- [ ] Interface em tela cheia / modo cinema
+### 🎬 Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal Livre
+- [ ] Suporte a N trilhas dinâmicas de vídeo, sobreposição, texto e áudio com botões `+ Adicionar Trilha`
+- [ ] Clipes Compostos (Compound Clips) para agrupamento e edição modular de blocos da timeline
+- [ ] Bloqueio individual de trilhas (Track Lock) e reordenação z-index por drag-and-drop
+- [ ] Marcadores de Keyframe (losangos) na timeline para qualquer propriedade (Posição X/Y, Zoom, Rotação, Opacidade, Volume)
+- [ ] Editor gráfico de curvas de interpolação entre keyframes (Linear, Ease-In, Ease-Out, Curva Bezier Livre)
+
+### 🌐 Fase 14 — Interoperabilidade Pro e Exportação para Outras NLEs
+- [ ] Exportador de Final Cut Pro XML (`.fcpxml` / `.xml`) para DaVinci Resolve e Adobe Premiere Pro
+- [ ] Exportador de EDL (Edit Decision List - CMX 3600) para broadcast e suites de pós-produção
+- [ ] Empacotador de Projeto (Project Bundler / Coleta de Arquivos) com consolidação de mídias e exportação `.zip`
 
 ---
 
@@ -258,15 +245,23 @@ O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
 ```
 LeccorCut/
 ├── src/
-│   ├── main.js          # Processo Electron principal + IPC + IA (Whisper, RMBG)
-│   ├── preload.js       # Context bridge Node ↔ Renderer
-│   ├── index.html       # UI (layout dark mode)
-│   ├── styles.css       # Design system HSL
-│   ├── renderer.js      # Timeline, preview, estado reativo, interações
-│   └── ffmpegBuilder.js # Montador modular do filter_complex FFmpeg
+│   ├── main.js             # Processo Electron principal + IPC + IA (Whisper, RMBG, TTS, Upscale, Backups)
+│   ├── preload.js          # Context bridge Node ↔ Renderer (APIs seguras expostas)
+│   ├── index.html          # UI completa (dark mode, timeline, modais, stickers, histórico)
+│   ├── styles.css          # Design system HSL, glassmorphism, modo cinema, responsividade
+│   ├── renderer.js         # Timeline reativa, preview, curva bezier, stickers, atalhos, cinema
+│   ├── ffmpegBuilder.js    # Montador modular do filter_complex FFmpeg (codecs, HDR, VBR, alpha)
+│   ├── capcutConverter.js  # Conversor bidirecional de drafts CapCut (microsegundos ↔ timeline)
+│   ├── assetsLibrary.js    # Biblioteca de stickers vetoriais e sintetizador PNG RGBA offline
+│   └── backupManager.js    # Gerenciador de snapshots periódicos e restauração de versões (.lccut)
 ├── tests/
-│   ├── export-smoke.js  # Teste de renderização FFmpeg
-│   └── cutout-smoke.js  # Teste do pipeline Smart Cutout
+│   ├── export-smoke.js     # Teste de renderização FFmpeg
+│   ├── cutout-smoke.js     # Teste do pipeline Smart Cutout
+│   ├── phase5-smoke.js     # Teste da Fase 5 (CapCut import/export, shot detect, minterpolate)
+│   ├── phase6-smoke.js     # Teste da Fase 6 (Estabilização, Auto Reframe, Tracking, Bezier, Beauty, Borders)
+│   ├── phase7-smoke.js     # Teste da Fase 7 (Stems, Beat Detect, TTS, Tradução, Upscale)
+│   ├── phase8-smoke.js     # Teste da Fase 8 (Codecs, ProRes, WebM alfa, CBR/VBR, HDR, Áudio Independente)
+│   └── phase9-smoke.js     # Teste da Fase 9 (Modo Cinema, Stickers, Backups, Atalhos) — 55 testes
 └── scripts/
     └── generate-icons.js
 ```
@@ -274,10 +269,12 @@ LeccorCut/
 ### Stack Tecnológica do LeccorCut
 | Camada | Tecnologia |
 |---|---|
-| Shell | Electron |
-| UI | HTML/CSS/JS vanilla |
-| Vídeo nativo | FFmpeg (CLI) |
-| IA local | Transformers.js (Whisper + RMBG-1.4) |
+| Shell | Electron (Node.js 20+) |
+| UI | HTML5 / Vanilla CSS3 (Glassmorphism) / JavaScript ES2022 |
+| Vídeo & Áudio nativo | FFmpeg CLI com `ffmpeg-static` + `ffprobe-static` |
+| IA local offline | Transformers.js (Whisper, RMBG-1.4, SpeechT5, Helsinki-NLP) + Real-ESRGAN adaptativo |
+| Gráficos & Vetores | SVG nativo + sintetizador PNG RGBA com `zlib` |
+| Formatos de Projeto | `.lccut` (JSON estruturado com backups periódicos) + `draft_content.json` (CapCut) |
 | Empacotamento | electron-builder + NSIS |
 
 ---
@@ -287,25 +284,32 @@ LeccorCut/
 | Aspecto | LeccorCut | CapCut |
 |---|---|---|
 | Shell | Electron (Node.js) | Qt6 + CEF + Lynx |
-| UI | HTML/CSS/JS vanilla | React/Vite (web) + Qt (nativo) |
-| Render engine | FFmpeg CLI | VECreator.dll (C++ nativo) |
-| Efeitos tempo real | ❌ Não implementado | lens.dll (GPU AGFX) |
-| IA local | Transformers.js | deepagents_capi.dll + OpenVINO |
-| Modelos locais | 2 (Whisper + RMBG) | 45+ modelos |
-| Cloud AI | ❌ Não | SeedDance, MiniMax, Gemini, etc. |
-| Rede | ❌ Offline | Cronet (HTTP3/QUIC) |
-| Watermark | Opcional/sem | 4 tipos (brand, AI, invisible, C2PA) |
-| Tamanho aprox. | ~50 MB | ~1.2 GB |
+| UI | HTML/CSS/JS vanilla (Zero bloat) | React/Vite (web) + Qt (nativo) |
+| Render engine | FFmpeg CLI modular + Hardware acceleration (Fase 10) | VECreator.dll (C++ nativo) |
+| Efeitos visuais | Shaders CSS / FFmpeg filter_complex (Fase 11) | lens.dll + AmazingEngine (GPU AGFX) |
+| IA local | Transformers.js + FFmpeg filters (100% offline) | deepagents_capi.dll + OpenVINO |
+| Modelos locais | Whisper, RMBG, SpeechT5, Opus-MT, ESRGAN | 45+ modelos ByteNN (`.bytenn`) e SAMI (`.model`) |
+| Cloud AI & Telemetria | ❌ Zero dependência de nuvem, 100% privado | SeedDance, MiniMax, Gemini, monitoramento pc-mon |
+| Watermark / Assinaturas | ❌ Livre de marcas d'água e paywalls | 4 tipos (brand, AI, invisible, C2PA) + VIP paywall |
+| Licença & Ativação | Open-Source / Local | Server-authoritative (`/commerce/*`) |
+| Tamanho aprox. | ~95 MB | ~1.2 GB |
 
 ---
 
 ## 📋 Próximos Passos Recomendados
 
-1. **Imediato**: Fase 4. Capturar tráfego com MITM (fecha a Fase 3) e instrumentar com Frida
-2. **Curto prazo**: Implementar no LeccorCut o importador de `draft_content.json` (Fase 5.3), que já tem base suficiente das Fases 2.3 e 5
-3. **Médio prazo**: Implementar detecção de cenas e object tracking no LeccorCut
-4. **Longo prazo**: Migrar engine de renderização de FFmpeg CLI para pipeline nativo C++/WebGPU
+1. **Prioridade Imediata**: Implementar a **Fase 10 — Aceleração por Hardware GPU e Mídia Proxy**:
+   - Detectar suporte a `h264_nvenc` e `h264_qsv` no `ffmpegBuilder.js`.
+   - Adicionar geração de proxies 720p em background para edição ultrarrápida de vídeos pesados.
+2. **Alta Prioridade**: Implementar a **Fase 11 — Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs**:
+   - Adicionar modos de mesclagem (`screen`, `multiply`, `overlay`) e suporte a arquivos `.cube`.
+3. **Média Prioridade**: Implementar a **Fase 12 — Áudio Avançado, Voice Changers e Separação Neural**:
+   - Integrar moduladores de voz (Monstro, Robô, Megafone) e pitch shifter na timeline.
+4. **Arquitetura Estrutural**: Implementar a **Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal**:
+   - Expandir o modelo de dados para N trilhas dinâmicas com keyframes livres interpolados.
+5. **Interoperabilidade Profissional**: Implementar a **Fase 14 — Exportação FCPXML, EDL e Project Bundling**:
+   - Viabilizar intercâmbio direto com DaVinci Resolve, Premiere e compartilhamento de projetos com mídias consolidadas.
 
 ---
 
-*Atualizado em: 2026-10-15 | Versão da análise: REA v6.4.0 + Ghidra 12.1.4*
+*Atualizado em: 2026-10-15 | Fases 1 a 9 concluídas (100%) | Roadmap Fases 10 a 14 detalhado com base na engenharia reversa do CapCut v9.6.0.4097*

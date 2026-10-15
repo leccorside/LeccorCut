@@ -239,6 +239,73 @@
 
 ---
 
+---
+
+## 🚀 Fase 10 — Aceleração por Hardware GPU e Mídia Proxy
+
+### 10.1 Encoders GPU e Aceleração de Exportação
+- [x] Implementar detecção automática de GPUs ativas no sistema (NVIDIA NVENC, Intel QuickSync QSV, AMD AMF)
+- [x] Implementar suporte a encoders acelerados por hardware no motor FFmpeg (`h264_nvenc`, `hevc_nvenc`, `h264_qsv`, `h264_amf`)
+- [x] Implementar decodificação acelerada por hardware na leitura de mídias (`-hwaccel d3d11va` / `auto`)
+- [x] Implementar seletor de aceleração por hardware na barra de exportação (`Automático`, `NVENC`, `QSV`, `AMF`, `Apenas CPU`)
+
+### 10.2 Sistema de Mídia Proxy e Pré-Render
+- [x] Implementar geração automática de arquivos Proxy em background para mídias 4K/8K (720p/540p com codificação ultra-rápida)
+- [x] Implementar alternância inteligente na timeline (playback suave no player via proxy, mantendo resolução original full no export)
+- [x] Implementar gerenciador de cache e limpeza de arquivos proxy no painel de configurações
+
+---
+
+## 🎭 Fase 11 — Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs
+
+### 11.1 Modos de Mesclagem e Máscaras de Camada
+- [ ] Implementar Modos de Mesclagem (Blend Modes: `Tela / Screen`, `Multiplicar / Multiply`, `Sobrepor / Overlay`, `Clarear / Lighten`, `Escurecer / Darken`, `Adicionar / Add`)
+- [ ] Implementar Máscaras de Forma Geométrica (Shape Masks: Retangular, Circular, Linear/Split e Espelho com suavização de borda *feather*)
+- [ ] Adicionar suporte a inversão de máscara e opacidade graduada
+
+### 11.2 Efeitos de Estilização e Color Grading Profissional (LUTs)
+- [ ] Implementar biblioteca de efeitos de estilização (Glitch / RGB Split, Shake de Câmera, Ruído de Película/Film Grain, Lens Flare)
+- [ ] Implementar importação e aplicação de arquivos 3D LUT (`.cube` e `.3dl` via filtro FFmpeg `lut3d`)
+- [ ] Implementar controles refinados de Color Grading (Highlight, Shadow, Midtones, Temperatura, Matiz e Curvas RGB)
+
+---
+
+## 🎙️ Fase 12 — Áudio Avançado, Voice Changers e Separação Neural
+
+### 12.1 Moduladores de Efeito de Voz (Voice Changers)
+- [ ] Implementar efeitos de modulação de voz (Voz Grave/Monstro, Voz Aguda/Chipmunk, Robô Cibernético, Megafone/Rádio Antigo, Eco Espacial)
+- [ ] Implementar Pitch Shifter contínuo (-12 a +12 semitons) com preservação de formantes
+- [ ] Implementar Equalizador Paramétrico de 10 bandas (EQ10) e Compressor Dinâmico de Áudio
+
+### 12.2 Separação de Áudio Multicanal e Visualização
+- [ ] Implementar separação de áudio em 4 stems independentes (Voz, Bateria, Baixo, Outros instrumentos) via modelo neural local
+- [ ] Implementar visualizador de onda senoidal de alta precisão estéreo na timeline inspirado no `WaveformVisualizer`
+
+---
+
+## 🎬 Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal Livre
+
+### 13.1 Timeline Dinâmica Multi-Camadas
+- [ ] Implementar suporte a N trilhas dinâmicas de vídeo, áudio, sobreposição e texto (botões `+ Adicionar Trilha`)
+- [ ] Implementar agrupamento e vinculação de clipes na timeline (Compound Clips / Clipes Compostos)
+- [ ] Implementar bloqueio individual de trilhas (Track Lock) para evitar edições acidentais
+
+### 13.2 Keyframing Universal Arbitrário
+- [ ] Implementar marcadores visuais de Keyframe (losangos/diamantes) na timeline para qualquer ponto do clipe
+- [ ] Suporte a keyframes para Posição (X, Y), Escala, Rotação, Opacidade e Volume de Áudio
+- [ ] Implementar editor gráfico de curvas de interpolação entre keyframes (Linear, Ease-In, Ease-Out, Curva Bezier Livre)
+
+---
+
+## 🌐 Fase 14 — Interoperabilidade Pro e Exportação para Outras NLEs
+
+### 14.1 Intercâmbio de Linha de Tempo
+- [ ] Implementar exportador de Final Cut Pro XML (`.fcpxml` / `.xml`) para DaVinci Resolve e Adobe Premiere Pro
+- [ ] Implementar exportador de EDL (Edit Decision List) para conformação de cortes em suites profissionais
+- [ ] Implementar empacotador de projeto (Project Bundler / Coleta de Arquivos) que exporta o arquivo de projeto junto a todas as mídias em uma pasta compacta
+
+---
+
 ## 📊 Status Geral
 
 | Fase | Progresso | Prioridade |
@@ -252,8 +319,14 @@
 | Fase 7 — IA Avançada Local (100% Offline) | ✅ Concluída (100%) | 🟠 Alta |
 | Fase 8 — Exportação Profissional e Codecs Adicionais | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 9 — UX, Produtividade e Assets | ✅ Concluída (100%) | 🟢 Concluída |
+| Fase 10 — Aceleração GPU por Hardware e Mídia Proxy | ⏳ A Fazer (0%) | 🔴 Alta |
+| Fase 11 — Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs | ⏳ A Fazer (0%) | 🟠 Alta |
+| Fase 12 — Áudio Avançado, Voice Changers e Separação Neural | ⏳ A Fazer (0%) | 🟡 Média |
+| Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal Livre | ⏳ A Fazer (0%) | 🔴 Alta |
+| Fase 14 — Interoperabilidade Pro (FCPXML / OTIO / EDL) | ⏳ A Fazer (0%) | 🟢 Média |
 
 ---
 
-*Última atualização: 2026-10-15 — Fase 9 concluída (55 testes passando) | Todas as Fases de Engenharia Reversa e Desenvolvimento 100% Concluídas!*
+*Última atualização: 2026-10-15 — Fases 1 a 9 concluídas (55 testes passando) | Mapeamento completo de paridade com CapCut (Fases 10 a 14 catalogadas)*
+
 
