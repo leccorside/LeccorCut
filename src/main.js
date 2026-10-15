@@ -22,6 +22,8 @@ const {
   separateFourStems,
   extractWaveformData
 } = require('./audioAdvanced');
+// ── Fase 14: Interoperabilidade Pro (FCPXML, EDL e Project Bundling) ──────────
+const { exportEdl, exportFcpxml, bundleProject } = require('./proExporters');
 
 let win;
 function createWindow() {
@@ -334,6 +336,48 @@ ipcMain.handle('open-project', async () => {
   const r = await dialog.showOpenDialog(win, { filters: [{ name: 'LeccorCut', extensions: ['lccut'] }], properties: ['openFile'] });
   if (r.canceled) return null;
   return JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
+});
+
+// ── Fase 14: Handlers de Interoperabilidade Pro ───────────────────────────────
+ipcMain.handle('export-edl', async (_e, projectData) => {
+  const r = await dialog.showSaveDialog(win, {
+    title: 'Exportar Edit Decision List (EDL - CMX 3600)',
+    defaultPath: 'timeline.edl',
+    filters: [{ name: 'Edit Decision List', extensions: ['edl'] }]
+  });
+  if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+  const content = exportEdl(projectData);
+  fs.writeFileSync(r.filePath, content, 'utf-8');
+  return { ok: true, filePath: r.filePath };
+});
+
+ipcMain.handle('export-fcpxml', async (_e, projectData) => {
+  const r = await dialog.showSaveDialog(win, {
+    title: 'Exportar Final Cut Pro XML (DaVinci / Premiere)',
+    defaultPath: 'timeline.fcpxml',
+    filters: [
+      { name: 'Final Cut Pro XML', extensions: ['fcpxml', 'xml'] }
+    ]
+  });
+  if (r.canceled || !r.filePath) return { ok: false, canceled: true };
+  const content = exportFcpxml(projectData);
+  fs.writeFileSync(r.filePath, content, 'utf-8');
+  return { ok: true, filePath: r.filePath };
+});
+
+ipcMain.handle('bundle-project', async (_e, projectData) => {
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Selecione a Pasta para Salvar o Pacote do Projeto (Project Bundle)',
+    properties: ['openDirectory', 'createDirectory']
+  });
+  if (r.canceled || !r.filePaths || r.filePaths.length === 0) return { ok: false, canceled: true };
+  const targetDir = r.filePaths[0];
+  try {
+    const result = await bundleProject(projectData, targetDir);
+    return result;
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
 });
 
 let segmenterPromise = null;

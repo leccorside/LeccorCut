@@ -285,5 +285,10 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .clip.compound{background:linear-gradient(135deg, #301b5a, #4834d4) !important;border:1px solid #7c5cff !important;box-shadow:inset 0 0 8px rgba(124,92,255,0.4)}
 .clip.compound .clip-title::before{content:'📦 ';font-size:10px}
 
+/* ── Fase 14: Interoperabilidade Pro e Exportação para Outras NLEs ── */
+.pro-btn{background:rgba(0,184,148,0.18);border:1px solid rgba(0,184,148,0.45);color:#55efc4;font-weight:600;transition:all .15s ease}
+.pro-btn:hover{background:rgba(0,184,148,0.32);border-color:#00b894;color:#fff;transform:translateY(-1px)}
+
+
 
 

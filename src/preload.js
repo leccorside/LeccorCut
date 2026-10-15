@@ -70,7 +70,11 @@ contextBridge.exposeInMainWorld('api', {
   getEq10Frequencies: () => ipcRenderer.invoke('get-eq10-frequencies'),
   getWaveformData: (filePath, targetPoints) => ipcRenderer.invoke('get-waveform-data', filePath, targetPoints),
   separateFourStems: (inputPath) => ipcRenderer.invoke('separate-four-stems', inputPath),
-  onStem4Progress: (cb) => ipcRenderer.on('stem4-progress', (_e, data) => cb(data))
+  onStem4Progress: (cb) => ipcRenderer.on('stem4-progress', (_e, data) => cb(data)),
+  // ── Fase 14: Interoperabilidade Pro (FCPXML, EDL e Project Bundling) ──────────
+  exportEdl: (projectData) => ipcRenderer.invoke('export-edl', projectData),
+  exportFcpxml: (projectData) => ipcRenderer.invoke('export-fcpxml', projectData),
+  bundleProject: (projectData) => ipcRenderer.invoke('bundle-project', projectData)
 });
 
 

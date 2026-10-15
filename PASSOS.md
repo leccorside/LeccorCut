@@ -300,9 +300,9 @@
 ## 🌐 Fase 14 — Interoperabilidade Pro e Exportação para Outras NLEs
 
 ### 14.1 Intercâmbio de Linha de Tempo
-- [ ] Implementar exportador de Final Cut Pro XML (`.fcpxml` / `.xml`) para DaVinci Resolve e Adobe Premiere Pro
-- [ ] Implementar exportador de EDL (Edit Decision List) para conformação de cortes em suites profissionais
-- [ ] Implementar empacotador de projeto (Project Bundler / Coleta de Arquivos) que exporta o arquivo de projeto junto a todas as mídias em uma pasta compacta
+- [x] Implementar exportador de Final Cut Pro XML (`.fcpxml` / `.xml`) para DaVinci Resolve e Adobe Premiere Pro
+- [x] Implementar exportador de EDL (Edit Decision List) para conformação de cortes em suites profissionais
+- [x] Implementar empacotador de projeto (Project Bundler / Coleta de Arquivos) que exporta o arquivo de projeto junto a todas as mídias em uma pasta compacta
 
 ---
 

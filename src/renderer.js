@@ -2363,6 +2363,65 @@ if ($('btnExportCapcut')) {
     if (ok) toast('Projeto exportado no formato CapCut (draft_content.json)');
   };
 }
+
+// ── Fase 14: Handlers de Interoperabilidade Pro (EDL, FCPXML e Project Bundle) ─
+function getFullProjectState() {
+  return {
+    media: state.media,
+    clips: state.clips,
+    texts: state.texts,
+    audios: state.audios,
+    overlays: state.overlays,
+    tracks: state.tracks,
+    markers: state.markers,
+    settings: {
+      aspect: $('expAspect')?.value || '16:9',
+      res: $('expRes')?.value || '1080',
+      fps: $('expFps')?.value || '30',
+      crf: $('expQ')?.value || '18'
+    }
+  };
+}
+
+if ($('btnExportEdl')) {
+  $('btnExportEdl').onclick = async () => {
+    if (!state.clips.length && !state.audios.length) return toast('Adicione clipes à timeline antes de exportar EDL');
+    const r = await window.api.exportEdl(getFullProjectState());
+    if (r && r.ok) {
+      toast(`📄 EDL CMX 3600 exportado com sucesso!`);
+    } else if (r && r.error) {
+      toast(`Erro ao exportar EDL: ${r.error}`);
+    }
+  };
+}
+
+if ($('btnExportFcpxml')) {
+  $('btnExportFcpxml').onclick = async () => {
+    if (!state.clips.length && !state.audios.length) return toast('Adicione clipes à timeline antes de exportar FCPXML');
+    const r = await window.api.exportFcpxml(getFullProjectState());
+    if (r && r.ok) {
+      toast(`🎞️ FCPXML exportado com sucesso (compatível com DaVinci e Premiere)!`);
+    } else if (r && r.error) {
+      toast(`Erro ao exportar FCPXML: ${r.error}`);
+    }
+  };
+}
+
+if ($('btnBundleProject')) {
+  $('btnBundleProject').onclick = async () => {
+    if (!state.clips.length && !state.audios.length && !state.media.length) {
+      return toast('Adicione mídias à timeline antes de empacotar o projeto.');
+    }
+    toast('📦 Coletando mídias e gerando pacote portátil...');
+    const r = await window.api.bundleProject(getFullProjectState());
+    if (r && r.ok) {
+      const mb = (r.totalBytes / (1024 * 1024)).toFixed(1);
+      toast(`📦 Pacote criado com sucesso! ${r.totalFiles} mídias coletadas (${mb} MB).`);
+    } else if (r && r.error) {
+      toast(`Erro ao empacotar projeto: ${r.error}`);
+    }
+  };
+}
 // ── Fase 8: Controles Dinâmicos de Formato, Bitrate e Exportação de Áudio ─────
 function updateExportControls() {
   const fmt = $('expFormat') ? $('expFormat').value : 'mp4';
