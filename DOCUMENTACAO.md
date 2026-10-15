@@ -397,7 +397,7 @@ Janela Principal (Qt6)
 | `/commerce/v1/subscription/cc_price_list` | Preços CapCut |
 | `/commerce/v1/subscription/user_info` | Info do usuário assinante |
 | `/commerce/v1/subscription/make_unauto_order` | Pedido sem auto-renovação |
-| `/commerce/v1/subscription/sign_and_pay` | Assinar e pagar |
+| `/commerce/v2/subscription/sign_and_pay` | Assinar e pagar |
 | `/commerce/v1/benefits/user_credit` | Créditos do usuário |
 | `/commerce/v1/benefits/user_credit_history` | Histórico de créditos |
 | `/commerce/v1/benefits/credit_receive` | Receber créditos |
@@ -408,14 +408,132 @@ Janela Principal (Qt6)
 | `/commerce/v1/student/verify/status` | Verificação de estudante |
 | `/lv/v1/commerce/get_entrances` | Pontos de entrada comerciais |
 
+> Inventário completo obtido na Fase 3 por varredura estática (bundles JS + strings C das DLLs): **93 hosts**, **~200 paths em bundles JS** e **~370 paths em binários nativos**. As tabelas abaixo agrupam os relevantes por função. Origem: `VECreator.dll`/`VEHelper.exe` (nativo), `app-server.mjs` (backend Bun do `common_agent`), `lynx_config/*/template.js` e `image_h5_*` (páginas web/Lynx).
+
+### 9.3 Hosts e Domínios de Produção (Base URLs)
+
+O CapCut não tem um "host único": cada serviço tem um subdomínio próprio, regionalizado (`-sg` Singapura, `-va` Virgínia/EUA, `-va-us` TikTok US Data Security) e com variante de **bootstrap** (`*-v2-boot.capcutapi.com`), usada antes da configuração de rede (TNC) ser baixada.
+
+| Serviço | Hosts principais | Uso |
+|---|---|---|
+| Editor (API principal) | `editor-api-sg.capcut.com`, `editor-api.capcutapi.com`, `editor-api-va.capcutapi.com`, `edit-api-sg.capcut.com` | Paths `/lv/v1/*`: tarefas, legendas, TTS, uploads |
+| Agente de IA (PC Agent) | `editor32-normal-sg.capcutapi.com`, `aivideo-normal-sg.capcutapi.com`, `ailab-agent-web.byteintl.net` | `/lv/v1/pc_agent/*`, `/storyboard_agent/v1/ai_lab/*` |
+| Comércio | `commerce-api-sg.capcut.com`, `commerce-api.capcutapi.com`, `commerce-api-va.capcut(api).com` | `/commerce/v1..v3/*` |
+| Login / conta | `passport-api-sg.capcut.com`, `passport-api.capcutapi.com`, `tt-passport16-normal-sg.capcutapi.com` | `/passport/*` |
+| Feed / templates | `feed-api-sg.capcut.com`, `feed-api.capcutapi.com`, `feed-api-va-us.capcutapi.com` | Templates, notificações |
+| Assets / efeitos | `heycan-api.capcutapi.com`, `api-heycan-pc-sg.capcut.com` | `/artist/v1/*`, `/effect/api/*` |
+| Recursos dinâmicos (Gecko) | `gecko-sg.capcutapi.com`, `gecko-sg.byteoversea.com` | Pacotes de recursos hot-update |
+| Cloud space | `cloudspace-normal.capcutapi.com` | Drafts e assets em nuvem |
+| Upload de mídia (VOD/ImageX) | `mcs-normal-sg.capcutapi.com`, `mcs-nontt.byteintlapi.com`, `sgali-mcs.byteoversea.com` | Upload multipart com credenciais STS |
+| Configuração de rede (TNC) | `tnc-v2-boot.capcutapi.com`, `ttnet-sg.byteoversea.com` | `/get_domains/v5/`: mapa dinâmico de domínios |
+| Segurança / anti-fraude | `mssdk-sg.capcutapi.com`, `mssdk-sg.byteoversea.com` | SDK de segurança (gera `X-Argus`/`X-Ladon`) |
+| A/B e config (Pitaya / VCS) | `pitaya-sg.capcutapi.com`, `vcs-sg.capcutapi.com` | Experimentos e feature flags |
+| Telemetria / logs | `log-sg.capcutapi.com`, `pc-mon-normal-sg.capcutapi.com`, `mon-va.byteoversea.com`, `mon-i18n.tiktokv.com` | Eventos, APM, Slardar |
+| Push / long-connection | `frontier-sg.capcut.com`, `frontier-va.byteoversea.com` | WebSocket de mensagens em tempo real |
+| Tracing de LLM | `fornax.bytedance.net` | Observabilidade do agente (Fornax trace) |
+| CDN | `sf16-*.ibytedtos.com`, `p16-capcut-sg.ibyteimg.com`, `sf16-*.tiktokcdn.com` | Assets estáticos |
+
+A região de armazenamento do usuário é resolvida via `/aweme/v1/ttregion/get_store_idc/` (em `sscronet.dll`) e propagada nos cabeçalhos `x-tt-store-region*`.
+
+### 9.4 Autenticação, Sessão e Assinatura de Requisições
+
+**Login (Passport).** Fluxo web clássico da ByteDance, executado no processo nativo:
+`/passport/web/auth/login/` → `/passport/web/auth/authorize/` (OAuth de terceiros: TikTok, Google, Facebook) → `/passport/web/check_qrconnect/` (login por QR Code) → `/passport/account/info/v2/`. A sessão é mantida por **cookies** (`sessionid`, `sid_tt`, `sid_guard`) e pelo cabeçalho **`x-tt-token`**, renovados periodicamente por `/passport/token/beat/v2/` (heartbeat). Também há `/lv/v2/oauth/access_token` e `/passport/web/transfer/get_token/` para repassar a sessão a sub-apps web.
+
+**Separação de privilégio (decisão de arquitetura notável).** O backend JS (`bun.exe` + `app-server.mjs`) **não guarda credenciais**. Ele recebe do host nativo apenas um *auth-context* (`schema: "agent-runtime.host-auth-context.v1"`) com `principal.status` (`anonymous`/`authenticated`), `accountScope`, `userId`, `authEpoch` e `revision`. As requisições autenticadas passam por um **Native HTTP Bridge** (`NativeHttpTransport`): socket local + token de bridge + allowlist de origens HTTPS. Os cabeçalhos sensíveis (`cookie`, `x-tt-token`, `x-argus`, `x-gorgon`, `x-khronos`, `x-ladon`, `x-ss-stub`) são **removidos do lado JS** e injetados pelo código nativo (Cronet/TTNet). Uma troca de conta incrementa `authEpoch` e força o *drain* de todas as sessões do agente.
+
+**Cabeçalhos de assinatura.** Há duas camadas:
+
+| Camada | Cabeçalhos | Onde é gerada |
+|---|---|---|
+| Assinatura de app (`sign-ver: 1`) | `sign`, `device-time`, `tdid`, `pf`, `appvr`, `loc`, `lan`, `appid`, `ch`, `App-Sdk-Version` | JS (`app-server.mjs`): hash MD5 sobre um sufixo do path, plataforma, versão do app, timestamp e device-id, com *salt* fixo embutido |
+| Assinatura de segurança (MSSDK) | `X-Argus`, `X-Gorgon`, `X-Khronos`, `X-Ladon`, `X-SS-Stub` | Nativo (`sscronet.dll` + SDK de segurança), não reproduzível no JS |
+| Rastreamento | `x-tt-logid`, `x-tt-trace-id`, `x-tt-trace-log` | Cronet/TTNet |
+
+> A assinatura de app é só integridade/anti-replay de baixo nível. Sem o token de sessão e sem as assinaturas MSSDK, a API privada não é utilizável. Não reproduzimos o salt aqui porque o LeccorCut não depende das APIs do CapCut.
+
+### 9.5 Upload de Mídia
+
+Upload em duas etapas, padrão ByteDance VOD/ImageX:
+
+1. `POST /lv/v1/upload_sign` (ou `/lv/v2/upload_sign`) com `{biz, scene, key_version}` → retorna **credenciais STS temporárias**: `access_key_id`, `secret_access_key`, `session_token`, `current_time`, `expired_time`, `space_name`, `region`/`domain`.
+2. O SDK `uploader-oversea-2.1.11.js` (web) ou o equivalente nativo envia o arquivo para o host MCS da região, assinando com as STS. As credenciais ficam em cache até `expired_time` (`uploadSignCache`, com dedup de requisições em voo).
+
+Endpoints relacionados: `/artist/v2/tools/get_upload_token` (assets de criadores), `/lv/v1/asset/prepare_upload_cloud` + `/lv/v1/asset/create_cloud_asset` (cloud space), `/lv/v1/copilot/upload_material` (material para o agente), `/api/v1/spaces/` (espaços de equipe).
+
+### 9.6 Efeitos, Templates, Stickers e Assets Cloud
+
+| Grupo | Endpoints |
+|---|---|
+| Plataforma de efeitos | `/effect/api/panel/info`, `/effect/api/panel/check`, `/effect/api/category/effects`, `/effect/api/v3/effects`, `/effect/api/v3/effect/listByResourceId`, `/effect/api/checkUpdate`, `/effect/api/search/effects` |
+| Itens de artista / criador | `/artist/v1/effect/mget_item`, `/artist/v1/effect/get_resources_by_category_id`, `/artist/v1/effect/search`, `/artist/v1/effect/user_favorite_list`, `/artist/v1/panel/get_panel_info` |
+| GIFs e banco de imagens | `/artist/v1/library/giphy/search`, `/artist/v1/library/giphy/trending`, `/artist/v1/library/tuchong/order` |
+| Templates | `/lv/v1/homepage/templates`, `/lv/v1/homepage/vip_templates`, `/lv/v1/pc/search/templates`, `/lv/v1/pc/replicate/*`, `/lv/v1/cc_web/plane/multi_get_templates` |
+| Música | `/lv/v1/search_songs`, `/lv/v1/get_collections`, `/lv/v1/music/check_v2` (copyright), `/lv/v1/music/similar_music_rec` |
+| Fontes | `/lv/v1/font/check` |
+| Publicação de efeitos | `/artist/v1/post/effect`, `/artist/v1/tools/check_antidirt` (moderação), `/artist/v1/tools/get_cv_tags` |
+
+Os pacotes de efeito baixados vêm como zip + `effect_required_files.tag` e são consumidos pelo `cccreator.dll`/AmazingEngine. A atualização de recursos sem novo release usa o **Gecko** (`gecko-sg.capcutapi.com`).
+
+### 9.7 Exportação e Watermark
+
+- `/lv/v1/watermark/get_watermark`: o servidor decide qual watermark visível (brand/AI) aplicar ao export.
+- `/lv/v1/c2pa/cert` + `/lv/v1/c2pa/sign`: certificado e **assinatura remota** do manifesto C2PA (ver 10.4).
+- `/lv/v1/pc/update_edit_result` e `/lv/v1/calc_video_score`: reporte do resultado da edição/exportação.
+- `/lv/v1/check_material`, `/lv/v1/music/check_v2`, `/lv/v1/image/anime_copyright_checker`, `/lv/v1/intelligent_edit/security_audit`: checagens de copyright e moderação antes de publicar/exportar.
+- Benefícios de exportação: `/commerce/v1/vip/query_benefit`, `/commerce/v1/vip/get_benefits` e `/commerce/v1/vip/exchange_benefit` (página Lynx `image_lynx_videocutpc_subscription_export`).
+
+### 9.8 Geração por IA (Cloud)
+
+O padrão é sempre **assíncrono**: *submit → poll (query) → fetch result / cancel*.
+
+| Família | Endpoints | Uso |
+|---|---|---|
+| Zenith (geração de vídeo/imagem) | `/lv/v1/zenith/submit_task`, `submit_image_task`, `query_task`, `fetch_result`, `cancel_task` | SeedDance, MiniMax, Seedream etc. |
+| Text-to-video | `/lv/v1/text_to_video/submit_generate_video_task`, `query_generate_video_task`, `prompt_to_text`, `parse_article_url` | Roteiro → vídeo, artigo → vídeo |
+| CapFlow | `/lv/v1/capflow/submit`, `query`, `cancel`, `history_task` | Fluxos de edição automática |
+| Tarefa genérica | `/lv/v1/common_task/new`, `submit_atomic_task`, `query`, `sync`, `cancel` | Usada também por `cccreator`/`videoeditor` (efeitos que processam no servidor) |
+| AIGC de efeitos/texto | `/artist/v1/aigc/generate`, `/artist/v1/aigc/image_sr`, `/artist/v1/aigc/submit_text_task`, `/lv/v2/aigc_image/super_resolution` | Efeitos gerados, super-resolução |
+| Voz | `/lv/v1/text_to_speech/new`, `query`; `/lv/v1/text_to_audio`; `/lv/v1/voice/*` (clonagem); `/lv/v1/get_sami_token` (token do motor de voz SAMI) | TTS, clone de voz |
+| Legendas cloud | `/lv/v1/audio_subtitle/submit`, `query`, `process_subtitle`, `highlight` | Transcrição em nuvem (alternativa ao Panther local) |
+| Agente (chat) | `/lv/v1/pc_agent/send_msg`, `poll_msg`, `update_message_option`; `/lv/v1/copilot/*` | Agente de edição conversacional |
+| Avatares | `/lv/v1/digital_human/create_item`, `omni_profile_recognize` | Humanos digitais |
+| Utilitários | `/lv/v1/translate/translate_texts`, `/lv/v1/ai_writing/*`, `/editor-tools/long-video-to-shorts` | Tradução, copy, corte longo → curto |
+
+O backend do agente também chama uma plataforma interna de prompts (`/api/devops/prompt_platform/v1/prompt/execute` e `streaming_execute`) e de RAG (`/api/devops/knowledge_platform/v1/retrieve`).
+
+### 9.9 Verificação de Assinatura (Licença) e Benefícios
+
+O CapCut **não usa licença local**: não há arquivo nem chave de licença. O direito de uso é decidido no servidor a cada ação paga:
+
+- **Estado da assinatura:** `/commerce/v1/subscription/user_info`, `/commerce/v3/subscription/get_user_lite_info` e `/commerce/v1/subscription/get_subscribe_info`.
+- **Benefícios por recurso:** `/commerce/v3/benefits/batch_get_user_benefit` e `/commerce/v3/benefits/check_qualification` (posso usar o recurso X?).
+- **Consumo:** `/commerce/v1/benefits/report_usage` e `/commerce/v3/benefits/batch_report_usage` (débito de créditos), mais `/commerce/v3/benefits/batch_check_withhold_deduct` (reserva antes de tarefa de IA).
+- **Metadados de recurso pago:** `/commerce/v3/resource/benefit_metadata`, `/commerce/v1/benefits/batch_get_style_conf` e `/commerce/v1/benefits/batch_get_template_combine_ids` (quais efeitos/templates são Pro).
+- **Fluxo de compra:** `/commerce/v3/trade/init_trade` → `/commerce/v3/trade/query_trade`; `/commerce/v1/purchase/make_order` → `query_order_status`.
+- **Moderação de conta:** `/lv/v1/user/get_ban_status`, `/lv/v1/punish/get_punish_status`, `/lv/v1/rick_control/check_risk`.
+
+Como recursos de IA e o watermark rodam ou são decididos no servidor, o modelo é *server-authoritative*. Para o LeccorCut isso confirma a decisão de ser **100% offline e sem paywall**: não há nada desse modelo a replicar.
+
 ---
 
 ## 10. Proteções e Segurança
 
 ### 10.1 Anti-Debug
-- `IsDebuggerPresent` — detectado nas strings do launcher
-- `AES_KEY_SETUP_FAILED`, `BAD_KEY_LENGTH`, `INVALID_TOKEN` — BoringSSL (OpenSSL fork Google)
-- Certificado de assinatura PE via Digicert e Sectigo
+
+Busca por imports (nomes de API terminados em NUL na tabela de imports) nos binários principais:
+
+| Binário | APIs relevantes | Leitura |
+|---|---|---|
+| `CapCut.exe` (launcher 4.97MB) | `IsDebuggerPresent` | Checagem trivial |
+| `metasecml.dll` (12MB) | `IsDebuggerPresent`, `CheckRemoteDebuggerPresent`, `WinVerifyTrust`, `CryptQueryObject` | **Núcleo anti-tamper** (SDK de segurança ByteDance, o mesmo que gera os cabeçalhos `X-Argus`/`X-Ladon`) |
+| `VECreator.dll` | `IsDebuggerPresent`, `NtQueryInformationProcess`, `WinVerifyTrust` | Checagem de debugger e de assinatura de módulos |
+| `cccreator.dll`, `deepagents_capi.dll` | só `OutputDebugStringA` / timers | Sem anti-debug próprio |
+| `sscronet.dll` | `CertGetCertificateChain` | Validação da cadeia TLS (sem *pinning* rígido confirmado estaticamente) |
+
+- Não há packer/VMProtect: as seções PE são legíveis e as strings ficam em claro.
+- Os hits de "frida" em `VECreator.dll`, `VEHelper.exe` e `VEDetector.exe` são **falsos positivos** (substring de "Black **Fri**day"). Não há detecção explícita de Frida, x64dbg ou IDA.
+- `AES_KEY_SETUP_FAILED`, `BAD_KEY_LENGTH`, `INVALID_TOKEN` vêm do BoringSSL (fork do OpenSSL pelo Google).
 
 ### 10.2 Mecanismo Interno de Watermarks (Lua + Atlas Engine)
 
@@ -450,6 +568,50 @@ A engine de watermark é orientada a entidades e sprites no motor `AmazingEngine
 - **BoringSSL** embarcado (fork do OpenSSL pelo Google)
 - Suporte a RSA, EC, DSA, PKCS12, TLS 1.3
 - Comunicação de rede via **Cronet** (sscronet.dll) com QUIC/HTTP3
+
+### 10.4 C2PA — Proveniência de Conteúdo (`tt_c2pa_sdk.dll`, 7MB)
+
+- **Implementação:** Rust. É um fork interno do `c2pa-rs` da Adobe/CAI (`tt-c2pa-rs`), com `rust-openssl`. Módulos visíveis nos caminhos de build: `tt_c2pa_native_sdk.rs`, `tt_c2pa_cert_manager.rs` e `tt_remote_signer.rs`.
+- **API C exportada:** `tt_c2pa_init`, `tt_c2pa_create`, `tt_c2pa_async_write_and_sign`, `tt_c2pa_http_response_create` e `tt_c2pa_enable_debug_log`. Quem chama é o `VECreator.dll` (`init_c2pa_sdk`, `c2pa_status`, `c2pa_cost`, `c2pa_cert_status`).
+- **Assinatura remota:** a chave privada **não fica no cliente**. O SDK monta o claim, calcula os hashes e manda o *payload* para `/lv/v1/c2pa/sign`; o certificado vem de `/lv/v1/c2pa/cert`. A requisição HTTP é delegada ao host (`tt_c2pa_http_response_create`).
+- **Formato:** manifest store em **JUMBF**, assinatura **COSE_Sign1** (ES256/384/512, PS256/384/512, Ed25519) e carimbo de tempo RFC 3161.
+- **Hash do conteúdo:** `c2pa.hash.bmff` para MP4/MOV (com **Merkle tree** em MP4 fragmentado), `c2pa.hash.data` para JPEG/PNG e `c2pa.hash.boxes`.
+- **Assertions:** `c2pa.actions.v2` (com `digitalSourceType`, que marca conteúdo gerado por IA), `c2pa.ingredient`, `c2pa.thumbnail.claim` e metadados schema.org.
+- **Ativação:** controlada por A/B (`tt_c2pa_ab_test.enable`), ou seja, não é aplicada a todos os exports.
+
+### 10.5 Watermark Invisível
+
+- **Modelo:** `Resources/models/invisible_watermark/win_lens_wm_embed_model_c4_v2.bytenn` (≈780KB; há uma variante `mac_`). É um modelo ByteNN de **embedding** (só insere a marca; o detector fica no servidor).
+- **Execução:** unidade de grafo `TEInvisibleWatermarkUnit` do motor de render (`cccreator.dll`, `ttvenative/src/engine/graph/processor/`), acelerada pelo Lens (`ve_lens_invisible_watermark_opt`).
+- **Parâmetros:** `enable_invisible_watermark`, `invisible_watermark_id` e `invisible_watermark_id_source` (identificador embutido, provavelmente ligado a usuário/dispositivo/tarefa), além de `invisible_watermark_frame_interval` (a marca vai em um subconjunto de frames, não em todos).
+- **Quando:** é injetado na configuração de export por `export_ns::TaskUtil::exportConfigAppendInvisibleWatermark`. A configuração vem do servidor (`lv.platform.labs.invisibleWatermarkInfo`), com flag de rollout específico para conteúdo de IA (`feature_gray_config.add_invisible_watermark_for_ai_gameplay`).
+- **Leitura:** é rastreabilidade de conteúdo gerado/exportado (principalmente de IA), em paralelo ao C2PA. O C2PA é metadado removível; o watermark invisível sobrevive a re-encode.
+
+### 10.6 Assinatura Digital dos Binários (Authenticode)
+
+| Campo | Valor |
+|---|---|
+| Binários verificados | 365 `.exe`/`.dll`, **todos com status `Valid`** |
+| Assinante | `CN=Bytedance Pte. Ltd., O=Bytedance Pte. Ltd., L=Singapore, C=SG` (EV, *Private Organization*) em 361 binários |
+| Emissor | `DigiCert Trusted G4 Code Signing RSA4096 SHA384 2021 CA1` |
+| Validade | 08/07/2025 → 08/07/2028 |
+| Thumbprint | `27304C8528F313F03A48581515054B6DF65C7D85` |
+| Algoritmo | sha256RSA |
+| Timestamp | `Sectigo Public Time Stamping Signer R37` |
+| Assinados pela Microsoft | `dxil.dll`, `msvcp140.dll` (redistribuíveis) |
+
+### 10.7 Verificação de Integridade
+
+- **Binários:** `WinVerifyTrust` é importado por `VECreator.dll` e `metasecml.dll`, o que é compatível com verificar a assinatura Authenticode de módulos e dos pacotes de update. A confirmação de *quando* isso é chamado (startup? carga de DLL?) fica para a Fase 4, com instrumentação.
+- **Recursos web:** `web-manifest.json` traz SHA-256 de cada asset do `common_agent` (ver 12.3).
+- **Pacotes de efeito/Gecko:** marcador `effect_required_files.tag` + verificação de hash no download.
+- **C2PA:** hash do próprio conteúdo exportado (`BMFF inithash mismatch`, `claimSignature.mismatch`).
+
+### 10.8 Ofuscação do Código JS
+
+- 59 bundles JS/MJS próprios com mais de 200KB foram analisados (sem `node_modules`). **Nenhum usa ofuscação** estilo `javascript-obfuscator` (`_0x…`): é só minificação Vite/Rollup/esbuild, com nomes curtos e template strings preservadas.
+- 29 bundles referenciam `sourceMappingURL`, mas **nenhum `.map` é distribuído**.
+- As strings de endpoint, os nomes de schema (`agent-runtime.host-auth-context.v1`) e os nomes de classe (`NativeHttpTransportError`) ficam legíveis, então os bundles são a melhor fonte para mapear contratos de API.
 
 ---
 
@@ -585,4 +747,4 @@ A análise de assinatura binária (magic headers) revelou dois padrões primári
 
 ---
 
-*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática e arquitetural completa (Fases 1 e 2) do CapCut v9.6.0.4097*
+*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática e arquitetural (Fases 1, 2 e 3 — parte estática de rede/APIs e proteções) do CapCut v9.6.0.4097*

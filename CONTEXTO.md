@@ -100,22 +100,31 @@ via engenharia reversa estática com as ferramentas **REA v6.4.0** + **Ghidra 12
 - **Formatos Binários de Redes Neurais (Fase 2.4)**:
   - Modelos ByteNN com magic header `BM\x00\x04` (`.bytenn`) e modelos de áudio SAMI com magic header `SAMI` (`.model`).
 
+- **Rede, APIs e Proteções (Fase 3 — parte estática, 2026-10-15)**:
+  - Varredura estática de bundles JS + strings C das DLLs: **93 hosts**, ~200 paths em JS e ~370 paths nativos (`VECreator.dll`/`VEHelper.exe`). Detalhes nas seções 9.3–9.9 da documentação.
+  - Hosts por serviço, regionalizados (`-sg`/`-va`/`-va-us`), com variantes de bootstrap `*-v2-boot.capcutapi.com` e domínios dinâmicos via TNC (`/get_domains/v5/`).
+  - Auth: Passport (cookies `sessionid`/`sid_tt` + `x-tt-token`, heartbeat `/passport/token/beat/v2/`). O backend Bun **não vê credenciais**: recebe um `host-auth-context.v1` e faz HTTP pelo **Native HTTP Bridge**, que injeta cookie, token e assinaturas MSSDK (`X-Argus`/`X-Gorgon`/`X-Ladon`). Há ainda uma assinatura de app `sign-ver: 1` (MD5 com salt) feita no JS.
+  - Upload: `/lv/v1/upload_sign` → credenciais STS temporárias → upload VOD/ImageX (MCS).
+  - IA cloud assíncrona (submit/query/fetch): Zenith, text_to_video, CapFlow, common_task, TTS/clone de voz.
+  - Licença: **não existe licença local**; tudo é *server-authoritative* (`/commerce/v3/benefits/*`, `report_usage`, `check_withhold_deduct`).
+  - Proteções: anti-debug concentrado no `metasecml.dll`; sem packer; JS só minificado (sem `.map`); 365/365 binários com Authenticode válido (EV Bytedance Pte. Ltd., DigiCert G4).
+  - C2PA: fork Rust do `c2pa-rs` com **assinatura remota** (`/lv/v1/c2pa/sign`), JUMBF + COSE_Sign1, hash BMFF/Merkle, ativado por A/B.
+  - Watermark invisível: modelo ByteNN `wm_embed_model_c4_v2` executado pela `TEInvisibleWatermarkUnit` no export, com ID e intervalo de frames vindos do servidor.
+
 ### Arquivos Gerados
-- [PASSOS.md](file:///d:/0000000-PROJETOS/LeccorCut/PASSOS.md) — Roteiro com checkboxes (Fases 1 e 2 100% concluídas)
-- [DOCUMENTACAO.md](file:///d:/0000000-PROJETOS/LeccorCut/DOCUMENTACAO.md) — Documentação técnica completa (Seções 1 a 17)
+- [PASSOS.md](file:///d:/0000000-PROJETOS/LeccorCut/PASSOS.md) — Roteiro com checkboxes (Fases 1 e 2 concluídas; Fase 3 com a parte estática concluída)
+- [DOCUMENTACAO.md](file:///d:/0000000-PROJETOS/LeccorCut/DOCUMENTACAO.md) — Documentação técnica completa (Seções 1 a 17; rede/APIs em 9.3–9.9; proteções em 10.4–10.8)
 - [CONTEXTO.md](file:///d:/0000000-PROJETOS/LeccorCut/CONTEXTO.md) — Memória de contexto atualizada
 
 ---
 
 ## ❌ O que ainda falta (Engenharia Reversa — Fases 3, 4 e 5)
 
-### Alta Prioridade (Fase 3 — Rede e APIs)
-- [ ] Mapear fluxo de autenticação e tokens (TikTok/CapCut OAuth, Bearer tokens)
-- [ ] Mapear base URLs e domínios de produção (`feed-api-sg.capcutapi.com`, `pc-mon-va.byteoversea.com`)
-- [ ] Interceptar chamadas reais via proxy MITM (Fiddler/mitmproxy) durante renderização e IA cloud
-- [ ] Mapear endpoints de upload de mídia e geração de efeitos generativos (SeedDance, MiniMax)
+### Fase 3 — único item restante (movido para a Fase 4)
+- [ ] Interceptar chamadas reais via proxy MITM (mitmproxy/Fiddler) durante startup, export e IA cloud, para confirmar quais hosts e paths mapeados estaticamente são de fato usados. Exige rodar o CapCut de forma interativa, com login.
 
 ### Média Prioridade (Fase 4 — Dinâmica e Frida)
+- [ ] Confirmar em runtime quando `WinVerifyTrust` é chamado (integridade de DLLs/updates)
 - [ ] Instrumentação via Frida para inspecionar chamadas nativas em `audioeffect.dll` e `cccreator.dll`
 - [ ] Inspecionar runtime do `bun.exe` e portas IPC locais ativas durante execução
 
@@ -276,8 +285,8 @@ LeccorCut/
 
 ## 📋 Próximos Passos Recomendados
 
-1. **Imediato**: Usar Ghidra headless para extrair exports do `videoeditor.dll` e mapear o formato de draft completo
-2. **Curto prazo**: Capturar tráfego de rede do CapCut com proxy MITM para documentar APIs completas
+1. **Imediato**: Fase 4. Capturar tráfego com MITM (fecha a Fase 3) e instrumentar com Frida
+2. **Curto prazo**: Implementar no LeccorCut o importador de `draft_content.json` (Fase 5.3), que já tem base suficiente das Fases 2.3 e 5
 3. **Médio prazo**: Implementar detecção de cenas e object tracking no LeccorCut
 4. **Longo prazo**: Migrar engine de renderização de FFmpeg CLI para pipeline nativo C++/WebGPU
 

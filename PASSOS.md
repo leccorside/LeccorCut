@@ -118,26 +118,30 @@
 - [x] `/commerce/v1/subscription/*` — Assinaturas e planos
 - [x] `/commerce/v1/benefits/*` — Créditos e benefícios
 - [x] `/lv/v1/commerce/get_entrances` — Pontos de entrada comerciais
-- [ ] Mapear base URL da API (host principal)
-- [ ] Capturar tráfego de rede em runtime (proxy MITM)
-- [ ] Documentar mecanismo de autenticação (token/sessão)
-- [ ] Mapear APIs de upload/download de mídia
-- [ ] Mapear APIs de efeitos, templates, stickers (cloud assets)
-- [ ] Mapear APIs de exportação e watermark
-- [ ] Mapear APIs de geração de vídeo por IA (SeedDance, etc.)
-- [ ] Identificar mecanismo de verificação de licença/assinatura
+- [x] Mapear base URLs da API (93 hosts; serviços regionalizados `-sg`/`-va` + variantes `*-v2-boot`; editor em `editor-api-sg.capcut.com`, agente em `editor32-normal-sg.capcutapi.com`)
+- [ ] Capturar tráfego de rede em runtime (proxy MITM) — **exige execução interativa do CapCut com login; movido para junto da Fase 4**
+- [x] Documentar mecanismo de autenticação (Passport + cookies `sessionid`/`sid_tt` + `x-tt-token` com heartbeat `/passport/token/beat/v2/`; Native HTTP Bridge injeta credenciais; assinaturas `sign-ver: 1` e MSSDK `X-Argus`/`X-Gorgon`/`X-Ladon`)
+- [x] Mapear APIs de upload/download de mídia (`/lv/v1/upload_sign` → credenciais STS temporárias → upload VOD/ImageX via MCS)
+- [x] Mapear APIs de efeitos, templates, stickers (`/effect/api/*`, `/artist/v1/*`, Giphy, Gecko, `/lv/v1/homepage/templates`)
+- [x] Mapear APIs de exportação e watermark (`/lv/v1/watermark/get_watermark`, `/lv/v1/c2pa/sign`, checagens de copyright)
+- [x] Mapear APIs de geração de vídeo por IA (Zenith, text_to_video, CapFlow, common_task; padrão assíncrono submit → query → fetch)
+- [x] Identificar mecanismo de verificação de licença/assinatura (sem licença local; *server-authoritative* via `/commerce/v3/benefits/*` + `report_usage`)
 
 ### 3.2 Proteção e Anti-Análise
-- [ ] Verificar obfuscação de código JS (webpack/vite minificado — confirmado)
-- [ ] Identificar mecanismos de detecção de debugger (`IsDebuggerPresent` — encontrado)
-- [ ] Analisar `tt_c2pa_sdk.dll` — C2PA (Content Provenance and Authenticity)
-- [ ] Investigar `invisible_watermark` — como é embarcado no vídeo exportado
-- [ ] Analisar certificados de assinatura do PE
-- [ ] Verificar verificação de integridade de DLLs em runtime
+- [x] Verificar ofuscação de código JS (só minificação Vite; 0 de 59 bundles com `_0x…`; `.map` não distribuídos)
+- [x] Identificar mecanismos de detecção de debugger (`metasecml.dll`: `IsDebuggerPresent` + `CheckRemoteDebuggerPresent`; `VECreator.dll`: `NtQueryInformationProcess`; sem packer; hits de "frida" são falsos positivos)
+- [x] Analisar `tt_c2pa_sdk.dll` (fork Rust do `c2pa-rs`; JUMBF + COSE_Sign1; assinatura remota via `/lv/v1/c2pa/sign`; hash BMFF/Merkle; A/B test)
+- [x] Investigar `invisible_watermark` (modelo ByteNN `wm_embed_model_c4_v2` executado pela `TEInvisibleWatermarkUnit` no export, com intervalo de frames e ID configurados pelo servidor)
+- [x] Analisar certificados de assinatura do PE (365/365 válidos; EV Bytedance Pte. Ltd. via DigiCert G4; timestamp Sectigo)
+- [x] Verificar integridade de DLLs (estático: `WinVerifyTrust` em `VECreator.dll`/`metasecml.dll` + SHA-256 no `web-manifest.json`; confirmação em runtime fica para a Fase 4)
 
 ---
 
 ## 🔧 Fase 4 — Análise Dinâmica (Em Execução)
+
+### 4.0 Captura de Tráfego (herdado da Fase 3)
+- [ ] Capturar tráfego com mitmproxy/Fiddler (CA raiz no repositório do Windows; verificar se o Cronet aceita o CA de usuário)
+- [ ] Confirmar quais hosts da seção 9.3 são realmente chamados no startup, na exportação e na IA cloud
 
 ### 4.1 Instrumentação com Frida
 - [ ] Hookear funções de inicialização do `VECreator.dll`
@@ -192,9 +196,9 @@
 
 | Fase | Progresso | Prioridade |
 |------|-----------|------------|
-| Fase 1 — Reconhecimento Estático | 🟡 Em andamento (60%) | 🔴 Alta |
-| Fase 2 — Arquitetura e Componentes | 🔴 Iniciado (25%) | 🔴 Alta |
-| Fase 3 — Rede e APIs | 🔴 Iniciado (20%) | 🟡 Média |
+| Fase 1 — Reconhecimento Estático | ✅ Concluída (100%) | 🔴 Alta |
+| Fase 2 — Arquitetura e Componentes | ✅ Concluída (100%) | 🔴 Alta |
+| Fase 3 — Rede e APIs | 🟢 Parte estática concluída (19/20; MITM movido para a Fase 4) | 🟡 Média |
 | Fase 4 — Análise Dinâmica | ⚪ Não iniciado | 🟡 Média |
 | Fase 5 — Aplicação ao LeccorCut | 🟡 Em andamento (40%) | 🟢 Contínuo |
 
