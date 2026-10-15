@@ -29,9 +29,18 @@
 </header>
 <main id="workspace">
   <section id="mediaPanel" class="panel">
-    <h2>Mídia</h2>
-    <button id="btnImport" class="primary wide">+ Importar</button>
-    <div id="mediaList"></div>
+    <div class="panel-tabs">
+      <button id="tabMedia" class="panel-tab active" title="Arquivos de Mídia do Projeto">📁 Mídia</button>
+      <button id="tabSfx" class="panel-tab" title="Biblioteca de Efeitos Sonoros Nativos">🔊 Efeitos (SFX)</button>
+    </div>
+    <div id="mediaView">
+      <button id="btnImport" class="primary wide">+ Importar</button>
+      <div id="mediaList"></div>
+    </div>
+    <div id="sfxView" hidden>
+      <div class="sfx-header-desc">Efeitos sonoros nativos sintetizados em tempo real, prontos para cortes e transições:</div>
+      <div id="sfxList"></div>
+    </div>
   </section>
   <section id="previewPanel" class="panel">
     <div id="stage">
@@ -67,6 +76,7 @@
     <button id="btnRedo" title="Refazer (Ctrl+Y)">↷</button>
     <button id="btnSnap" class="active" title="Alinhamento Magnético / Snap (N)">🧲 Snap</button>
     <button id="btnMarker" title="Adicionar ou Alternar Marcador na agulha (M)">🏷️ Marcador (M)</button>
+    <button id="btnFlash" class="accent-btn" title="Inserir Flash Branco de Batida / Impacto no cursor (B)">⚡ Flash Batida</button>
     <button id="btnSplit">✂ Dividir (S)</button>
     <button id="btnFreeze" title="Congelar Quadro no cursor (F)">❄ Congelar (F)</button>
     <button id="btnDelete">🗑 Excluir (Del)</button>

@@ -10,5 +10,8 @@ contextBridge.exposeInMainWorld('api', {
   openProject: () => ipcRenderer.invoke('open-project'),
   onProgress: (cb) => ipcRenderer.on('export-progress', (_e, s) => cb(s)),
   smartCutout: (imagePath) => ipcRenderer.invoke('smart-cutout', imagePath),
-  onCutoutProgress: (cb) => ipcRenderer.on('cutout-progress', (_e, m) => cb(m))
+  onCutoutProgress: (cb) => ipcRenderer.on('cutout-progress', (_e, m) => cb(m)),
+  getSfxList: () => ipcRenderer.invoke('get-sfx-list'),
+  generateSfx: (key) => ipcRenderer.invoke('generate-sfx', key),
+  generateFlash: () => ipcRenderer.invoke('generate-flash')
 });

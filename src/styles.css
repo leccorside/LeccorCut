@@ -65,3 +65,20 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .speed-curve-svg{width:100%;height:60px;display:block;margin:4px 0}
 .speed-curve-desc{font-size:11px;color:var(--mut);line-height:1.3;margin-top:4px}
 .clip-speed-badge{display:inline-block;background:rgba(0,0,0,0.45);padding:1px 5px;border-radius:4px;font-size:9px;color:var(--a1);font-weight:700;margin-left:4px}
+.panel-tabs{display:flex;gap:4px;margin-bottom:10px;border-bottom:1px solid var(--line);padding-bottom:6px}
+.panel-tab{flex:1;padding:7px 10px;font-size:12px;font-weight:600;background:var(--panel2);border:1px solid var(--line);border-radius:6px;cursor:pointer;color:var(--mut);transition:.15s}
+.panel-tab:hover{color:var(--txt);border-color:var(--a1)}
+.panel-tab.active{background:linear-gradient(90deg,var(--a1),var(--a2));color:#06121a;font-weight:700;border-color:transparent}
+.sfx-header-desc{font-size:11px;color:var(--mut);margin-bottom:10px;line-height:1.4}
+.sfx-item{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;margin-bottom:6px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;transition:.15s}
+.sfx-item:hover{border-color:var(--a1);transform:translateX(2px)}
+.sfx-info{display:flex;flex-direction:column;gap:2px}
+.sfx-title{font-size:12px;font-weight:600;color:var(--txt)}
+.sfx-dur{font-size:10px;color:var(--mut)}
+.sfx-actions{display:flex;gap:5px}
+.sfx-preview-btn{padding:4px 8px;font-size:11px;background:rgba(255,255,255,0.06);border:1px solid var(--line);border-radius:6px;cursor:pointer}
+.sfx-preview-btn:hover{background:rgba(0,229,195,0.15);border-color:var(--a1);color:var(--a1)}
+.sfx-add-btn{padding:4px 10px;font-size:11px;font-weight:700;background:linear-gradient(90deg,var(--a1),var(--a2));color:#06121a;border:none;border-radius:6px;cursor:pointer}
+.sfx-add-btn:hover{filter:brightness(1.15)}
+.accent-btn{background:linear-gradient(135deg,#ff9f43,#ff5252);border:none;color:#fff;font-weight:700}
+.accent-btn:hover{filter:brightness(1.2);border-color:transparent}

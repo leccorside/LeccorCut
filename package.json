@@ -6,7 +6,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/export-smoke.js && node tests/cutout-smoke.js",
+    "test": "node tests/export-smoke.js && node tests/cutout-smoke.js && node tests/sfx-smoke.js",
     "icons": "node scripts/generate-icons.js",
     "dist": "node scripts/generate-icons.js && electron-builder --win --x64"
   },

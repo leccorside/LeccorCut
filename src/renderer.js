@@ -1084,6 +1084,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 's' || e.key === 'S') split();
   else if (e.key === 'Delete') del();
   else if (e.key === 'f' || e.key === 'F') freezeFrame();
+  else if (e.key === 'b' || e.key === 'B') addFlashEffect();
   else if (e.key === 'm' || e.key === 'M') addOrToggleMarker();
   else if (e.key === 'n' || e.key === 'N') toggleSnap();
   else if (e.key === 'ArrowLeft') { e.preventDefault(); state.time = Math.max(0, state.time - (e.shiftKey ? 1 : frameDur)); renderPreview(); }
@@ -1185,3 +1186,141 @@ document.addEventListener('keydown', (e) => {
 initTrackHeaders();
 applyAspect();
 renderTimeline(); renderPreview();
+
+let sfxAudioPlayer = null;
+
+function initPanelTabs() {
+  const tabM = $('tabMedia'), tabS = $('tabSfx');
+  const viewM = $('mediaView'), viewS = $('sfxView');
+  if (tabM && tabS && viewM && viewS) {
+    tabM.onclick = () => {
+      tabM.classList.add('active');
+      tabS.classList.remove('active');
+      viewM.hidden = false;
+      viewS.hidden = true;
+    };
+    tabS.onclick = () => {
+      tabS.classList.add('active');
+      tabM.classList.remove('active');
+      viewM.hidden = true;
+      viewS.hidden = false;
+    };
+  }
+}
+
+async function initSfx() {
+  const listEl = $('sfxList');
+  if (!listEl || !window.api || !window.api.getSfxList) return;
+  try {
+    const list = await window.api.getSfxList();
+    listEl.innerHTML = '';
+    list.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'sfx-item';
+      el.innerHTML = `
+        <div class="sfx-info">
+          <span class="sfx-title">${item.name}</span>
+          <span class="sfx-dur">${item.duration.toFixed(2)}s · Efeito Nativo</span>
+        </div>
+        <div class="sfx-actions">
+          <button class="sfx-preview-btn" title="Ouvir pré-escuta">▶</button>
+          <button class="sfx-add-btn" title="Inserir na trilha de áudio">+</button>
+        </div>
+      `;
+      const btnPlay = el.querySelector('.sfx-preview-btn');
+      const btnAdd = el.querySelector('.sfx-add-btn');
+
+      btnPlay.onclick = async (ev) => {
+        ev.stopPropagation();
+        if (btnPlay.textContent === '⏹') {
+          if (sfxAudioPlayer) { sfxAudioPlayer.pause(); sfxAudioPlayer = null; }
+          btnPlay.textContent = '▶';
+          return;
+        }
+        btnPlay.textContent = '⏳';
+        try {
+          const res = await window.api.generateSfx(item.key);
+          if (sfxAudioPlayer) { sfxAudioPlayer.pause(); }
+          sfxAudioPlayer = new Audio(fileUrl(res.path));
+          sfxAudioPlayer.onended = () => { btnPlay.textContent = '▶'; };
+          await sfxAudioPlayer.play();
+          btnPlay.textContent = '⏹';
+        } catch (err) {
+          btnPlay.textContent = '▶';
+          toast('Erro ao reproduzir SFX: ' + (err.message || err));
+        }
+      };
+
+      btnAdd.onclick = async (ev) => {
+        ev.stopPropagation();
+        btnAdd.disabled = true;
+        try {
+          const res = await window.api.generateSfx(item.key);
+          const a = {
+            id: uid++,
+            path: res.path,
+            name: res.name,
+            start: state.time,
+            in: 0,
+            duration: res.duration,
+            max: res.duration,
+            volume: 1,
+            fadeIn: 0,
+            fadeOut: 0
+          };
+          state.audios.push(a);
+          select({ kind: 'audio', id: a.id });
+          renderTimeline();
+          renderPreview();
+          toast(`Efeito adicionado: ${res.name}`);
+        } catch (err) {
+          toast('Erro ao inserir SFX: ' + (err.message || err));
+        } finally {
+          btnAdd.disabled = false;
+        }
+      };
+
+      listEl.appendChild(el);
+    });
+  } catch (err) {
+    console.error('Falha ao carregar lista de SFX:', err);
+  }
+}
+
+async function addFlashEffect() {
+  try {
+    const res = await window.api.generateFlash();
+    if (!res || !res.path) return;
+    const dur = 0.25;
+    const ov = {
+      id: uid++,
+      path: res.path,
+      name: '⚡ Flash Batida',
+      isImage: true,
+      start: state.time,
+      in: 0,
+      duration: dur,
+      max: 999,
+      scale: 100,
+      rotate: 0,
+      hflip: false,
+      x: 0.5,
+      y: 0.5,
+      opacity: 1,
+      motion: false,
+      anim: 'fade',
+      chroma: false
+    };
+    state.overlays.push(ov);
+    select({ kind: 'overlay', id: ov.id });
+    renderTimeline();
+    renderPreview();
+    toast('⚡ Flash de impacto inserido no cursor!');
+  } catch (err) {
+    toast('Erro ao gerar Flash: ' + (err.message || err));
+  }
+}
+
+if ($('btnFlash')) $('btnFlash').onclick = addFlashEffect;
+initPanelTabs();
+initSfx();

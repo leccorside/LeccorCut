@@ -246,11 +246,12 @@ function buildFfmpeg(project, outPath) {
     const flip = o.hflip ? 'hflip,' : '';
     const rot = o.rotate ? `rotate=${o.rotate}*PI/180:c=none:ow='rotw(${o.rotate}*PI/180)':oh='roth(${o.rotate}*PI/180)',` : '';
     const anim = o.anim || 'none';
-    let alphaExpr = `aa=${o.opacity ?? 1}`;
+    let fadeFilter = '';
     if (anim === 'fade') {
-      alphaExpr = `aa='if(lt(t\\,${o.start}+0.4)\\,(t-${o.start})/0.4*${o.opacity ?? 1}\\,if(gt(t\\,${o.start + o.duration}-0.4)\\,(${o.start + o.duration}-t)/0.4*${o.opacity ?? 1}\\,${o.opacity ?? 1}))'`;
+      const fDur = Math.min(0.4, o.duration / 2);
+      fadeFilter = `,fade=t=in:st=0:d=${fDur.toFixed(3)}:alpha=1,fade=t=out:st=${Math.max(0, o.duration - fDur).toFixed(3)}:d=${fDur.toFixed(3)}:alpha=1`;
     }
-    f.push(`[${idx}:v]${trim}setpts=PTS-STARTPTS+${o.start}/TB,scale=${Math.round(W * o.scale / 100 / 2) * 2}:-2,${flip}${rot}${ck}format=yuva420p,colorchannelmixer=${alphaExpr}[ov${k}]`);
+    f.push(`[${idx}:v]${trim}scale=${Math.round(W * o.scale / 100 / 2) * 2}:-2,${flip}${rot}${ck}format=yuva420p,colorchannelmixer=aa=${o.opacity ?? 1}${fadeFilter},setpts=PTS-STARTPTS+${o.start}/TB[ov${k}]`);
 
     let pr = o.motion ? `min(1\\,max(0\\,(t-${o.start})/${o.duration}))` : '0';
     if (o.motion && o.easing === 'smooth') {
