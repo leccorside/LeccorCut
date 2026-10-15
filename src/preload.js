@@ -20,6 +20,11 @@ contextBridge.exposeInMainWorld('api', {
   videoMatting: (opts) => ipcRenderer.invoke('video-matting', opts),
   onVideoMattingProgress: (cb) => ipcRenderer.on('video-matting-progress', (_e, data) => cb(data)),
   stabilizeVideo: (opts) => ipcRenderer.invoke('stabilize-video', opts),
-  onStabilizeProgress: (cb) => ipcRenderer.on('stabilize-progress', (_e, data) => cb(data))
+  onStabilizeProgress: (cb) => ipcRenderer.on('stabilize-progress', (_e, data) => cb(data)),
+  autoReframe: (opts) => ipcRenderer.invoke('auto-reframe', opts),
+  onReframeProgress: (cb) => ipcRenderer.on('reframe-progress', (_e, data) => cb(data)),
+  motionTrack: (opts) => ipcRenderer.invoke('motion-track', opts),
+  onMotionTrackProgress: (cb) => ipcRenderer.on('motion-track-progress', (_e, data) => cb(data))
 });
+
 

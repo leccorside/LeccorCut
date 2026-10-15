@@ -196,8 +196,8 @@
 
 ### 6.1 Estabilização e Enquadramento
 - [x] Implementar Estabilização de Vídeo offline (`vidstabdetect` + `vidstabtransform` via FFmpeg para redução de trepidação)
-- [ ] Implementar Redimensionamento Inteligente / Auto Reframe (enquadramento dinâmico 9:16 com detecção de sujeito/foco)
-- [ ] Implementar Rastreamento de Movimento (Motion/Object Tracking para ancorar textos, stickers e sobreposições a objetos do vídeo)
+- [x] Implementar Redimensionamento Inteligente / Auto Reframe (enquadramento dinâmico 9:16, 1:1, 4:5 com seleção de foco inteligente esquerda/centro/direita e reescalonamento Lanczos)
+- [x] Implementar Rastreamento de Movimento (Motion/Object Tracking com análise de vetores `mestimate` + `showinfo`, interpolação temporal de keyframes e ancoragem a sobreposições PiP/stickers)
 
 ### 6.2 Curvas de Velocidade e Shaders Visuais
 - [ ] Implementar Speed Ramping com editor de Curva Bezier Livre (adição de keyframes customizados, arrasto livre e interpolação)
@@ -248,7 +248,7 @@
 | Fase 3 — Rede e APIs | ✅ Concluída (parte estática 19/20; MITM feito na Fase 4) | 🟡 Média |
 | Fase 4 — Análise Dinâmica | ✅ Concluída no escopo definido | 🟡 Média |
 | Fase 5 — Aplicação Core ao LeccorCut | ✅ Concluída (100%) | 🟢 Concluída |
-| Fase 6 — Edição Avançada e Processamento Visual | 🔄 Em Progresso (17% - estabilização concluída) | 🔴 Alta |
+| Fase 6 — Edição Avançada e Processamento Visual | 🔄 Em Progresso (50% - Fase 6.1 100% concluída) | 🔴 Alta |
 | Fase 7 — IA Avançada Local (100% Offline) | ⏳ A Fazer (0%) | 🟡 Média |
 | Fase 8 — Exportação Profissional e Codecs Adicionais | ⏳ A Fazer (0%) | 🔴 Alta |
 | Fase 9 — UX, Produtividade e Assets | ⏳ A Fazer (0%) | 🟢 Média |

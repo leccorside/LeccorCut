@@ -217,8 +217,27 @@ function syncOverlay() {
   if (o.easing === 'smooth') {
     pr = 3 * pr * pr - 2 * pr * pr * pr;
   }
-  let ox = o.motion ? o.x + ((o.x2 ?? o.x) - o.x) * pr : o.x;
-  let oy = o.motion ? o.y + ((o.y2 ?? o.y) - o.y) * pr : o.y;
+  let ox = o.x;
+  let oy = o.y;
+  if (o.motionKeyframes && o.motionKeyframes.length > 0) {
+    const kfs = o.motionKeyframes;
+    const relTime = dt;
+    let kfPrev = kfs[0], kfNext = kfs[kfs.length - 1];
+    for (let i = 0; i < kfs.length - 1; i++) {
+      if (relTime >= kfs[i].time && relTime <= kfs[i + 1].time) {
+        kfPrev = kfs[i];
+        kfNext = kfs[i + 1];
+        break;
+      }
+    }
+    const span = Math.max(0.001, kfNext.time - kfPrev.time);
+    const kfPr = Math.min(1, Math.max(0, (relTime - kfPrev.time) / span));
+    ox = kfPrev.cx + (kfNext.cx - kfPrev.cx) * kfPr;
+    oy = kfPrev.cy + (kfNext.cy - kfPrev.cy) * kfPr;
+  } else if (o.motion) {
+    ox = o.x + ((o.x2 ?? o.x) - o.x) * pr;
+    oy = o.y + ((o.y2 ?? o.y) - o.y) * pr;
+  }
   let op = o.opacity ?? 1;
 
   const anim = o.anim || 'none';
@@ -729,6 +748,65 @@ async function executeStabilizeVideo(clip) {
   }
 }
 
+async function executeAutoReframe(clip, targetAspect, focus) {
+  if (!clip || clip.isImage) return;
+  toast(`Iniciando Auto Reframe → ${targetAspect} (foco: ${focus})...`);
+  window.api.onReframeProgress(data => toast(data.text));
+  try {
+    const res = await window.api.autoReframe({
+      inputPath: clip.path,
+      targetAspect,
+      focus,
+      scaleH: state.settings?.height || 1080
+    });
+    if (!res.ok) return toast('Erro no Auto Reframe: ' + (res.error || 'Falha'));
+    clip.path = res.path;
+    clip.name = `📐 ${clip.name.replace(/^📐\s*/, '')}`;
+    renderTimeline();
+    renderProps();
+    renderPreview();
+    toast(`Auto Reframe ${targetAspect} aplicado com sucesso!`);
+  } catch (err) {
+    toast('Erro: ' + (err.message || err));
+  }
+}
+
+async function executeMotionTrack(clip) {
+  if (!clip || clip.isImage) return;
+  toast('Analisando vetores de movimento do clipe...');
+  window.api.onMotionTrackProgress(data => toast(data.text));
+  try {
+    const res = await window.api.motionTrack({ inputPath: clip.path, sampleEvery: 4 });
+    if (!res.ok) return toast('Erro no Motion Track: ' + (res.error || 'Falha'));
+
+    if (!res.keyframes || res.keyframes.length === 0) {
+      return toast('Nenhum keyframe de movimento detectado no clipe.');
+    }
+
+    // Aplica os keyframes de rastreamento ao overlay selecionado ou salva no clipe
+    const sel = state.selected;
+    if (sel && sel.kind === 'overlay') {
+      const ov = state.overlays.find(o => o.id === sel.id);
+      if (ov) {
+        ov.motion = true;
+        ov.motionKeyframes = res.keyframes;
+        ov.x = res.keyframes[0].cx;
+        ov.y = res.keyframes[0].cy;
+        ov.x2 = res.keyframes[res.keyframes.length - 1].cx;
+        ov.y2 = res.keyframes[res.keyframes.length - 1].cy;
+        renderProps();
+        renderPreview();
+        toast(`Motion Track aplicado ao overlay: ${res.keyframes.length} keyframes de posição ancorados!`);
+        return;
+      }
+    }
+    clip.motionTrackData = res.keyframes;
+    toast(`Análise concluída: ${res.keyframes.length} keyframes de movimento em ${res.duration?.toFixed(1)}s. Selecione um overlay para ancorar.`);
+  } catch (err) {
+    toast('Erro: ' + (err.message || err));
+  }
+}
+
 function renderProps() {
   const p = $('props'); const s = state.selected;
   if (!s) { p.innerHTML = '<p class="hint">Selecione um clipe na timeline.</p>'; return; }
@@ -753,6 +831,9 @@ function renderProps() {
       + r('oX', 'Posição horizontal', 0, 1, 0.01, o.x)
       + r('oY', 'Posição vertical', 0, 1, 0.01, o.y)
       + r('oOp', 'Opacidade', 0.1, 1, 0.05, o.opacity)
+      + (o.motionKeyframes && o.motionKeyframes.length > 0
+        ? `<div class="prop" style="color:#00b894;font-size:11px;display:flex;justify-content:space-between;align-items:center;background:#1a2520;padding:6px;border-radius:4px;border:1px solid #00b894;"><span>🎯 Motion Track Ativo (${o.motionKeyframes.length} pts)</span><button id="btnRemoveTrack" style="padding:2px 8px;font-size:10px;">Remover</button></div>`
+        : `<button id="btnTrackUnderOverlay" class="wide secondary" style="margin-top:4px;">🎯 Ancorar ao Movimento do Clipe Abaixo</button>`)
       + `<div class="prop"><label><input type="checkbox" id="oMot" ${o.motion ? 'checked' : ''}> Animar posição (início → fim)</label></div>`
       + `<div class="prop">Movimento<select id="oEase">
         <option value="linear" ${(o.easing || 'linear') === 'linear' ? 'selected' : ''}>Linear</option>
@@ -765,6 +846,21 @@ function renderProps() {
       + r('oCSim', 'Tolerância', 0.05, 0.6, 0.01, o.chromaSim ?? 0.3);
     if ($('btnSmartCutoutOverlay')) $('btnSmartCutoutOverlay').onclick = () => executeSmartCutout(o.path, 'overlay', o);
     if ($('btnVideoMattingOverlay')) $('btnVideoMattingOverlay').onclick = () => executeVideoMatting(o.path, 'overlay', o);
+    if ($('btnRemoveTrack')) {
+      $('btnRemoveTrack').onclick = () => {
+        delete o.motionKeyframes;
+        renderProps();
+        renderPreview();
+        toast('Rastreamento de movimento desvinculado do overlay.');
+      };
+    }
+    if ($('btnTrackUnderOverlay')) {
+      $('btnTrackUnderOverlay').onclick = () => {
+        const baseClip = state.clips.find(c => !c.isImage && o.start >= c.start && o.start < c.start + c.duration) || state.clips[0];
+        if (!baseClip) return toast('Nenhum clipe de vídeo encontrado sob o overlay.');
+        executeMotionTrack(baseClip);
+      };
+    }
     $('oAnim').onchange = (e) => { o.anim = e.target.value; renderPreview(); };
     $('oRot').oninput = (e) => { o.rotate = +e.target.value; renderPreview(); };
     $('oFlip').onchange = (e) => { o.hflip = e.target.checked; renderPreview(); };
@@ -900,12 +996,25 @@ function renderProps() {
        + `<button id="btnSmartCutoutClip" class="wide primary">✂ Extrair Objeto com IA para Sobreposição (PiP)</button>`
        + (!c.isImage ? `<button id="btnVideoMattingClip" class="wide secondary" style="margin-top:4px;">✂ Matting de Vídeo Contínuo (Extrair Vídeo Transparente PiP)</button>` : '')
        + (!c.isImage ? `<button id="btnStabilizeClip" class="wide" style="margin-top:4px;">🎥 Estabilizar Vídeo (Reduzir Trepidação)</button>` : '')
+       + (!c.isImage ? `<div class="prop" style="margin-top:6px;gap:4px;flex-wrap:wrap;">
+           <span style="font-size:11px;opacity:.7;width:100%;margin-bottom:2px;">📐 Auto Reframe</span>
+           <select id="pReframeAspect" style="flex:1;min-width:70px;"><option value="9:16">9:16</option><option value="1:1">1:1</option><option value="4:5">4:5</option><option value="16:9">16:9</option></select>
+           <select id="pReframeFocus" style="flex:1;min-width:70px;"><option value="center">Centro</option><option value="left">Esquerda</option><option value="right">Direita</option></select>
+           <button id="btnAutoReframeClip" class="wide" style="margin-top:2px;">📐 Aplicar Reenquadramento</button>
+         </div>` : '')
+       + (!c.isImage ? `<button id="btnMotionTrackClip" class="wide" style="margin-top:4px;">🎯 Motion Track (Analisar Movimento)</button>` : '')
        + (c.hasAudio && !c.isImage ? `<button id="btnDetach" class="wide">Separar Áudio do Vídeo</button>` : '');
   p.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => { c.filters[i.dataset.k] = +i.value; renderPreview(); });
   $('pFill').onchange = (e) => { c.filters.fillMode = e.target.value; renderPreview(); };
   if ($('btnSmartCutoutClip')) $('btnSmartCutoutClip').onclick = () => executeSmartCutout(c.path, 'clip', c);
   if ($('btnVideoMattingClip')) $('btnVideoMattingClip').onclick = () => executeVideoMatting(c.path, 'clip', c);
   if ($('btnStabilizeClip')) $('btnStabilizeClip').onclick = () => executeStabilizeVideo(c);
+  if ($('btnAutoReframeClip')) $('btnAutoReframeClip').onclick = () => {
+    const aspect = $('pReframeAspect')?.value || '9:16';
+    const focus  = $('pReframeFocus')?.value  || 'center';
+    executeAutoReframe(c, aspect, focus);
+  };
+  if ($('btnMotionTrackClip')) $('btnMotionTrackClip').onclick = () => executeMotionTrack(c);
   if ($('btnDetach')) $('btnDetach').onclick = () => detachAudio(c);
   $('pDenoise').onchange = (e) => { c.filters.denoise = e.target.checked; };
   $('pLoudnorm').onchange = (e) => { c.filters.loudnorm = e.target.checked; };

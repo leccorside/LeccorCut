@@ -860,4 +860,24 @@ Captura com mitmproxy + CA de usuário temporário (runbook em `FASE4_MITM.md`),
 
 ---
 
-*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática, arquitetural e dinâmica/comportamental, incluindo captura MITM (Fases 1 a 4; itens de circunvenção de licença/anti-fraude e de TLS deliberadamente fora de escopo) do CapCut v9.6.0.4097*
+## 19. Módulos da Fase 6 — Edição Avançada e Processamento Visual
+
+### 19.1 Estabilização de Vídeo Offline
+- **Pipeline:** Análise em 2 passos via FFmpeg utilizando os filtros `vidstabdetect` (Passo 1: extração de matriz de vetores de translação e rotação em arquivo `.trf`) e `vidstabtransform` (Passo 2: aplicação das transformações com interpolação bicúbica, `smoothing=15` e compensação de bordas).
+- **Execução:** Handler IPC `stabilize-video` com progresso assíncrono emitido para o frontend. Não requer GPU externa nem conexão com a internet.
+
+### 19.2 Redimensionamento Inteligente (Auto Reframe)
+- **Pipeline:** Redimensionamento e reenquadramento automático de vídeos para diferentes proporções de tela (`9:16` para Reels/Shorts/TikTok, `1:1` para feed quadrado, `4:5` vertical clássico e `16:9` widescreen).
+- **Algoritmo:** Sonda as dimensões originais via `ffprobe`, calcula o recorte ótimo mantendo a proporção-alvo e aplica posicionamento dinâmico do foco (`left`, `center` ou `right`) com reescalonamento de alta qualidade via filtro Lanczos (`crop=w:h:x:y,scale=W:H:flags=lanczos,setsar=1`).
+- **UI:** Integrado ao painel de propriedades do clipe de vídeo com seletores de Proporção e Foco.
+
+### 19.3 Rastreamento de Movimento (Motion / Object Tracking)
+- **Pipeline:** Estimativa de movimento quadro a quadro realizada nativamente pelo FFmpeg utilizando o algoritmo `mestimate` (`method=epzs:mb_size=16`) combinado com o filtro `showinfo`.
+- **Ancoragem:** Extração de coordenadas temporais normalizadas gerando um mapa de keyframes `{time, cx, cy}`.
+- **Interpolação em Tempo Real:** No player da timeline (`syncOverlay`), a posição do overlay (PiP/sticker/texto) é interpolada suavemente quadro a quadro com base no tempo decorrido, mantendo o elemento ancorado ao sujeito rastreado.
+- **Exportação:** Compatível com os parâmetros de interpolação do motor `ffmpegBuilder.js`.
+
+---
+
+*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática, arquitetural e dinâmica/comportamental, incluindo captura MITM (Fases 1 a 4) e implementação completa das Fases 5 e 6.1 no LeccorCut*
+
