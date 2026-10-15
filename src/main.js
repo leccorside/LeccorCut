@@ -7,6 +7,7 @@ const unpacked = (p) => p.replace('app.asar' + path.sep, 'app.asar.unpacked' + p
 const ffmpegPath = unpacked(require('ffmpeg-static'));
 const ffprobePath = unpacked(require('ffprobe-static').path);
 const { buildFfmpeg } = require('./ffmpegBuilder');
+const { capcutToLeccor, leccorToCapcut } = require('./capcutConverter');
 
 let win;
 function createWindow() {
@@ -272,67 +273,107 @@ ipcMain.handle('smart-cutout', async (_e, inputPath) => {
   }
 });
 
-const SFX_PRESETS = [
-  { key: 'whoosh', name: '💨 Transição Whoosh', duration: 0.35, filter: 'anoisesrc=d=0.35:c=white:r=44100,bandpass=f=900:width_type=h:w=700,afade=t=in:ss=0:d=0.15,afade=t=out:st=0.15:d=0.20,volume=3.0' },
-  { key: 'boom', name: '💥 Impacto / Boom Sub', duration: 1.2, filter: 'sine=f=80:d=1.2:r=44100,afade=t=in:ss=0:d=0.01,afade=t=out:st=0.05:d=1.15,volume=3.5' },
-  { key: 'ding', name: '🔔 Sino / Ding Ideia', duration: 1.0, filter: 'sine=f=1760:d=1.0:r=44100,afade=t=in:ss=0:d=0.01,afade=t=out:st=0.04:d=0.96,volume=2.2' },
-  { key: 'pop', name: '🎈 Pop / Bolha', duration: 0.15, filter: 'sine=f=580:d=0.15:r=44100,afade=t=in:ss=0:d=0.01,afade=t=out:st=0.02:d=0.13,volume=3.0' },
-  { key: 'click', name: '🖱️ Clique de Mouse', duration: 0.08, filter: 'anoisesrc=d=0.08:c=white:r=44100,highpass=f=2500,afade=t=out:st=0.01:d=0.07,volume=3.2' },
-  { key: 'camera', name: '📸 Disparo de Câmera', duration: 0.22, filter: 'anoisesrc=d=0.22:c=white:r=44100,bandpass=f=1400:w=900,afade=t=in:ss=0:d=0.02,afade=t=out:st=0.05:d=0.17,volume=2.8' },
-  { key: 'glitch', name: '⚡ Falha / Glitch Digital', duration: 0.3, filter: 'anoisesrc=d=0.3:c=pink:r=44100,tremolo=f=45:d=0.9,afade=t=out:st=0.1:d=0.2,volume=2.2' },
-  { key: 'riser', name: '📈 Tensão Crescente (Riser)', duration: 2.0, filter: 'sine=f=220:d=2.0:r=44100,afade=t=in:ss=0:d=1.9,afade=t=out:st=1.9:d=0.1,volume=2.5' },
-  { key: 'laser', name: '🔫 Laser Sci-Fi', duration: 0.28, filter: 'sine=f=1100:d=0.28:r=44100,tremolo=f=75:d=0.85,afade=t=out:st=0.03:d=0.25,volume=2.8' },
-  { key: 'success', name: '🎉 Sucesso / Conquista', duration: 0.6, filter: 'sine=f=988:d=0.6:r=44100,afade=t=in:ss=0:d=0.02,afade=t=out:st=0.15:d=0.45,volume=2.5' }
-];
+ipcMain.handle('import-capcut-draft', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Importar Projeto do CapCut (draft_content.json)',
+    filters: [
+      { name: 'CapCut Draft (JSON)', extensions: ['json'] },
+      { name: 'Todos os Arquivos', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  });
+  if (r.canceled || !r.filePaths.length) return null;
 
-ipcMain.handle('get-sfx-list', () => {
-  return SFX_PRESETS.map(({ key, name, duration }) => ({ key, name, duration }));
+  const filePath = r.filePaths[0];
+  let draftJson;
+  try {
+    draftJson = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch (err) {
+    return { ok: false, error: 'Arquivo JSON inválido: ' + err.message };
+  }
+
+  if (!draftJson.tracks && !draftJson.materials) {
+    return { ok: false, error: 'O arquivo selecionado não contém o formato draft_content.json do CapCut.' };
+  }
+
+  const projectState = capcutToLeccor(draftJson);
+
+  // Decora mídias com miniaturas e formas de onda se os arquivos existirem no disco
+  for (const m of projectState.media) {
+    if (fs.existsSync(m.path)) {
+      try {
+        const probed = await probe(m.path);
+        Object.assign(m, probed);
+        await decorateMedia(m);
+      } catch {}
+    }
+  }
+
+  for (const c of projectState.clips) {
+    const med = projectState.media.find(m => m.path === c.path);
+    if (med && med.thumb) c.thumb = med.thumb;
+  }
+  for (const o of projectState.overlays) {
+    const med = projectState.media.find(m => m.path === o.path);
+    if (med && med.thumb) o.thumb = med.thumb;
+  }
+  for (const a of projectState.audios) {
+    const med = projectState.media.find(m => m.path === a.path);
+    if (med && med.wave) a.wave = med.wave;
+  }
+
+  return { ok: true, project: projectState, fileName: path.basename(filePath) };
 });
 
-ipcMain.handle('generate-sfx', async (_e, key) => {
-  const preset = SFX_PRESETS.find(p => p.key === key);
-  if (!preset) throw new Error(`SFX desconhecido: ${key}`);
-  const sfxDir = path.join(app.getPath('userData'), 'sfx');
-  if (!fs.existsSync(sfxDir)) fs.mkdirSync(sfxDir, { recursive: true });
-  const sfxFile = path.join(sfxDir, `${preset.key}.wav`);
-  if (!fs.existsSync(sfxFile)) {
-    await new Promise((resolve, reject) => {
-      execFile(ffmpegPath, [
-        '-v', 'error',
-        '-f', 'lavfi',
-        '-i', preset.filter,
-        '-t', String(preset.duration),
-        '-c:a', 'pcm_s16le',
-        '-y', sfxFile
-      ], (err) => {
-        if (err) reject(err); else resolve();
-      });
-    });
-  }
-  return {
-    path: sfxFile,
-    name: preset.name,
-    duration: preset.duration
-  };
+ipcMain.handle('export-capcut-draft', async (_e, state) => {
+  const r = await dialog.showSaveDialog(win, {
+    title: 'Exportar para CapCut (draft_content.json)',
+    defaultPath: 'draft_content.json',
+    filters: [{ name: 'JSON', extensions: ['json'] }]
+  });
+  if (r.canceled || !r.filePath) return false;
+
+  const capcutData = leccorToCapcut(state);
+  fs.writeFileSync(r.filePath, JSON.stringify(capcutData, null, 2), 'utf8');
+  return true;
 });
 
-ipcMain.handle('generate-flash', async () => {
-  const flashDir = path.join(app.getPath('userData'), 'effects');
-  if (!fs.existsSync(flashDir)) fs.mkdirSync(flashDir, { recursive: true });
-  const flashFile = path.join(flashDir, 'white_flash.png');
-  if (!fs.existsSync(flashFile)) {
-    await new Promise((resolve, reject) => {
-      execFile(ffmpegPath, [
-        '-v', 'error',
-        '-f', 'lavfi',
-        '-i', 'color=c=white:s=1920x1080',
-        '-frames:v', '1',
-        '-y', flashFile
-      ], (err) => {
-        if (err) reject(err); else resolve();
-      });
-    });
+ipcMain.handle('detect-scenes', async (_e, videoPath, threshold = 0.35) => {
+  if (!videoPath || !fs.existsSync(videoPath)) {
+    return { ok: false, error: 'Arquivo de vídeo não encontrado' };
   }
-  return { path: flashFile };
+
+  return new Promise((resolve) => {
+    const args = [
+      '-v', 'info',
+      '-i', videoPath,
+      '-filter_complex', `select='gt(scene,${threshold})',showinfo`,
+      '-f', 'null',
+      '-'
+    ];
+
+    const p = spawn(ffmpegPath, args);
+    const cutTimes = [];
+
+    p.stderr.on('data', (data) => {
+      const text = data.toString();
+      const matches = text.matchAll(/pts_time:([0-9.]+)/g);
+      for (const m of matches) {
+        const time = parseFloat(m[1]);
+        if (!isNaN(time) && !cutTimes.includes(time)) {
+          cutTimes.push(Number(time.toFixed(3)));
+        }
+      }
+    });
+
+    p.on('close', (code) => {
+      cutTimes.sort((a, b) => a - b);
+      resolve({ ok: code === 0, scenes: cutTimes, count: cutTimes.length });
+    });
+
+    p.on('error', (err) => {
+      resolve({ ok: false, error: err.message, scenes: [] });
+    });
+  });
 });
 

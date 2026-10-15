@@ -178,6 +178,7 @@ function buildFfmpeg(project, outPath) {
     if (fl.grayscale) postFilters.push('hue=s=0');
     if (fl.vignette) postFilters.push('vignette=PI/4');
     if (fl.fade) postFilters.push(`fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0, c.duration - 0.5)}:d=0.5`);
+    if (fl.smoothSlowMo && speed < 1) postFilters.push(`minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir`);
     if (!isVideoVisible) postFilters.push('drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill');
 
     const allFilters = [...preFilters, ...postFilters];

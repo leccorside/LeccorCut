@@ -82,3 +82,8 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .sfx-add-btn:hover{filter:brightness(1.15)}
 .accent-btn{background:linear-gradient(135deg,#ff9f43,#ff5252);border:none;color:#fff;font-weight:700}
 .accent-btn:hover{filter:brightness(1.2);border-color:transparent}
+.capcut-btn{background:rgba(124,92,255,0.18);border:1px solid rgba(124,92,255,0.45);color:#d8b4fe;font-weight:600}
+.capcut-btn:hover{background:rgba(124,92,255,0.32);border-color:#a855f7;color:#fff}
+.scene-btn{background:rgba(0,229,195,0.14);border:1px solid rgba(0,229,195,0.4);color:var(--a1);font-weight:600}
+.scene-btn:hover{background:rgba(0,229,195,0.28);border-color:var(--a1);color:#fff}
+

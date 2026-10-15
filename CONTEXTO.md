@@ -141,9 +141,12 @@ via engenharia reversa estática com as ferramentas **REA v6.4.0** + **Ghidra 12
 - [ ] Inspecionar runtime do `bun.exe` e portas IPC locais ativas durante execução
 
 ### Baixa Prioridade (Fase 5 — Re-implementação no LeccorCut)
-- [ ] Implementar parser/conversor de `draft_content.json` do CapCut para a timeline do LeccorCut
+- [x] Implementar parser/conversor de `draft_content.json` do CapCut para a timeline do LeccorCut (`src/capcutConverter.js`)
+- [x] Adicionar botões de Importar e Exportar CapCut na interface
+- [x] Implementar detecção de cenas automática (Shot Detection via FFmpeg `gt(scene,0.35)`)
+- [x] Implementar interpolação de frames para slow motion suave via FFmpeg `minterpolate`
 - [ ] Adicionar suporte a OpenTimelineIO no LeccorCut
-- [ ] Implementar visualizador de waveforms nativo inspirado no `WaveformVisualizer`
+- [ ] Implementar visualizador de waveforms nativo em C++ inspirado no `WaveformVisualizer`
 
 ---
 
@@ -155,6 +158,7 @@ O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
 - ✅ Timeline multi-trilha: Vídeo Principal, Sobreposição (PiP), Áudio, Texto/Legendas
 - ✅ Track headers com botões de visibilidade e mute
 - ✅ Corte preciso (`S`), split na agulha
+- ✅ Detecção automática de cenas (Shot Detection, botão `🎬 Detectar Cenas`) com inserção de marcadores
 - ✅ Reorganização por drag-and-drop
 - ✅ Redimensionamento/trim pelas alças laterais
 - ✅ Congelar quadro (Freeze Frame, tecla `F`)
@@ -195,6 +199,7 @@ O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
 
 ### Efeitos e Ajustes
 - ✅ Speed Ramping com curvas (Heroico, Bala, Montagem, Flash In, Flash Out)
+- ✅ Câmera lenta suave com Interpolação de Quadros (Optical Flow via FFmpeg `minterpolate`)
 - ✅ Gráfico SVG de curva de velocidade em tempo real
 - ✅ Transições: fade, dissolve, wipeleft, slideleft, circleopen, pixelize
 - ✅ Filtros e presets de cor (sepia, vintage, warm, cool, cinematic, vivid)
@@ -204,6 +209,7 @@ O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
 - ✅ Espelhamento H/V, rotações 90°/180°/270°, zoom digital
 
 ### Exportação e Formatos
+- ✅ Importação e Exportação bidirecional com CapCut (`draft_content.json` com escala temporal em microsegundos)
 - ✅ Quick Presets: TikTok/Reels/Shorts (9:16), YouTube (16:9), Feed (1:1), Retrato (4:5)
 - ✅ Resoluções: 720p, 1080p, 1440p (2K), 2160p (4K)
 - ✅ FPS: 24, 30, 60
@@ -219,9 +225,7 @@ O LeccorCut (`D:\0000000-PROJETOS\LeccorCut`) já implementa:
 ### Funcionalidades de Edição
 - [ ] Speed ramping com keyframes individuais (curvas customizadas, não apenas presets)
 - [ ] Rastreamento de objetos (Object Tracking) na timeline
-- [ ] Detecção automática de cenas (Shot Detection)
-- [ ] Interpolação de frames (Frame Interpolation / VFI)
-- [ ] Matting de vídeo em tempo real (Background Removal em vídeo)
+- [ ] Matting de vídeo em tempo real (Background Removal em vídeo contínuo)
 - [ ] Efeitos de face em tempo real (beautify, stickers faciais)
 - [ ] Estabilização de vídeo (Video Stabilization)
 - [ ] Redimensionamento inteligente (Smart Crop / Auto Reframe)

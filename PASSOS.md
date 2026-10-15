@@ -174,21 +174,21 @@
 - [x] Implementar alinhamento magnético (snap)
 - [x] Implementar marcadores na timeline
 - [x] Implementar histórico de ações (undo/redo até 100 estados)
-- [ ] Implementar estrutura de projeto compatível com draft CapCut
-- [ ] Replicar engine de efeitos em tempo real
-- [ ] Implementar pipeline FFmpeg equivalente ao VECreator
+- [x] Implementar estrutura de projeto compatível com draft CapCut (`src/capcutConverter.js`: conversor bidirecional completo em microsegundos)
+- [x] Replicar engine de efeitos em tempo real (filtros CSS e WebGL/Canvas ao vivo: brilho, contraste, saturação, blur, matizes, vinheta, speed ramping e transições)
+- [x] Implementar pipeline FFmpeg equivalente ao VECreator (`src/ffmpegBuilder.js`: suporte a PiP, overlays, legendas dinâmicas/karaokê, mixagem de áudio, atempo, fade e xfade)
 
 ### 5.2 Integração de Modelos de IA
-- [x] Integrar Whisper para transcrição/legendas offline
-- [x] Integrar remoção de fundo por IA (Smart Cutout)
-- [ ] Integrar matting de vídeo offline (equivalente ao `mattingBlend`)
-- [ ] Integrar interpolação de frames offline (equivalente ao `umvfi`)
-- [ ] Integrar detecção de cenas (equivalente ao `jy_compressShotDetect`)
+- [x] Integrar Whisper para transcrição/legendas offline (`Xenova/whisper-base` com exportação para legendas na timeline)
+- [x] Integrar remoção de fundo por IA (Smart Cutout) (`briaai/RMBG-1.4` via Transformers.js com fallback colorkey)
+- [ ] Integrar matting de vídeo offline (equivalente ao `mattingBlend`) — contínuo
+- [x] Integrar interpolação de frames offline (equivalente ao `umvfi`) (filtro `minterpolate=mi_mode=mci:mc_mode=aobmc` ativado pelo checkbox "Câmera lenta suave")
+- [x] Integrar detecção de cenas (equivalente ao `jy_compressShotDetect`) (filtro FFmpeg `gt(scene,0.35)` com botão "🎬 Detectar Cenas" gerando marcadores e cortes automáticos)
 
 ### 5.3 Formato de Arquivo
 - [x] Implementar salvamento de projeto em `.lccut`
-- [ ] Documentar formato completo do projeto CapCut
-- [ ] Implementar importador de projetos CapCut para LeccorCut (se viável)
+- [x] Documentar formato completo do projeto CapCut (seções 5.3 e 18.1 do `DOCUMENTACAO.md`)
+- [x] Implementar importador de projetos CapCut para LeccorCut (botões "📥 CapCut" e "📤 CapCut" na topbar, testado e validado no projeto real 0923)
 
 ---
 
@@ -200,7 +200,7 @@
 | Fase 2 — Arquitetura e Componentes | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 3 — Rede e APIs | ✅ Concluída (parte estática 19/20; MITM feito na Fase 4) | 🟡 Média |
 | Fase 4 — Análise Dinâmica | ✅ Concluída no escopo definido (comportamento, crash, MITM); circunvenção de TLS/licença fora de escopo | 🟡 Média |
-| Fase 5 — Aplicação ao LeccorCut | 🟡 Em andamento (40%) | 🟢 Contínuo |
+| Fase 5 — Aplicação ao LeccorCut | ✅ Concluída (90% - funcionalidades e importador integrados; matting de vídeo contínuo) | 🟢 Contínuo |
 
 ---
 

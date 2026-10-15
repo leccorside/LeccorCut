@@ -13,5 +13,8 @@ contextBridge.exposeInMainWorld('api', {
   onCutoutProgress: (cb) => ipcRenderer.on('cutout-progress', (_e, m) => cb(m)),
   getSfxList: () => ipcRenderer.invoke('get-sfx-list'),
   generateSfx: (key) => ipcRenderer.invoke('generate-sfx', key),
-  generateFlash: () => ipcRenderer.invoke('generate-flash')
+  generateFlash: () => ipcRenderer.invoke('generate-flash'),
+  importCapCutDraft: () => ipcRenderer.invoke('import-capcut-draft'),
+  exportCapCutDraft: (state) => ipcRenderer.invoke('export-capcut-draft', state),
+  detectScenes: (videoPath, threshold) => ipcRenderer.invoke('detect-scenes', videoPath, threshold)
 });

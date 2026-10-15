@@ -784,6 +784,7 @@ function renderProps() {
             ${[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4].map(v => `<option ${c.speed === v || (!c.speed && v === 1) ? 'selected' : ''} value="${v}">${v}x</option>`).join('')}
           </select>
         </div>
+        <div class="prop"><label><input type="checkbox" id="pSlowMo" ${c.filters.smoothSlowMo ? 'checked' : ''}> Câmera lenta suave (Interpolação de Quadros / Optical Flow)</label></div>
       ` : `
         <div class="prop">Preset de Curva
           <select id="pCurvePreset">
@@ -848,6 +849,7 @@ function renderProps() {
     c.speed = sp;
     renderTimeline(); renderProps(); renderPreview();
   };
+  if ($('pSlowMo')) $('pSlowMo').onchange = (e) => { c.filters.smoothSlowMo = e.target.checked; };
   if ($('pCurvePreset')) $('pCurvePreset').onchange = (e) => {
     applySpeedCurve(c, e.target.value);
     renderTimeline(); renderProps(); renderPreview();
@@ -970,6 +972,58 @@ function del() {
   state.selected = null; renderTimeline(); renderProps(); renderPreview();
 }
 
+async function detectScenes() {
+  const hit = clipAt(state.time);
+  const targetClip = (state.selected?.kind === 'clip' ? state.clips.find(c => c.id === state.selected.id) : null) || (hit ? hit.c : null);
+  if (!targetClip) return toast('Selecione um clipe de vídeo para detectar cenas');
+  if (targetClip.isImage || !targetClip.hasVideo) return toast('A detecção de cenas requer um arquivo de vídeo');
+
+  const btn = $('btnDetectScenes');
+  if (btn) btn.disabled = true;
+  toast('🎬 Analisando transições de cena com IA/FFmpeg...');
+
+  try {
+    const res = await window.api.detectScenes(targetClip.path, 0.35);
+    if (!res || !res.ok) {
+      return toast('Erro na detecção de cenas: ' + (res?.error || 'falha no processamento'));
+    }
+    const cuts = res.scenes || [];
+    if (!cuts.length) {
+      return toast('Nenhum corte de cena significativo detectado neste vídeo');
+    }
+
+    const { starts } = layout();
+    const clipIdx = state.clips.indexOf(targetClip);
+    const clipStart = starts[clipIdx];
+    let createdCount = 0;
+
+    for (const cutTime of cuts) {
+      const srcStart = targetClip.in;
+      const srcEnd = targetClip.in + targetClip.duration * (targetClip.speed || 1);
+      if (cutTime > srcStart && cutTime < srcEnd) {
+        const tlTime = clipStart + (cutTime - srcStart) / (targetClip.speed || 1);
+        if (!state.markers.some(m => Math.abs(m.time - tlTime) < 0.2)) {
+          state.markers.push({
+            id: uid++,
+            time: Number(tlTime.toFixed(3)),
+            label: 'Cena'
+          });
+          createdCount++;
+        }
+      }
+    }
+
+    renderTimeline();
+    renderPreview();
+    hCheck();
+    toast(`🎬 ${createdCount} transições de cena detectadas e marcadas na timeline!`);
+  } catch (err) {
+    toast('Erro: ' + (err.message || err));
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function renderMedia() {
   const l = $('mediaList'); l.innerHTML = '';
   state.media.forEach(m => {
@@ -1038,6 +1092,7 @@ function initTrackHeaders() {
 $('btnImport').onclick = async () => { state.media.push(...await window.api.importMedia()); renderMedia(); };
 $('btnPlay').onclick = () => setPlaying(!state.playing);
 $('btnSplit').onclick = split;
+if ($('btnDetectScenes')) $('btnDetectScenes').onclick = detectScenes;
 $('btnFreeze').onclick = freezeFrame;
 $('btnDelete').onclick = del;
 $('btnAddText').onclick = () => {
@@ -1139,6 +1194,59 @@ $('btnOpen').onclick = async () => {
   if (d.settings) { $('expAspect').value = d.settings.aspect; $('expRes').value = d.settings.res; $('expFps').value = d.settings.fps; $('expQ').value = d.settings.crf; }
   renderMedia(); renderTrackHeaders(); renderTimeline(); renderProps(); applyAspect();
 };
+
+if ($('btnImportCapcut')) {
+  $('btnImportCapcut').onclick = async () => {
+    toast('Carregando projeto do CapCut...');
+    const res = await window.api.importCapCutDraft();
+    if (!res) return;
+    if (!res.ok) return toast('Erro: ' + (res.error || 'Falha ao importar'));
+    const d = res.project;
+    Object.assign(state, {
+      media: d.media || [],
+      clips: d.clips || [],
+      texts: d.texts || [],
+      audios: d.audios || [],
+      overlays: d.overlays || [],
+      markers: d.markers || [],
+      tracks: d.tracks || { video: { visible: true, mute: false }, overlay: { visible: true }, text: { visible: true }, audio: { mute: false, solo: false } },
+      selected: null,
+      time: 0
+    });
+    uid = 1 + Math.max(0, ...state.clips.map(c => c.id), ...state.texts.map(t => t.id), ...state.audios.map(a => a.id), ...state.overlays.map(o => o.id), ...(state.markers || []).map(m => m.id));
+    if (d.settings) {
+      if ($('expAspect')) $('expAspect').value = d.settings.aspect || '16:9';
+      if ($('expRes')) $('expRes').value = d.settings.res || '1080';
+      if ($('expFps')) $('expFps').value = d.settings.fps || '30';
+      if ($('expQ')) $('expQ').value = d.settings.crf || '18';
+    }
+    renderMedia(); renderTrackHeaders(); renderTimeline(); renderProps(); applyAspect();
+    hCheck();
+    toast(`CapCut importado com sucesso: ${state.clips.length} clipes, ${state.audios.length} áudios`);
+  };
+}
+
+if ($('btnExportCapcut')) {
+  $('btnExportCapcut').onclick = async () => {
+    if (!state.clips.length && !state.audios.length) return toast('Adicione clipes à timeline antes de exportar');
+    const projectState = {
+      media: state.media,
+      clips: state.clips,
+      texts: state.texts,
+      audios: state.audios,
+      overlays: state.overlays,
+      tracks: state.tracks,
+      settings: {
+        aspect: $('expAspect').value,
+        res: $('expRes').value,
+        fps: $('expFps').value,
+        crf: $('expQ').value
+      }
+    };
+    const ok = await window.api.exportCapCutDraft(projectState);
+    if (ok) toast('Projeto exportado no formato CapCut (draft_content.json)');
+  };
+}
 $('btnExport').onclick = async () => {
   if (!state.clips.length) return toast('Adicione clipes à timeline');
   toast('Exportando...'); window.api.onProgress(s => toast(`Exportando... ${Math.min(99, Math.round(s / total() * 100))}%`));
