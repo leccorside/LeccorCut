@@ -38,7 +38,15 @@ function clipAt(t) {
 
 const CSS_PRESETS = { sepia: 'sepia(1)', vintage: 'sepia(.5) contrast(1.1)', warm: 'sepia(.3) saturate(1.2)', cool: 'hue-rotate(15deg) saturate(1.1)', cinematic: 'contrast(1.15) saturate(.9)', vivid: 'saturate(1.6) contrast(1.1)' };
 function cssFilter(f = {}) {
-  return `brightness(${1 + (f.brightness || 0) / 100}) contrast(${1 + (f.contrast || 0) / 100}) saturate(${1 + (f.saturation || 0) / 100}) blur(${f.blur || 0}px) grayscale(${f.grayscale ? 1 : 0}) ${CSS_PRESETS[f.preset] || ''}`;
+  let b = 1 + (f.brightness || 0) / 100;
+  let c = 1 + (f.contrast || 0) / 100;
+  let s = 1 + (f.saturation || 0) / 100;
+  if (f.beauty) {
+    b += (f.beautyGlow ?? 30) / 350;
+    c += 0.03;
+    s += 0.05;
+  }
+  return `brightness(${b.toFixed(3)}) contrast(${c.toFixed(3)}) saturate(${s.toFixed(3)}) blur(${f.blur || 0}px) grayscale(${f.grayscale ? 1 : 0}) ${CSS_PRESETS[f.preset] || ''}`;
 }
 function cssTransform(f = {}) {
   return `scale(${(f.hflip ? -1 : 1) * (f.zoom || 1)}, ${(f.vflip ? -1 : 1) * (f.zoom || 1)}) rotate(${f.rotate || 0}deg)`;
@@ -93,27 +101,72 @@ const SPEED_CURVES = {
       { start: 0, end: 0.7, speed: 1.0 },
       { start: 0.7, end: 1.0, speed: 3.0 }
     ]
+  },
+  custom: {
+    label: '✏️ Curva Livre (Bezier Customizável)',
+    badge: '✏️ Livre',
+    desc: 'Curva Bezier livre: arraste os pontos para moldar acelerações e desacelerações, clique 2x no gráfico para criar keyframes e clique com botão direito para excluir.',
+    segments: []
   }
 };
 
+function pointsToSegments(pts) {
+  if (!pts || !Array.isArray(pts) || pts.length < 2) {
+    return [{ start: 0, end: 1.0, speed: 1.0 }];
+  }
+  const sorted = [...pts].sort((a, b) => a.t - b.t);
+  sorted[0] = { ...sorted[0], t: 0 };
+  sorted[sorted.length - 1] = { ...sorted[sorted.length - 1], t: 1.0 };
+  const segs = [];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const p0 = sorted[i];
+    const p1 = sorted[i + 1];
+    const t0 = Math.max(0, Math.min(1, p0.t));
+    const t1 = Math.max(t0 + 0.01, Math.min(1, p1.t));
+    const sp = Math.max(0.1, Number(((p0.s + p1.s) / 2).toFixed(3)));
+    segs.push({
+      start: Number(t0.toFixed(3)),
+      end: Number(t1.toFixed(3)),
+      speed: sp
+    });
+  }
+  return segs;
+}
+
+function getClipCurveSegments(clip) {
+  if (!clip || clip.isImage || !clip.speedCurve || clip.speedCurve === 'none') return null;
+  if (clip.speedCurve === 'custom') {
+    if (!clip.customCurvePoints || clip.customCurvePoints.length < 2) {
+      clip.customCurvePoints = [
+        { t: 0, s: 1.0 },
+        { t: 0.35, s: 2.5 },
+        { t: 0.65, s: 0.4 },
+        { t: 1.0, s: 1.0 }
+      ];
+    }
+    return pointsToSegments(clip.customCurvePoints);
+  }
+  return SPEED_CURVES[clip.speedCurve]?.segments || null;
+}
+
 function getClipSample(clip, localTimelineTime) {
   if (clip.isImage) return { targetTime: 0, speed: 1 };
-  if (!clip.speedCurve || clip.speedCurve === 'none' || !SPEED_CURVES[clip.speedCurve]) {
+  const segments = getClipCurveSegments(clip);
+  if (!segments) {
     const sp = clip.speed || 1;
     return {
       targetTime: clip.in + localTimelineTime * sp,
       speed: sp
     };
   }
-  const curve = SPEED_CURVES[clip.speedCurve];
   const srcDur = clip.srcDurUsed || (clip.duration * (clip.speed || 1));
   let curTl = 0;
-  for (let i = 0; i < curve.segments.length; i++) {
-    const seg = curve.segments[i];
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
     const segIn = clip.in + seg.start * srcDur;
     const segEnd = clip.in + seg.end * srcDur;
     const segTlDur = (segEnd - segIn) / seg.speed;
-    if (localTimelineTime <= curTl + segTlDur || i === curve.segments.length - 1) {
+    if (localTimelineTime <= curTl + segTlDur || i === segments.length - 1) {
       const dt = Math.max(0, localTimelineTime - curTl);
       return {
         targetTime: Math.min(segEnd, segIn + dt * seg.speed),
@@ -128,44 +181,76 @@ function getClipSample(clip, localTimelineTime) {
 function applySpeedCurve(clip, curveKey) {
   const oldSrcDur = clip.srcDurUsed || (clip.duration * (clip.speed || 1));
   clip.srcDurUsed = oldSrcDur;
-  if (!curveKey || curveKey === 'none' || !SPEED_CURVES[curveKey]) {
+  if (!curveKey || curveKey === 'none') {
     clip.speedCurve = 'none';
     const sp = clip.speed || 1;
     clip.duration = oldSrcDur / sp;
-  } else {
-    clip.speedCurve = curveKey;
-    const curve = SPEED_CURVES[curveKey];
-    let totalTl = 0;
-    for (const seg of curve.segments) {
-      const inStart = clip.in + seg.start * oldSrcDur;
-      const inEnd = clip.in + seg.end * oldSrcDur;
-      totalTl += (inEnd - inStart) / seg.speed;
-    }
-    clip.duration = Math.max(0.2, totalTl);
+    return;
   }
+  clip.speedCurve = curveKey;
+  if (curveKey === 'custom' && (!clip.customCurvePoints || clip.customCurvePoints.length < 2)) {
+    clip.customCurvePoints = [
+      { t: 0, s: 1.0 },
+      { t: 0.35, s: 2.5 },
+      { t: 0.65, s: 0.4 },
+      { t: 1.0, s: 1.0 }
+    ];
+  }
+  const segments = getClipCurveSegments(clip);
+  if (!segments) return;
+  let totalTl = 0;
+  for (const seg of segments) {
+    const inStart = clip.in + seg.start * oldSrcDur;
+    const inEnd = clip.in + seg.end * oldSrcDur;
+    totalTl += (inEnd - inStart) / seg.speed;
+  }
+  clip.duration = Math.max(0.2, totalTl);
 }
 
-function speedToY(s) {
-  const minS = 0.2, maxS = 3.2;
+function speedToY(s, h = 60) {
+  const minS = 0.1, maxS = 4.0;
   const norm = Math.max(0, Math.min(1, (s - minS) / (maxS - minS)));
-  return Math.round(52 - norm * 42);
+  return Math.round((h - 8) - norm * (h - 16));
+}
+
+function yToSpeed(y, h = 60) {
+  const minS = 0.1, maxS = 4.0;
+  const norm = Math.max(0, Math.min(1, ((h - 8) - y) / (h - 16)));
+  return Math.max(0.1, Math.min(5.0, Number((minS + norm * (maxS - minS)).toFixed(2))));
+}
+
+function catmullRomToBezier(points) {
+  if (!points || points.length < 2) return '';
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
 }
 
 function renderSpeedCurveSvg(curveKey) {
   const curve = SPEED_CURVES[curveKey];
   if (!curve) return '';
   const pts = [];
-  pts.push({ x: 10, y: speedToY(curve.segments[0].speed) });
+  pts.push({ x: 10, y: speedToY(curve.segments[0].speed, 60) });
   let lastX = 10;
   curve.segments.forEach((seg) => {
     const xEnd = 10 + Math.round(seg.end * 190);
-    const yVal = speedToY(seg.speed);
+    const yVal = speedToY(seg.speed, 60);
     pts.push({ x: xEnd, y: yVal });
     lastX = xEnd;
   });
   const pathD = pts.reduce((acc, p, i) => i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`, '');
   const areaD = `${pathD} L ${lastX} 56 L 10 56 Z`;
-  const yNormal = speedToY(1.0);
+  const yNormal = speedToY(1.0, 60);
   return `<svg viewBox="0 0 210 60" class="speed-curve-svg">
     <defs>
       <linearGradient id="scGrad" x1="0" y1="0" x2="0" y2="1">
@@ -179,6 +264,187 @@ function renderSpeedCurveSvg(curveKey) {
     <path d="${pathD}" fill="none" stroke="#00e5c3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
     ${pts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="#7c5cff" stroke="#fff" stroke-width="1"/>`).join('')}
   </svg>`;
+}
+
+function renderBezierEditor(clip) {
+  if (!clip.customCurvePoints || clip.customCurvePoints.length < 2) {
+    clip.customCurvePoints = [
+      { t: 0, s: 1.0 },
+      { t: 0.35, s: 2.5 },
+      { t: 0.65, s: 0.4 },
+      { t: 1.0, s: 1.0 }
+    ];
+  }
+  const W = 240, H = 100, padX = 14;
+  const usableW = W - padX * 2;
+  const sorted = [...clip.customCurvePoints].sort((a, b) => a.t - b.t);
+  const pxPts = sorted.map((pt, idx) => ({
+    x: padX + pt.t * usableW,
+    y: speedToY(pt.s, H),
+    s: pt.s,
+    t: pt.t,
+    idx
+  }));
+
+  const bezierD = catmullRomToBezier(pxPts);
+  const areaD = `${bezierD} L ${padX + usableW} ${H - 6} L ${padX} ${H - 6} Z`;
+  const yNormal = speedToY(1.0, H);
+  const yFast = speedToY(2.0, H);
+  const ySlow = speedToY(0.5, H);
+
+  return `
+    <div class="bezier-editor-card">
+      <svg id="bezierCanvas" viewBox="0 0 ${W} ${H}" class="bezier-editor-svg">
+        <defs>
+          <linearGradient id="bezGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#00e5c3" stop-opacity="0.5"/>
+            <stop offset="100%" stop-color="#7c5cff" stop-opacity="0.08"/>
+          </linearGradient>
+        </defs>
+        <!-- Linhas de referência -->
+        <line x1="${padX}" y1="${yFast}" x2="${W - padX}" y2="${yFast}" stroke="#2a2e3f" stroke-dasharray="2,2"/>
+        <text x="${W - padX - 18}" y="${yFast - 2}" fill="#6b7280" font-size="7">2.0x</text>
+        <line x1="${padX}" y1="${yNormal}" x2="${W - padX}" y2="${yNormal}" stroke="#00e5c3" stroke-dasharray="3,3" stroke-opacity="0.6"/>
+        <text x="${W - padX - 18}" y="${yNormal - 2}" fill="#00e5c3" font-size="7" font-weight="700">1.0x</text>
+        <line x1="${padX}" y1="${ySlow}" x2="${W - padX}" y2="${ySlow}" stroke="#2a2e3f" stroke-dasharray="2,2"/>
+        <text x="${W - padX - 18}" y="${ySlow - 2}" fill="#6b7280" font-size="7">0.5x</text>
+
+        <!-- Área e Linha Bezier -->
+        <path d="${areaD}" fill="url(#bezGrad)"/>
+        <path d="${bezierD}" fill="none" stroke="#00e5c3" stroke-width="2.5" stroke-linecap="round"/>
+
+        <!-- Keyframes interativos -->
+        ${pxPts.map((p) => `
+          <g class="handle-group" data-idx="${p.idx}">
+            <circle class="curve-handle" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5" fill="#7c5cff" stroke="#ffffff" stroke-width="1.8"/>
+            <text x="${p.x.toFixed(1)}" y="${Math.max(10, p.y - 7).toFixed(1)}" fill="#e8eaf2" font-size="8" text-anchor="middle" font-weight="700">${p.s.toFixed(1)}x</text>
+          </g>
+        `).join('')}
+      </svg>
+      <div class="bezier-tools">
+        <button type="button" id="btnAddBezierPt" class="bezier-btn">+ Ponto</button>
+        <span style="font-size:10px;color:var(--mut);">Clique 2x p/ criar • Dir p/ excluir</span>
+        <button type="button" id="btnResetBezier" class="bezier-btn">↺ Resetar</button>
+      </div>
+    </div>
+  `;
+}
+
+function setupBezierEditorEvents(clip) {
+  const svg = $('bezierCanvas');
+  if (!svg || !clip || clip.speedCurve !== 'custom') return;
+
+  const W = 240, H = 100, padX = 14;
+  const usableW = W - padX * 2;
+
+  svg.querySelectorAll('.handle-group').forEach(grp => {
+    const idx = parseInt(grp.dataset.idx, 10);
+    const circle = grp.querySelector('.curve-handle');
+    if (!circle) return;
+
+    circle.onmousedown = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const onMouseMove = (moveEvt) => {
+        const rect = svg.getBoundingClientRect();
+        const mouseX = moveEvt.clientX - rect.left;
+        const mouseY = moveEvt.clientY - rect.top;
+
+        const svgX = (mouseX / rect.width) * W;
+        const svgY = (mouseY / rect.height) * H;
+
+        const isEdge = idx === 0 || idx === clip.customCurvePoints.length - 1;
+        if (!isEdge) {
+          const tNorm = Math.max(0.02, Math.min(0.98, (svgX - padX) / usableW));
+          clip.customCurvePoints[idx].t = Number(tNorm.toFixed(3));
+        }
+
+        const spd = yToSpeed(svgY, H);
+        clip.customCurvePoints[idx].s = spd;
+
+        applySpeedCurve(clip, 'custom');
+        renderTimeline();
+        renderProps();
+        renderPreview();
+      };
+
+      const onMouseUp = () => {
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+      };
+
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+    };
+
+    circle.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!clip.customCurvePoints || clip.customCurvePoints.length <= 2) {
+        toast('A curva deve ter no mínimo 2 pontos (início e fim).');
+        return;
+      }
+      if (idx === 0 || idx === clip.customCurvePoints.length - 1) {
+        toast('Os pontos de início (0%) e fim (100%) não podem ser excluídos.');
+        return;
+      }
+      clip.customCurvePoints.splice(idx, 1);
+      applySpeedCurve(clip, 'custom');
+      renderTimeline();
+      renderProps();
+      renderPreview();
+      toast('Keyframe de velocidade removido.');
+    };
+  });
+
+  svg.ondblclick = (e) => {
+    const rect = svg.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const svgX = (mouseX / rect.width) * W;
+    const svgY = (mouseY / rect.height) * H;
+
+    const tNorm = Math.max(0.05, Math.min(0.95, (svgX - padX) / usableW));
+    const spd = yToSpeed(svgY, H);
+
+    clip.customCurvePoints.push({ t: Number(tNorm.toFixed(3)), s: spd });
+    clip.customCurvePoints.sort((a, b) => a.t - b.t);
+
+    applySpeedCurve(clip, 'custom');
+    renderTimeline();
+    renderProps();
+    renderPreview();
+    toast(`Keyframe ${spd}x adicionado na posição ${(tNorm * 100).toFixed(0)}%!`);
+  };
+
+  if ($('btnAddBezierPt')) {
+    $('btnAddBezierPt').onclick = () => {
+      clip.customCurvePoints.push({ t: 0.5, s: 1.5 });
+      clip.customCurvePoints.sort((a, b) => a.t - b.t);
+      applySpeedCurve(clip, 'custom');
+      renderTimeline();
+      renderProps();
+      renderPreview();
+      toast('Novo keyframe adicionado à curva!');
+    };
+  }
+
+  if ($('btnResetBezier')) {
+    $('btnResetBezier').onclick = () => {
+      clip.customCurvePoints = [
+        { t: 0, s: 1.0 },
+        { t: 0.35, s: 2.5 },
+        { t: 0.65, s: 0.4 },
+        { t: 1.0, s: 1.0 }
+      ];
+      applySpeedCurve(clip, 'custom');
+      renderTimeline();
+      renderProps();
+      renderPreview();
+      toast('Curva Bezier resetada para o padrão!');
+    };
+  }
 }
 
 function getCaptionWords(t) {
@@ -263,6 +529,27 @@ function syncOverlay() {
   el.style.top = (oy * 100) + '%';
   el.style.transform = `translate(${-ox * 100}%, ${-oy * 100}%) scaleX(${flip}) rotate(${rot}deg)`;
   el.style.opacity = op;
+  if (o.borderWidth && o.borderWidth > 0) {
+    el.style.border = `${o.borderWidth}px solid ${o.borderColor || '#ffffff'}`;
+    el.style.borderRadius = `${o.borderRadius || 0}px`;
+  } else {
+    el.style.border = 'none';
+    el.style.borderRadius = `${o.borderRadius || 0}px`;
+  }
+  if (o.glow) {
+    const gc = o.glowColor || '#00e5c3';
+    const gb = o.glowBlur || 15;
+    if (o.isImage) {
+      el.style.filter = `drop-shadow(0 0 ${gb}px ${gc}) drop-shadow(0 0 ${Math.round(gb * 1.6)}px ${gc})`;
+      el.style.boxShadow = 'none';
+    } else {
+      el.style.boxShadow = `0 0 ${gb}px ${gc}, 0 0 ${Math.round(gb * 1.6)}px ${gc}`;
+      el.style.filter = 'none';
+    }
+  } else {
+    el.style.boxShadow = 'none';
+    el.style.filter = 'none';
+  }
   if (!o.isImage) {
     const target = (o.in || 0) + state.time - o.start;
     if (!state.playing || Math.abs(v.currentTime - target) > 0.3) v.currentTime = target;
@@ -843,7 +1130,69 @@ function renderProps() {
       + r('oY2', 'Posição vertical final', 0, 1, 0.01, o.y2 ?? o.y)
       + `<div class="prop"><label><input type="checkbox" id="oChroma" ${o.chroma ? 'checked' : ''}> Chroma key (remover cor)</label></div>`
       + `<div class="prop">Cor<input type="color" id="oCColor" value="${o.chromaColor || '#00ff00'}"></div>`
-      + r('oCSim', 'Tolerância', 0.05, 0.6, 0.01, o.chromaSim ?? 0.3);
+      + r('oCSim', 'Tolerância', 0.05, 0.6, 0.01, o.chromaSim ?? 0.3)
+      + `<div class="prop-card">
+          <div class="prop-card-title">🎨 Borda & Glow Neon (Estilo PiP)</div>
+          <div class="prop">Borda: <span id="lblOBorder">${o.borderWidth || 0}px</span>
+            <input type="range" id="oBorderWidth" min="0" max="25" step="1" value="${o.borderWidth || 0}">
+          </div>
+          <div class="prop">Cor da Borda
+            <input type="color" id="oBorderColor" value="${o.borderColor || '#ffffff'}">
+          </div>
+          <div class="prop">Arredondamento: <span id="lblORadius">${o.borderRadius || 0}px</span>
+            <input type="range" id="oBorderRadius" min="0" max="50" step="1" value="${o.borderRadius || 0}">
+          </div>
+          <div class="prop"><label><input type="checkbox" id="oGlow" ${o.glow ? 'checked' : ''}> Ativar Efeito Glow / Neon</label></div>
+          ${o.glow ? `
+            <div class="prop">Cor do Glow
+              <input type="color" id="oGlowColor" value="${o.glowColor || '#00e5c3'}">
+            </div>
+            <div class="prop">Raio do Glow: <span id="lblOGlowBlur">${o.glowBlur || 15}px</span>
+              <input type="range" id="oGlowBlur" min="5" max="45" step="1" value="${o.glowBlur || 15}">
+            </div>
+            <div style="display:flex;gap:4px;margin-top:4px;">
+              <button type="button" class="btn-glow-chip" data-color="#00e5c3" style="background:#00e5c3;color:#000;padding:2px 6px;font-size:10px;border-radius:4px;border:none;cursor:pointer;">Ciano</button>
+              <button type="button" class="btn-glow-chip" data-color="#ff007f" style="background:#ff007f;color:#fff;padding:2px 6px;font-size:10px;border-radius:4px;border:none;cursor:pointer;">Neon Pink</button>
+              <button type="button" class="btn-glow-chip" data-color="#ffd700" style="background:#ffd700;color:#000;padding:2px 6px;font-size:10px;border-radius:4px;border:none;cursor:pointer;">Dourado</button>
+              <button type="button" class="btn-glow-chip" data-color="#7c5cff" style="background:#7c5cff;color:#fff;padding:2px 6px;font-size:10px;border-radius:4px;border:none;cursor:pointer;">Roxo</button>
+            </div>
+          ` : ''}
+        </div>`;
+    if ($('oBorderWidth')) $('oBorderWidth').oninput = (e) => {
+      o.borderWidth = +e.target.value;
+      if ($('lblOBorder')) $('lblOBorder').textContent = `${o.borderWidth}px`;
+      renderPreview();
+    };
+    if ($('oBorderColor')) $('oBorderColor').oninput = (e) => {
+      o.borderColor = e.target.value;
+      renderPreview();
+    };
+    if ($('oBorderRadius')) $('oBorderRadius').oninput = (e) => {
+      o.borderRadius = +e.target.value;
+      if ($('lblORadius')) $('lblORadius').textContent = `${o.borderRadius}px`;
+      renderPreview();
+    };
+    if ($('oGlow')) $('oGlow').onchange = (e) => {
+      o.glow = e.target.checked;
+      renderProps();
+      renderPreview();
+    };
+    if ($('oGlowColor')) $('oGlowColor').oninput = (e) => {
+      o.glowColor = e.target.value;
+      renderPreview();
+    };
+    if ($('oGlowBlur')) $('oGlowBlur').oninput = (e) => {
+      o.glowBlur = +e.target.value;
+      if ($('lblOGlowBlur')) $('lblOGlowBlur').textContent = `${o.glowBlur}px`;
+      renderPreview();
+    };
+    p.querySelectorAll('.btn-glow-chip').forEach(btn => {
+      btn.onclick = () => {
+        o.glowColor = btn.dataset.color;
+        if ($('oGlowColor')) $('oGlowColor').value = o.glowColor;
+        renderPreview();
+      };
+    });
     if ($('btnSmartCutoutOverlay')) $('btnSmartCutoutOverlay').onclick = () => executeSmartCutout(o.path, 'overlay', o);
     if ($('btnVideoMattingOverlay')) $('btnVideoMattingOverlay').onclick = () => executeVideoMatting(o.path, 'overlay', o);
     if ($('btnRemoveTrack')) {
@@ -962,15 +1311,17 @@ function renderProps() {
         </div>
         <div class="prop"><label><input type="checkbox" id="pSlowMo" ${c.filters.smoothSlowMo ? 'checked' : ''}> Câmera lenta suave (Interpolação de Quadros / Optical Flow)</label></div>
       ` : `
-        <div class="prop">Preset de Curva
+        <div class="prop">Modo de Curva
           <select id="pCurvePreset">
             ${Object.keys(SPEED_CURVES).map(k => `<option ${c.speedCurve === k ? 'selected' : ''} value="${k}">${SPEED_CURVES[k].label}</option>`).join('')}
           </select>
         </div>
-        <div class="speed-curve-card">
-          ${renderSpeedCurveSvg(c.speedCurve || 'hero')}
-          <div class="speed-curve-desc">${SPEED_CURVES[c.speedCurve || 'hero']?.desc || ''}</div>
-        </div>
+        ${c.speedCurve === 'custom' ? renderBezierEditor(c) : `
+          <div class="speed-curve-card">
+            ${renderSpeedCurveSvg(c.speedCurve || 'hero')}
+            <div class="speed-curve-desc">${SPEED_CURVES[c.speedCurve || 'hero']?.desc || ''}</div>
+          </div>
+        `}
       `}
     </div>`;
   p.innerHTML = `<div class="prop">Enquadramento<select id="pFill">
@@ -990,6 +1341,18 @@ function renderProps() {
        <div class="prop">Filtro de cor<select id="pPreset">${['none', 'sepia', 'vintage', 'warm', 'cool', 'cinematic', 'vivid'].map(v => `<option ${(c.filters.preset || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
        <div class="prop">Transição para o próximo clipe<select id="pTrans">${['none', 'fade', 'dissolve', 'wipeleft', 'slideleft', 'circleopen', 'pixelize'].map(v => `<option ${(c.transition || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`
        + speedHtml
+       + `<div class="prop-card">
+           <div class="prop-card-title">✨ Retoque Facial / Efeito Beauty (Pele Suave)</div>
+           <div class="prop"><label><input type="checkbox" id="pBeauty" ${c.filters.beauty ? 'checked' : ''}> Suavização de Pele & Iluminação (Beauty)</label></div>
+           ${c.filters.beauty ? `
+             <div class="prop">Suavização Bilateral: <span id="lblBeautySmooth">${c.filters.beautySmooth ?? 50}%</span>
+               <input type="range" id="pBeautySmooth" min="10" max="100" value="${c.filters.beautySmooth ?? 50}">
+             </div>
+             <div class="prop">Realce / Iluminação: <span id="lblBeautyGlow">${c.filters.beautyGlow ?? 30}%</span>
+               <input type="range" id="pBeautyGlow" min="0" max="100" value="${c.filters.beautyGlow ?? 30}">
+             </div>
+           ` : ''}
+         </div>`
        + `<div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>
        <div class="prop"><label><input type="checkbox" id="pDenoise" ${c.filters.denoise ? 'checked' : ''}> Redução de ruído (chiado)</label></div>
        <div class="prop"><label><input type="checkbox" id="pLoudnorm" ${c.filters.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>`
@@ -1047,6 +1410,24 @@ function renderProps() {
     applySpeedCurve(c, e.target.value);
     renderTimeline(); renderProps(); renderPreview();
   };
+  if ($('pBeauty')) $('pBeauty').onchange = (e) => {
+    c.filters.beauty = e.target.checked;
+    renderProps();
+    renderPreview();
+  };
+  if ($('pBeautySmooth')) $('pBeautySmooth').oninput = (e) => {
+    c.filters.beautySmooth = +e.target.value;
+    if ($('lblBeautySmooth')) $('lblBeautySmooth').textContent = `${c.filters.beautySmooth}%`;
+    renderPreview();
+  };
+  if ($('pBeautyGlow')) $('pBeautyGlow').oninput = (e) => {
+    c.filters.beautyGlow = +e.target.value;
+    if ($('lblBeautyGlow')) $('lblBeautyGlow').textContent = `${c.filters.beautyGlow}%`;
+    renderPreview();
+  };
+  if (c.speedCurve === 'custom') {
+    setupBezierEditorEvents(c);
+  }
 }
 
 function detachAudio(c) {

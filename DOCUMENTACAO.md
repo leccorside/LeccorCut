@@ -877,7 +877,22 @@ Captura com mitmproxy + CA de usuário temporário (runbook em `FASE4_MITM.md`),
 - **Interpolação em Tempo Real:** No player da timeline (`syncOverlay`), a posição do overlay (PiP/sticker/texto) é interpolada suavemente quadro a quadro com base no tempo decorrido, mantendo o elemento ancorado ao sujeito rastreado.
 - **Exportação:** Compatível com os parâmetros de interpolação do motor `ffmpegBuilder.js`.
 
+### 19.4 Speed Ramping com Editor de Curva Bezier Livre
+- **Modelo Matemático:** Interpolação cúbica contínua (Spline Catmull-Rom para curva Bezier) que mapeia o tempo normalizado da fonte ($t \in [0, 1]$) para fatores arbitrários de velocidade ($s \in [0.1x, 5.0x]$).
+- **Interface Gráfica:** Componente SVG interativo (`#bezierCanvas`) com handles circulares arrastáveis, linhas de referência tracejadas (0.5x, 1.0x, 2.0x), adição de keyframes por duplo clique e exclusão por clique direito.
+- **Integração Timeline & Exportação:** A função `pointsToSegments` converte os keyframes da curva em intervalos discretizados de tempo e velocidade, alimentando tanto a função de amostragem em tempo real (`getClipSample`) quanto a cadeia de filtros `setpts` e `atempo` no `ffmpegBuilder.js`.
+
+### 19.5 Retoque Facial / Efeito Beauty Offline
+- **Pipeline:** Suavização bilateral de pele preservando arestas e contornos faciais (olhos, sobrancelhas e lábios) combinada com realce de iluminação.
+- **Implementação FFmpeg:** Filtro `smartblur` (raio e limiar parametrizados dinamicamente pelos sliders de suavização) seguido de `unsharp` para retenção de nitidez e `eq` para realce de luminosidade e saturação suave (`smartblur=lr=X:ls=0.6:lt=Y,unsharp=5:5:0.5:5:5:0.0,eq=brightness=Z:contrast=1.03:saturation=1.05`).
+- **Preview:** Renderizado em tempo real no visualizador via shaders de brilho, contraste e realce adaptativo.
+
+### 19.6 Estilização de Bordas e Glow/Neon em Sobreposições (PiP)
+- **Bordas:** Parâmetros configuráveis de espessura (`borderWidth`), cor (`borderColor`) e raio de curvatura (`borderRadius`), aplicados no canvas e via filtro `pad` no FFmpeg.
+- **Efeito Glow / Neon:** Adiciona halo luminoso difuso ao redor do elemento. No preview, utiliza `box-shadow` multicamadas para elementos opacos e `drop-shadow` para recortes transparentes de IA (Smart Cutout / Stickers), acompanhado de botões rápidos para presets neon (Ciano, Neon Pink, Dourado e Roxo).
+
 ---
 
-*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática, arquitetural e dinâmica/comportamental, incluindo captura MITM (Fases 1 a 4) e implementação completa das Fases 5 e 6.1 no LeccorCut*
+*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática, arquitetural e dinâmica/comportamental, incluindo captura MITM (Fases 1 a 4) e implementação completa das Fases 5 e 6 no LeccorCut*
+
 

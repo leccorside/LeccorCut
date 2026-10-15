@@ -63,8 +63,46 @@ function buildAtempo(speed) {
   return parts.join(',');
 }
 
+function pointsToSegments(pts) {
+  if (!pts || !Array.isArray(pts) || pts.length < 2) {
+    return [{ start: 0, end: 1.0, speed: 1.0 }];
+  }
+  const sorted = [...pts].sort((a, b) => a.t - b.t);
+  sorted[0] = { ...sorted[0], t: 0 };
+  sorted[sorted.length - 1] = { ...sorted[sorted.length - 1], t: 1.0 };
+  const segs = [];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const p0 = sorted[i];
+    const p1 = sorted[i + 1];
+    const t0 = Math.max(0, Math.min(1, p0.t));
+    const t1 = Math.max(t0 + 0.01, Math.min(1, p1.t));
+    const sp = Math.max(0.1, Number(((p0.s + p1.s) / 2).toFixed(3)));
+    segs.push({
+      start: Number(t0.toFixed(3)),
+      end: Number(t1.toFixed(3)),
+      speed: sp
+    });
+  }
+  return segs;
+}
+
 function getCurveSegments(c) {
-  const curve = SPEED_CURVES[c.speedCurve];
+  let curve = null;
+  if (c.speedCurve === 'custom') {
+    if (c.customSegments && c.customSegments.length) {
+      curve = c.customSegments;
+    } else if (c.customCurvePoints && c.customCurvePoints.length >= 2) {
+      curve = pointsToSegments(c.customCurvePoints);
+    } else {
+      curve = [
+        { start: 0, end: 0.35, speed: 2.5 },
+        { start: 0.35, end: 0.65, speed: 0.4 },
+        { start: 0.65, end: 1.0, speed: 1.0 }
+      ];
+    }
+  } else {
+    curve = SPEED_CURVES[c.speedCurve];
+  }
   if (!curve) return null;
   const srcDur = c.srcDurUsed || (c.duration * (c.speed || 1));
   let tlAcc = 0;
@@ -179,6 +217,14 @@ function buildFfmpeg(project, outPath) {
     if (fl.vignette) postFilters.push('vignette=PI/4');
     if (fl.fade) postFilters.push(`fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0, c.duration - 0.5)}:d=0.5`);
     if (fl.smoothSlowMo && speed < 1) postFilters.push(`minterpolate=fps=${FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir`);
+    if (fl.beauty) {
+      const sm = fl.beautySmooth ?? 50;
+      const gw = fl.beautyGlow ?? 30;
+      const lr = (1.5 + sm * 0.02).toFixed(1);
+      const lt = Math.round(4 + sm * 0.08);
+      const bGlow = (gw * 0.0008).toFixed(3);
+      postFilters.push(`smartblur=lr=${lr}:ls=0.6:lt=${lt},unsharp=5:5:0.5:5:5:0.0,eq=brightness=${bGlow}:contrast=1.03:saturation=1.05`);
+    }
     if (!isVideoVisible) postFilters.push('drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill');
 
     const allFilters = [...preFilters, ...postFilters];
@@ -252,7 +298,17 @@ function buildFfmpeg(project, outPath) {
       const fDur = Math.min(0.4, o.duration / 2);
       fadeFilter = `,fade=t=in:st=0:d=${fDur.toFixed(3)}:alpha=1,fade=t=out:st=${Math.max(0, o.duration - fDur).toFixed(3)}:d=${fDur.toFixed(3)}:alpha=1`;
     }
-    f.push(`[${idx}:v]${trim}scale=${Math.round(W * o.scale / 100 / 2) * 2}:-2,${flip}${rot}${ck}format=yuva420p,colorchannelmixer=aa=${o.opacity ?? 1}${fadeFilter},setpts=PTS-STARTPTS+${o.start}/TB[ov${k}]`);
+    let borderFilter = '';
+    if (o.borderWidth && o.borderWidth > 0) {
+      const bw = Math.min(25, Math.max(1, Math.round(o.borderWidth)));
+      const bColor = (o.borderColor || '#ffffff').replace('#', '');
+      borderFilter = `pad=w=iw+${bw * 2}:h=ih+${bw * 2}:x=${bw}:y=${bw}:color=0x${bColor},`;
+    } else if (o.glow) {
+      const gw = Math.min(20, Math.max(2, Math.round((o.glowBlur || 15) / 3)));
+      const gColor = (o.glowColor || '#00e5c3').replace('#', '');
+      borderFilter = `pad=w=iw+${gw * 2}:h=ih+${gw * 2}:x=${gw}:y=${gw}:color=0x${gColor},`;
+    }
+    f.push(`[${idx}:v]${trim}scale=${Math.round(W * o.scale / 100 / 2) * 2}:-2,${flip}${rot}${ck}${borderFilter}format=yuva420p,colorchannelmixer=aa=${o.opacity ?? 1}${fadeFilter},setpts=PTS-STARTPTS+${o.start}/TB[ov${k}]`);
 
     let pr = o.motion ? `min(1\\,max(0\\,(t-${o.start})/${o.duration}))` : '0';
     if (o.motion && o.easing === 'smooth') {
