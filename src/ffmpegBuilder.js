@@ -78,6 +78,26 @@ function getCurveSegments(c) {
   });
 }
 
+function getCaptionWords(t) {
+  if (t.words && Array.isArray(t.words) && t.words.length) {
+    return t.words;
+  }
+  const rawWords = String(t.text || '').trim().split(/\s+/).filter(Boolean);
+  if (!rawWords.length) return [];
+  const start = Number(t.start) || 0;
+  const dur = Math.max(0.2, Number(t.duration) || 2);
+  const totalWeight = rawWords.reduce((acc, w) => acc + Math.max(1, w.length), 0);
+  let curAcc = 0;
+  return rawWords.map((word, idx) => {
+    const frac = Math.max(1, word.length) / totalWeight;
+    const wDur = Math.max(0.12, dur * frac);
+    const wStart = start + curAcc;
+    const wEnd = idx === rawWords.length - 1 ? start + dur : wStart + wDur;
+    curAcc += wDur;
+    return { word, start: wStart, end: wEnd };
+  });
+}
+
 // Trilha principal: clips em sequência. Textos: sobreposição por tempo.
 function buildFfmpeg(project, outPath) {
   const S = project.settings || {};
@@ -256,24 +276,62 @@ function buildFfmpeg(project, outPath) {
     const fontFile = fontPath(t.font, t.bold !== false);
     const bw = t.outline ?? 2;
     const anim = t.anim || (t.fade ? 'fade' : 'none');
+    const hlColor = t.highlightColor || '#ffeb3b';
+    const box = t.box ? `:box=1:boxcolor=${(t.boxColor || '#000000').replace('#', '0x')}@${t.boxOpacity ?? 0.6}:boxborderw=${Math.round(14 * Math.min(W, H) / 720)}` : '';
+    const baseFs = Math.round(fs0 * Math.min(W, H) / 720);
+    const yExpr = `(h-text_h)*${t.py ?? 0.88}`;
+    const xExpr = `(w-text_w)*${t.px ?? 0.5}`;
+
+    if (anim === 'single_word') {
+      const words = getCaptionWords(t);
+      const singleFs = Math.round(baseFs * 1.25);
+      words.forEach((w, wi) => {
+        f.push(`[${last}]drawtext=text='${esc(w.word)}'${fontFile ? `:fontfile='${fontFile}'` : ''}:fontcolor=${hlColor}:fontsize='${singleFs}':x=${xExpr}:y='${yExpr}':borderw=${Math.round(bw * Math.min(W, H) / 720)}:bordercolor=black${box}:enable='between(t,${w.start.toFixed(3)},${w.end.toFixed(3)})'[t_${i}_sw${wi}]`);
+        last = `t_${i}_sw${wi}`;
+      });
+      return;
+    }
+
+    if (anim === 'word_by_word') {
+      const words = getCaptionWords(t);
+      words.forEach((w, wi) => {
+        const textAccum = words.slice(0, wi + 1).map(x => x.word).join(' ');
+        const inT = w.start.toFixed(3);
+        const outT = (wi === words.length - 1 ? (t.start + t.duration) : words[wi + 1].start).toFixed(3);
+        f.push(`[${last}]drawtext=text='${esc(textAccum)}'${fontFile ? `:fontfile='${fontFile}'` : ''}:fontcolor=${t.color || 'white'}:fontsize='${baseFs}':x=${xExpr}:y='${yExpr}':borderw=${Math.round(bw * Math.min(W, H) / 720)}:bordercolor=black${box}:enable='between(t,${inT},${outT})'[t_${i}_wbw${wi}]`);
+        last = `t_${i}_wbw${wi}`;
+      });
+      return;
+    }
+
+    if (anim === 'karaoke') {
+      const words = getCaptionWords(t);
+      words.forEach((w, wi) => {
+        const parts = words.map((x, idx) => idx === wi ? `[${x.word.toUpperCase()}]` : x.word).join(' ');
+        const inT = w.start.toFixed(3);
+        const outT = (wi === words.length - 1 ? (t.start + t.duration) : words[wi + 1].start).toFixed(3);
+        f.push(`[${last}]drawtext=text='${esc(parts)}'${fontFile ? `:fontfile='${fontFile}'` : ''}:fontcolor=${hlColor}:fontsize='${baseFs}':x=${xExpr}:y='${yExpr}':borderw=${Math.round(bw * Math.min(W, H) / 720)}:bordercolor=black${box}:enable='between(t,${inT},${outT})'[t_${i}_k${wi}]`);
+        last = `t_${i}_k${wi}`;
+      });
+      return;
+    }
+
     let alpha = '';
-    let yExpr = `(h-text_h)*${t.py ?? 0.88}`;
-    let fsExpr = String(Math.round(fs0 * Math.min(W, H) / 720));
+    let animYExpr = yExpr;
+    let fsExpr = String(baseFs);
 
     if (anim === 'fade') {
       alpha = `:alpha='if(lt(t,${t.start}+0.3),(t-${t.start})/0.3,if(gt(t,${t.start + t.duration}-0.3),(${t.start + t.duration}-t)/0.3,1))'`;
     } else if (anim === 'slide') {
       alpha = `:alpha='if(lt(t,${t.start}+0.25),(t-${t.start})/0.25,1)'`;
       const slideDist = Math.round(35 * Math.min(W, H) / 720);
-      yExpr = `if(lt(t\\,${t.start}+0.3)\\,(h-text_h)*${t.py ?? 0.88}+(1-(t-${t.start})/0.3)*${slideDist}\\,(h-text_h)*${t.py ?? 0.88})`;
+      animYExpr = `if(lt(t\\,${t.start}+0.3)\\,(h-text_h)*${t.py ?? 0.88}+(1-(t-${t.start})/0.3)*${slideDist}\\,(h-text_h)*${t.py ?? 0.88})`;
     } else if (anim === 'pop') {
       alpha = `:alpha='if(lt(t,${t.start}+0.2),(t-${t.start})/0.2,1)'`;
-      const baseFs = Math.round(fs0 * Math.min(W, H) / 720);
       fsExpr = `if(lt(t\\,${t.start}+0.25)\\,${baseFs}*(0.6+0.4*(t-${t.start})/0.25)\\,${baseFs})`;
     }
 
-    const box = t.box ? `:box=1:boxcolor=${(t.boxColor || '#000000').replace('#', '0x')}@${t.boxOpacity ?? 0.6}:boxborderw=${Math.round(14 * Math.min(W, H) / 720)}` : '';
-    f.push(`[${last}]drawtext=text='${esc(t.text)}'${fontFile ? `:fontfile='${fontFile}'` : ''}:fontcolor=${t.color || 'white'}:fontsize='${fsExpr}':x=(w-text_w)*${t.px ?? 0.5}:y='${yExpr}':borderw=${Math.round(bw * Math.min(W, H) / 720)}:bordercolor=black${box}${alpha}:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
+    f.push(`[${last}]drawtext=text='${esc(t.text)}'${fontFile ? `:fontfile='${fontFile}'` : ''}:fontcolor=${t.color || 'white'}:fontsize='${fsExpr}':x=${xExpr}:y='${animYExpr}':borderw=${Math.round(bw * Math.min(W, H) / 720)}:bordercolor=black${box}${alpha}:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
     last = `t${i}`;
   });
   args.push('-filter_complex', f.join(';'), '-map', `[${last}]`, '-map', `[${aOut}]`,
@@ -281,4 +339,4 @@ function buildFfmpeg(project, outPath) {
   return { args };
 }
 
-module.exports = { buildFfmpeg, SPEED_CURVES, buildAtempo, getCurveSegments };
+module.exports = { buildFfmpeg, SPEED_CURVES, buildAtempo, getCurveSegments, getCaptionWords };

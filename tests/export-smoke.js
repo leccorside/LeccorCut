@@ -83,3 +83,27 @@ try {
   console.error('filter_complex:\n' + argsSpeed[argsSpeed.indexOf('-filter_complex') + 1].split(';').join(';\n'));
   process.exit(1);
 }
+
+// Teste com Legendas Dinâmicas (Karaokê e Word-by-Word)
+const outKaraoke = path.join(dir, 'out-karaoke.mp4');
+const projectWithKaraoke = {
+  ...project,
+  clips: [mk(1, a, { duration: 3 })],
+  overlays: [],
+  audios: [],
+  texts: [
+    { id: 10, text: 'LeccorCut editor profissional com karaokê', start: 0.5, duration: 2.2, anim: 'karaoke', highlightColor: '#ffeb3b', color: '#ffffff', size: 44, px: 0.5, py: 0.8 },
+    { id: 11, text: 'Palavra por palavra viral', start: 1.0, duration: 1.8, anim: 'word_by_word', color: '#00e5c3', size: 40, px: 0.5, py: 0.3 }
+  ]
+};
+const { args: argsKaraoke } = buildFfmpeg(projectWithKaraoke, outKaraoke);
+try {
+  execFileSync(ffmpeg, ['-v', 'error', ...argsKaraoke], { stdio: 'inherit' });
+  const size4 = fs.statSync(outKaraoke).size;
+  console.log(`OK: exportação com Legendas Karaokê gerada (${size4} bytes) em ${outKaraoke}`);
+} catch (e) {
+  console.error('FALHA na exportação com Legendas Karaokê');
+  console.error('filter_complex:\n' + argsKaraoke[argsKaraoke.indexOf('-filter_complex') + 1].split(';').join(';\n'));
+  process.exit(1);
+}
+

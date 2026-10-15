@@ -181,6 +181,25 @@ function renderSpeedCurveSvg(curveKey) {
   </svg>`;
 }
 
+function getCaptionWords(t) {
+  if (t.words && Array.isArray(t.words) && t.words.length) {
+    return t.words;
+  }
+  const rawWords = String(t.text || '').trim().split(/\s+/).filter(Boolean);
+  if (!rawWords.length) return [];
+  const start = Number(t.start) || 0;
+  const dur = Math.max(0.2, Number(t.duration) || 2);
+  const totalWeight = rawWords.reduce((acc, w) => acc + Math.max(1, w.length), 0);
+  let curAcc = 0;
+  return rawWords.map((word, idx) => {
+    const frac = Math.max(1, word.length) / totalWeight;
+    const wDur = Math.max(0.12, dur * frac);
+    const wStart = start + curAcc;
+    const wEnd = idx === rawWords.length - 1 ? start + dur : wStart + wDur;
+    curAcc += wDur;
+    return { word, start: wStart, end: wEnd };
+  });
+}
 
 function syncOverlay() {
   const v = $('ovPlayer'), im = $('ovImg');
@@ -266,18 +285,76 @@ function renderPreview() {
   $('textLayer').innerHTML = '';
   if (state.tracks.text?.visible !== false) {
     state.texts.filter(t => state.time >= t.start && state.time < t.start + t.duration).forEach(t => {
-      const s = document.createElement('span'); s.textContent = t.text; s.style.color = t.color; s.style.fontSize = (t.size / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight)) + 'px';
+      const s = document.createElement('span');
       const px = t.px ?? 0.5, py = t.py ?? 0.88;
-      s.style.fontFamily = `'${t.font || 'Arial'}', sans-serif`; s.style.fontWeight = t.bold === false ? 400 : 700;
+      s.style.fontSize = (t.size / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight)) + 'px';
+      s.style.fontFamily = `'${t.font || 'Arial'}', sans-serif`;
+      s.style.fontWeight = t.bold === false ? 400 : 700;
       const ow = (t.outline ?? 2) / 720 * Math.min($('stage').clientWidth, $('stage').clientHeight);
       s.style.textShadow = ow > 0 ? `0 0 ${ow * 1.5}px #000, 0 0 ${ow * 1.5}px #000, 0 0 ${ow}px #000` : 'none';
-      if (t.box) { const h = (t.boxColor || '#000000').replace('#', ''); const rgb = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)).join(','); s.style.background = `rgba(${rgb},${t.boxOpacity ?? 0.6})`; s.style.padding = '0.2em 0.5em'; s.style.borderRadius = '4px'; }
+      if (t.box) {
+        const h = (t.boxColor || '#000000').replace('#', '');
+        const rgb = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)).join(',');
+        s.style.background = `rgba(${rgb},${t.boxOpacity ?? 0.6})`;
+        s.style.padding = '0.2em 0.5em';
+        s.style.borderRadius = '4px';
+      }
       const anim = t.anim || (t.fade ? 'fade' : 'none');
       const dt = state.time - t.start, rem = t.start + t.duration - state.time;
       let animScale = 1, animY = 0, animOp = 1;
-      if (anim === 'fade') animOp = Math.max(0, Math.min(1, dt / 0.3, rem / 0.3));
-      else if (anim === 'slide' && dt < 0.3) { const pr = Math.max(0, dt / 0.3); animY = (1 - pr) * 25; animOp = Math.min(1, dt / 0.2); }
-      else if (anim === 'pop' && dt < 0.25) { const pr = Math.max(0, dt / 0.25); animScale = 0.6 + 0.4 * pr; animOp = Math.min(1, dt / 0.15); }
+      const hlColor = t.highlightColor || '#ffeb3b';
+
+      if (anim === 'single_word') {
+        const words = getCaptionWords(t);
+        const active = words.find(w => state.time >= w.start && state.time < w.end) || words[words.length - 1];
+        s.textContent = active ? active.word : '';
+        s.style.color = hlColor;
+        animScale = 1.25;
+      } else if (anim === 'word_by_word') {
+        s.innerHTML = '';
+        const words = getCaptionWords(t);
+        words.forEach((w, wi) => {
+          if (state.time < w.start) return;
+          const wsp = document.createElement('span');
+          wsp.textContent = (wi > 0 ? ' ' : '') + w.word;
+          const isCurrent = state.time >= w.start && state.time < w.end;
+          wsp.style.color = isCurrent ? hlColor : t.color;
+          if (isCurrent) {
+            wsp.style.fontWeight = '900';
+            wsp.style.textShadow = `0 0 10px ${hlColor}`;
+          }
+          s.appendChild(wsp);
+        });
+      } else if (anim === 'karaoke') {
+        s.innerHTML = '';
+        const words = getCaptionWords(t);
+        words.forEach((w, wi) => {
+          const wsp = document.createElement('span');
+          wsp.textContent = (wi > 0 ? ' ' : '') + w.word;
+          const isCurrent = state.time >= w.start && state.time < w.end;
+          const isPassed = state.time >= w.end;
+          if (isCurrent) {
+            wsp.style.color = hlColor;
+            wsp.style.fontWeight = '900';
+            wsp.style.textShadow = `0 0 12px ${hlColor}`;
+            wsp.style.display = 'inline-block';
+            wsp.style.transform = 'scale(1.15)';
+          } else if (isPassed) {
+            wsp.style.color = t.color;
+            wsp.style.opacity = '1';
+          } else {
+            wsp.style.color = t.color;
+            wsp.style.opacity = '0.55';
+          }
+          s.appendChild(wsp);
+        });
+      } else {
+        s.textContent = t.text;
+        s.style.color = t.color;
+        if (anim === 'fade') animOp = Math.max(0, Math.min(1, dt / 0.3, rem / 0.3));
+        else if (anim === 'slide' && dt < 0.3) { const pr = Math.max(0, dt / 0.3); animY = (1 - pr) * 25; animOp = Math.min(1, dt / 0.2); }
+        else if (anim === 'pop' && dt < 0.25) { const pr = Math.max(0, dt / 0.25); animScale = 0.6 + 0.4 * pr; animOp = Math.min(1, dt / 0.15); }
+      }
       s.style.opacity = animOp;
       s.style.left = (px * 100) + '%'; s.style.top = (py * 100) + '%';
       s.style.transform = `translate(${-px * 100}%, ${-py * 100}%) translateY(${animY}px) scale(${animScale})`;
@@ -598,7 +675,8 @@ function renderProps() {
       + `<div class="prop">Tamanho<input type="number" id="tSize" value="${t.size}" min="10" max="200"></div>`
       + `<div class="prop">Cor<input type="color" id="tColor" value="${t.color}"></div>`
       + `<div class="prop">Fonte<select id="tFont">${['Arial', 'Impact', 'Segoe UI', 'Comic Sans MS', 'Times New Roman', 'Courier New'].map(v => `<option ${(t.font || 'Arial') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`
-      + `<div class="prop">Animação<select id="tAnim">${[['none', 'Nenhuma'], ['fade', 'Fade In/Out'], ['slide', 'Deslizar (Slide Up)'], ['pop', 'Pop / Zoom In']].map(([k, label]) => `<option ${(t.anim || (t.fade ? 'fade' : 'none')) === k ? 'selected' : ''} value="${k}">${label}</option>`).join('')}</select></div>`
+      + `<div class="prop">Animação<select id="tAnim">${[['none', 'Nenhuma'], ['fade', 'Fade In/Out'], ['slide', 'Deslizar (Slide Up)'], ['pop', 'Pop / Zoom In'], ['karaoke', '🎤 Karaokê (Destaque Ativo)'], ['word_by_word', '📝 Palavra por Palavra'], ['single_word', '⚡ Estilo Viral (Hormozi)']].map(([k, label]) => `<option ${(t.anim || (t.fade ? 'fade' : 'none')) === k ? 'selected' : ''} value="${k}">${label}</option>`).join('')}</select></div>`
+      + `<div class="prop" id="pHighlightGroup" ${['karaoke', 'word_by_word', 'single_word'].includes(t.anim) ? '' : 'style="display:none"'}>Cor de Destaque<input type="color" id="tHighlightColor" value="${t.highlightColor || '#ffeb3b'}"></div>`
       + `<div class="prop"><label><input type="checkbox" id="tBold" ${t.bold !== false ? 'checked' : ''}> Negrito</label></div>`
       + `<div class="prop">Contorno<input type="range" id="tOut" min="0" max="8" step="1" value="${t.outline ?? 2}"></div>`
       + `<div class="prop"><label><input type="checkbox" id="tBox" ${t.box ? 'checked' : ''}> Fundo (caixa)</label> <input type="color" id="tBoxColor" value="${t.boxColor || '#000000'}"></div>`
@@ -611,7 +689,14 @@ function renderProps() {
     $('tSize').oninput = (e) => { t.size = +e.target.value || 48; renderPreview(); };
     $('tColor').oninput = (e) => { t.color = e.target.value; renderPreview(); };
     $('tFont').onchange = (e) => { t.font = e.target.value; renderPreview(); };
-    $('tAnim').onchange = (e) => { t.anim = e.target.value; t.fade = (e.target.value === 'fade'); renderPreview(); };
+    $('tAnim').onchange = (e) => {
+      t.anim = e.target.value;
+      t.fade = (e.target.value === 'fade');
+      const hlGrp = $('pHighlightGroup');
+      if (hlGrp) hlGrp.style.display = ['karaoke', 'word_by_word', 'single_word'].includes(t.anim) ? 'block' : 'none';
+      renderPreview();
+    };
+    if ($('tHighlightColor')) $('tHighlightColor').oninput = (e) => { t.highlightColor = e.target.value; renderPreview(); };
     $('tBold').onchange = (e) => { t.bold = e.target.checked; renderPreview(); };
     $('tOut').oninput = (e) => { t.outline = +e.target.value; renderPreview(); };
     $('tBox').onchange = (e) => { t.box = e.target.checked; renderPreview(); };
@@ -622,8 +707,8 @@ function renderProps() {
     $('btnApplyAllTexts').onclick = () => {
       state.texts.forEach(other => {
         other.size = t.size; other.color = t.color; other.font = t.font;
-        other.bold = t.bold; other.anim = t.anim; other.fade = t.fade; other.outline = t.outline;
-        other.box = t.box; other.boxColor = t.boxColor; other.boxOpacity = t.boxOpacity;
+        other.bold = t.bold; other.anim = t.anim; other.fade = t.fade; other.highlightColor = t.highlightColor;
+        other.outline = t.outline; other.box = t.box; other.boxColor = t.boxColor; other.boxOpacity = t.boxOpacity;
         other.px = t.px; other.py = t.py;
       });
       renderTimeline(); renderPreview(); toast('Estilo aplicado a ' + state.texts.length + ' textos');
