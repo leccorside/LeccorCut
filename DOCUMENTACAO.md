@@ -1,4 +1,4 @@
-﻿# 📚 Documentação Técnica — Engenharia Reversa CapCut v9.6.0.4097
+# 📚 Documentação Técnica — Engenharia Reversa CapCut v9.6.0.4097
 
 > Gerado via análise estática com REA v6.4.0 + extração manual de strings e recursos.
 
@@ -95,6 +95,27 @@ C:\Users\...\AppData\Local\CapCut\Apps\
 | `Qt6Gui.dll` | 7.2 MB | Qt6 GUI framework |
 | `Qt6Widgets.dll` | 6.0 MB | Qt6 Widgets |
 
+### 4.1 Tabela Completa de Imports e Exports dos Binários Core (PE Analysis)
+
+| Binário / DLL | Imports (DLLs / Funções) | Principais Dependências | Exports | Principais Símbolos Exportados |
+|---|---|---|---|---|
+| `CapCut.exe` | 17 DLLs / 408 funcs | `KERNEL32` (252), `ADVAPI32` (55), `USER32` (33), `SHLWAPI` (19) | 88 funcs | Chromium base (`base::MemoryAllocatorDumpGuid`, `base::ReadOnlySharedMemoryRegion`) |
+| `cccreator.dll` | 62 DLLs / 1.701 funcs | `MSVCP140` (253), `KERNEL32` (181), `audioeffect.dll` (151), `avutil-59.dll` (120), `jazz.dll` (116), `sscronet.dll` (105) | 7.401 funcs | `AmazingEngine` (`Segment`, `StickerCommonSegment`, `SwingSurfaceTrackingController`) |
+| `videoeditor.dll` | 28 DLLs / 854 funcs | `MSVCP140` (214), `cccreator.dll` (196), `KERNEL32` (83), `clipflow_sdk.dll` (77), `avutil-59` (28) | 8.192 funcs | `lyra::AlgorithmAsyncUtils`, `lvve::SegmentPreRenderCacheManager`, `lyra::wrapper::VESDKModule` |
+| `lens.dll` | 19 DLLs / 370 funcs | `MSVCP140` (104), CRT Math (61), `KERNEL32` (53), `fastcv.dll` (21) | 379 funcs | `FRAMEWORK::LENS` (`ICvAcceleratedOperatorInterface`, `ILensAlgorithmInterface`) |
+| `VECreator.dll` | 23 DLLs / 4.087 funcs | `Qt6Core` (1.901), `Qt6Gui` (789), `FusionUI` (342), `Qt6Quick` (266), `Qt6Widgets` (223), `lynx.dll` (43), `nuro.dll` (57) | 1.808 funcs | `effectplatform::davinci` (`ResourceFetchCallback`, `loki`, `heycan`, `EffectLinkage`) |
+| `smart_cut.ofx` | 14 DLLs / 198 funcs | `libGLESv2.dll` (34), `cccreator.dll` (36), `MSVCP140` (39), `KERNEL32` (31) | 2 funcs | Open Effects Standard (`OfxGetNumberOfPlugins`, `OfxGetPlugin`) |
+
+### 4.2 Arquitetura do DeepAgents (`deepagents_capi.dll`)
+
+`deepagents_capi.dll` (42 MB) é a ponte de inferência e orquestração de agentes de IA, compilada via **Go + CGo** (`_cgo_dummy_export`). Expõe **77 funções C-API**:
+
+- **Gerenciamento de Agentes**: `da_agent_create`, `da_agent_create_with_callbacks`, `da_agent_destroy`, `da_agent_start`, `da_agent_run_async`, `da_agent_execute_subagent`, `da_agent_get_conversation_execution_graph`.
+- **Sessões e Contexto**: `da_session_create`, `da_session_get_model_context_view`, `da_session_get_transcript_view`, `da_session_set_thinking_override`, `da_session_rewrite_history`.
+- **Streaming de Respostas**: `da_agent_stream_start`, `da_agent_stream_run`, `da_agent_stream_next`, `da_stream_read`, `da_stream_close`.
+- **Tool Calling (Execução de Ferramentas)**: `da_tool_call_emit_event`, `da_tool_call_reply_impl`, `da_tool_call_get_thread_id`, `da_tool_spec_array_alloc`, `da_tool_spec_array_free`.
+- **Telemetria e Observabilidade**: `da_fornax_trace_send_reply_impl`, `da_session_get_fornax_runtime_view` (integração direta com telemetria Fornax da ByteDance).
+
 ---
 
 ## 5. Formato do Projeto (Draft) — Estrutura Interna
@@ -172,6 +193,52 @@ O `videoeditor.dll` embarca um sistema de **migração de versão** baseado em L
 - `vocal beautifys in segments`
 - `ai_portrait` (remoção de fundo por portrait)
 - `ai_translate_applied` (tradução automática por IA)
+
+### 5.3 Esquema Real do `draft_content.json` (Engenharia Reversa Empírica)
+
+Inspecionado diretamente a partir de projetos reais salvos em `User Data/Projects/com.lveditor.draft/`:
+
+* **Unidade de Tempo Base**: **Microsegundos ($\mu s$)** ($1\text{ s} = 1.000.000\text{ }\mu s$).
+* **Estrutura Raiz**:
+  ```json
+  {
+    "id": "uuid-do-projeto",
+    "version": 2,
+    "new_version": "96.0.0",
+    "duration": 209600000,
+    "fps": 30.0,
+    "canvas_config": {
+      "ratio": "original",
+      "width": 1080,
+      "height": 1920,
+      "background": null
+    },
+    "tracks": [ ... ],
+    "materials": { ... },
+    "keyframes": { ... }
+  }
+  ```
+* **Tracks & Segments (Arquitetura Relacional)**:
+  As tracks contêm segmentos com intervalos de tempo (`source_timerange` e `target_timerange`) que apontam para um `material_id`:
+  ```json
+  {
+    "id": "seg_001",
+    "material_id": "mat_video_001",
+    "render_index": 0,
+    "source_timerange": { "start": 0, "duration": 7400000 },
+    "target_timerange": { "start": 0, "duration": 7400000 },
+    "speed": 1.0,
+    "volume": 1.0,
+    "clip": { "scale": { "x": 1.0, "y": 1.0 }, "transform": { "x": 0.0, "y": 0.0 } },
+    "keyframe_refs": [ "kf_01", "kf_02" ]
+  }
+  ```
+* **Repositório Global de Materiais (`materials`)**:
+  Separado em **55 tabelas especializadas**:
+  - Mídia: `videos`, `audios`, `images`, `tail_leaders`, `canvases`.
+  - Edição: `speeds`, `transitions`, `material_animations`, `sound_channel_mappings`.
+  - Efeitos & Cor: `hsl`, `color_curves`, `primary_color_wheels`, `green_screens`, `chromas`.
+  - IA & Áudio Avançado: `vocal_separations`, `vocal_beautifys`, `smart_relights`, `smart_crops`, `ai_translates`.
 
 ---
 
@@ -350,12 +417,34 @@ Janela Principal (Qt6)
 - `AES_KEY_SETUP_FAILED`, `BAD_KEY_LENGTH`, `INVALID_TOKEN` — BoringSSL (OpenSSL fork Google)
 - Certificado de assinatura PE via Digicert e Sectigo
 
-### 10.2 Watermarks
-- **Brand watermark**: `CapCut.png` — logo animado nos exports gratuitos
-- **AI watermark**: `CapCutAI.png` — watermark em conteúdo gerado por IA
-- **Invisible watermark**: `invisible_watermark/` — watermark imperceptível no vídeo
-- **C2PA**: `tt_c2pa_sdk.dll` — proveniência de conteúdo (padrão de autenticidade)
-- **Animações de watermark**: definidas em `ani_info.json` + `infoSticker.lua`
+### 10.2 Mecanismo Interno de Watermarks (Lua + Atlas Engine)
+
+A engine de watermark é orientada a entidades e sprites no motor `AmazingEngine`, controlada por scripts Lua e metadados JSON:
+- **Estrutura dos Pacotes** (`Resources/watermark/`):
+  - `brand_left`, `brand_right`, `ai_left`, `ai_right`: Watermarks dinâmicos animados.
+  - `brand_static`, `ai_left_static`, `big_brand`, `normal_brand`: Watermarks estáticos.
+- **Orquestração via Lua** (`infoSticker.lua`):
+  ```lua
+  InfoSticker = { 
+      materials = { 
+          { id = 0, type = materialType.autoAtlas, data = "ani_info.json", source = "SequenceMap.png" }
+      },
+      entity
+  }
+  function InfoSticker:new()
+      local viewer = director:getViewer()
+      local scale = viewer:getWidth() / 720.0 * 1.0
+      o.entity = scene:createEntity("infoSticker" .. math.random())
+      o.entity:getTransform():setScale(scale)
+      o.entity:addSpriteComponent():getSprite()
+      ...
+  end
+  ```
+- **Atlas de Animação** (`ani_info.json` & `heycanInfo.json`):
+  - Spritesheet `SequenceMap.png` (1024x1024 px) contendo 90 frames (`ccbl_00000.png` a `ccbl_00089.png`).
+  - Cada frame armazena coordenadas de corte (`frame: x, y, w, h`), tamanho original (`200x60`) e flags (`trimmed: true`).
+  - O runtime interpola a 30/60 fps dinamicamente na camada superior de composição.
+- **C2PA Metadata**: Vinculado via `tt_c2pa_sdk.dll` para injetar credenciais criptográficas de autenticidade no container MP4/MOV exportado.
 
 ### 10.3 Criptografia
 - **BoringSSL** embarcado (fork do OpenSSL pelo Google)
@@ -388,4 +477,112 @@ Janela Principal (Qt6)
 
 ---
 
-*Gerado em: 2026-10-15 | Fonte: análise estática de strings, recursos e manifests do CapCut v9.6.0.4097*
+## 12. Plugins, Interoperabilidade e Web Manifests
+
+### 12.1 Plugin Open Effects (`smart_cut.ofx.bundle`)
+- **Padrão OFX Nativo**: Implementa `OfxGetNumberOfPlugins` e `OfxGetPlugin`.
+- **Aceleração**: Vinculado a `libGLESv2.dll` e `cccreator.dll`.
+- **Objetivo**: Plugin de segmentação/corte inteligente que opera como filtro de GPU acelerado via OpenGL ES 2.0 / ANGLE.
+
+### 12.2 Conversão e Importação de Drafts (OpenTimelineIO)
+No diretório `Tools/draft-converter/_internal/opentimelineio/`, foram identificados adaptadores padrão:
+- `otio_aaf_adapter`: Suporte a Avid AAF.
+- `otio_fcpx_xml_adapter`: Suporte a Final Cut Pro X XML.
+- `otio_fcp_adapter`: Suporte a Apple Final Cut Pro 7 XML.
+- **Relevância para o LeccorCut**: Essa mesma biblioteca (OpenTimelineIO) pode ser adotada diretamente para importar e exportar timelines entre CapCut, DaVinci Resolve, Premiere e LeccorCut.
+
+### 12.3 Especificação do `web-manifest.json`
+Localizado em `Resources/common_agent/app/web-manifest.json`:
+- **Schema**: `common-agent.web-manifest.v1`
+- **Contrato de Host**: `requires: { productHostApi: { minVersion: "1", maxVersion: "1" } }`
+- **Entradas (Entries)**: `commonagent` (`commonagent/index.html`) e `videoStudio` (`video-studio/index.html`).
+- **Integridade**: Dicionário `hashes` mapeia o SHA-256 de cada script, imagem e worker para verificação estrita antes da execução pelo CEF.
+
+---
+
+## 13. Pipeline de Renderização e Orquestração (`VECreator.dll`)
+
+- **VESDK Core**: Inicializado via `SceneCoreUtils::initVESDK`. Controla transações de draft (`draftTransaction`, `draftCommit`) e despacho de eventos do player (`vesdk_player_events`).
+- **Orquestrador de Materiais IA**: `agent::AgentMaterialPipelineOrchestrator` — coordena transcodificação de mídia (`preemptTranscodeAndUpload`, `processTranscodeTask`), upload assíncrono e agendamento de artefatos gerados por IA.
+- **IPC Mojo para Efeitos**: `mojom::EffectPlatformService` — interface IPC entre o processo da UI e o serviço de efeitos Davinci/Loki (`EffectPlatformServiceImpl`).
+- **UI QML Integrada**: Janelas de autor de efeitos como `LokiAuthorPopupWindow.qml` integradas diretamente sobre a viewport de edição.
+
+---
+
+## 14. Processo de Inicialização e Bootstrap Multiprocesso
+
+O ciclo de vida da aplicação divide responsabilidades em vários processos especializados:
+
+1. **Launcher Principal (`Apps\CapCut.exe` — 4.97 MB)**:
+   - Lê `ProductInfo.xml` e `Configure.ini`.
+   - Verifica atualizações diferenciais pendentes via `CapCut-DiffUpgrade.exe`, `hpatchz.exe` e `courgette64.exe`.
+   - Spawna o executável da versão atual: `Apps\9.6.0.4097\CapCut.exe` (90 KB).
+
+2. **Core Bootstrap (`Apps\9.6.0.4097\CapCut.exe`)**:
+   - Inicializa `VESafeGuard.dll` (`safe_guard_first_load`) para proteção contra falhas prematuras.
+   - Carrega `VEConfig.dll` e inicializa o runtime Qt6.
+   - Spawna os processos auxiliares nativos:
+     - `VEDetector.exe`: Força seleção de GPU dedicada (NVIDIA Optimus / AMD PowerXpress) e gerencia download de drivers incompatíveis.
+     - `VEHelper.exe`: Coleta telemetria e diagnósticos de execução para `https://pc-mon-va.byteoversea.com`.
+     - `ttdaemon.exe`: Processo isolado que inicializa CUDA (`cuInit`, `cuLaunchKernel`) e expõe a engine de efeitos `FRAMEWORK::LENS` sem sobrecarregar a UI principal.
+     - `bun.exe` (107 MB): Runtime JS de alta performance em background que hospeda o `common_agent`.
+
+3. **Bridge Node.js / Bun (`agent_runtime_addon.node` — 521 KB)**:
+   - Módulo N-API nativo (`napi_register_module_v1`).
+   - Monitora o processo pai via `startParentProcessWatchdog(parentPid)`.
+   - Roteia exceções e handoff de crash para `Bun__handoffCrashHandlerToExternalReporter`.
+
+---
+
+## 15. Arquitetura da UI e JavaScript Bridge (Multi-Framework)
+
+### 15.1 Coexistência na Janela
+* **Janela Base:** Qt6 (`QMainWindow` / `QQuickView`).
+* **Viewport e Timeline:** Renderizados via Qt Quick / Direct3D / ANGLE com aceleração de hardware direta.
+* **Painéis Web (Sidebar, Video Studio, Agent Hub):** Instâncias de Chromium Embedded Framework (`libcef.dll`) acopladas como HWNDs filhos dentro dos layouts do Qt.
+* **Componentes Móveis:** Lynx UI (`lynx.dll`) para cards dinâmicos e telas de assinatura.
+
+### 15.2 Comunicação e Bridge JS nativo
+Três canais de comunicação coexistem:
+1. `window.cefQuery({ request: JSON.stringify({ callType, data }) })`: Roteador assíncrono nativo do CEF.
+2. `window.Capcut?.JSBridge`: Objetos de invocação direta com métodos `.call()`, `.invoke()`, `.postMessage()`.
+3. `window.videoStudioNativeBridge?.postMessage({ version: 1, type, payload })`: Mensageria orientada a eventos para o Video Studio.
+
+**Chamadas de Bridge Mapeadas:**
+- `ackAgentHubHostModeLayout`, `getAgentHubCreationConfig`
+- `getUserSubscriptionInfo`, `getVipInfo`, `showVipPaywallModal`
+- `openAgentHubDeepLink`, `requestAgentHubWorkspaceActionFromAssets`
+- `setAgentHubSidebarWidth`, `finishAgentHubMediaDrag`, `showToast`
+- Eventos transacionais de timeline: `beforeCreate`, `beforeTransaction`, `transaction`, `selectionUpdate`, `update`, `create`, `destroy`.
+
+---
+
+## 16. Subsistema de Áudio e Voz
+
+* **Engine de Áudio `mammon` (`audioeffect.dll` — 2.102 exports)**:
+  - `WaveformVisualizer@mammon`: Geração e amostragem de dados de onda senoidal para a timeline (`getPoints`, `getPointsInterleaved`).
+  - Buffers de Baixa Latência: `CycleFifoBufferX`, `DynamicDelayAdjustX`.
+  - Tratamento Acústico: Cancelamento de eco `AEC` / `AecMicSelection`, redução de ruído `realtime_denoises`.
+* **Reconhecimento de Voz Panther (`speechsdk.dll` — 778 exports)**:
+  - Motor `lab::speech::client::Engine` e inferência de fala `PthInfer@panther` com decodificador `PthLMDecoderOptions`.
+  - Permite geração de transcrições e legendas automáticas offline diretamente no binário nativo.
+* **Codec Lyra (`lyra_cli_client.dll` — 53 exports)**:
+  - Codec neural do Google de ultra-baixa taxa de bits para transmissão em tempo real de áudio de voz.
+
+---
+
+## 17. Formatos Binários dos Modelos de IA (`ByteNN` e `SAMI`)
+
+A análise de assinatura binária (magic headers) revelou dois padrões primários:
+1. **Modelos `.bytenn` (ByteDance Neural Network)**:
+   - Header: `42 4d 00 04` (`BM\x00\x04`).
+   - Usado para redes neurais de segmentação rápida, matting e detecção de corte de cenas (`nn_denoise.bytenn`, `jy_compressShotDetectBackbone.bytenn`, `win_lens_wm_embed_model.bytenn`).
+2. **Modelos `.model` de Áudio (SAMI Framework)**:
+   - Header: `53 41 4d 49` (`SAMI` = *Speech, Audio, and Music Intelligence*).
+   - Usado para modelos como `aec44k_resnet_echo_cancellation_v1.2.model`.
+3. **Modelos de Visão Computacional**:
+   - Compilados para OpenVINO (`openvino.dll`) e AmazingEngine com cabeçalhos de matrizes pré-compiladas para NPU/GPU.
+
+---
+
+*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática e arquitetural completa (Fases 1 e 2) do CapCut v9.6.0.4097*

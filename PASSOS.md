@@ -1,4 +1,4 @@
-﻿# 🔍 Roteiro de Engenharia Reversa — CapCut v9.6.0.4097
+# 🔍 Roteiro de Engenharia Reversa — CapCut v9.6.0.4097
 
 > **Alvo:** `C:\Users\Johnathan Amorim\AppData\Local\CapCut\Apps\CapCut.exe`
 > **Versão:** 9.6.0.4097 (release)
@@ -17,11 +17,11 @@
 - [x] Identificar tecnologias: Qt6, CEF (Chromium), FFmpeg, Python 3.11, Bun, Lynx UI
 - [x] Ler `ProductInfo.xml` (CID: `capcutpc_0`, versão, release type)
 - [x] Identificar modelos de IA empacotados (pasta `Resources/models/`)
-- [ ] Extrair tabela completa de imports/exports do `CapCut.exe` launcher via Ghidra
-- [ ] Extrair tabela de imports do `VECreator.dll` via Ghidra
-- [ ] Extrair tabela de imports do `cccreator.dll` via Ghidra
-- [ ] Extrair tabela de imports do `videoeditor.dll` via Ghidra
-- [ ] Extrair tabela de imports do `lens.dll` via Ghidra
+- [x] Extrair tabela completa de imports/exports do `CapCut.exe` launcher (via pefile: 17 DLLs, 408 imports, 88 exports Chromium base)
+- [x] Extrair tabela de imports do `VECreator.dll` (23 DLLs, 4.087 imports: Qt6, FusionUI, lynx, nuro; 1.808 exports Davinci/EffectPlatform)
+- [x] Extrair tabela de imports do `cccreator.dll` (62 DLLs, 1.701 imports: audioeffect, avutil, jazz, sscronet; 7.401 exports AmazingEngine)
+- [x] Extrair tabela de imports do `videoeditor.dll` (28 DLLs, 854 imports: cccreator, clipflow_sdk, avcodec; 8.192 exports Lyra/VESDK)
+- [x] Extrair tabela de imports do `lens.dll` (19 DLLs, 370 imports: fastcv; 379 exports FRAMEWORK::LENS)
 
 ### 1.2 Análise de Strings e Recursos
 - [x] Extrair strings ASCII do `CapCut.exe` launcher (caminhos, DLLs, erros de crypto)
@@ -30,12 +30,12 @@
 - [x] Identificar endpoints de agente de IA (`/api/agent-runtime/v1`)
 - [x] Extrair referências a modelos de IA no bundle JS (SeedDance, MiniMax, GPTImage2, etc.)
 - [x] Mapear tipos de watermark (brand, AI, CapCut, CapCutAI)
-- [ ] Extrair strings do `VECreator.dll` (pipeline de renderização)
-- [ ] Extrair strings do `videoeditor.dll` (editor core)
-- [ ] Extrair strings do `audioeffect.dll` (processamento de áudio)
-- [ ] Extrair strings do `deepagents_capi.dll` (bridge IA)
-- [ ] Analisar arquivos `.lua` dos watermarks
-- [ ] Analisar arquivos `ani_info.json` dos watermarks (formato de animação)
+- [x] Extrair strings do `VECreator.dll` (pipeline de renderização: SceneCoreUtils::initVESDK, AgentMaterialPipelineOrchestrator, EffectPlatformService Mojo IPC, Loki UI QML)
+- [x] Extrair strings do `videoeditor.dll` (editor core: 17.457 strings extraídas em scratch)
+- [x] Extrair strings do `audioeffect.dll` (processamento de áudio: equalizadores, reverb, pitch shift, auto-tune)
+- [x] Extrair strings do `deepagents_capi.dll` (bridge IA: Go/CGo runtime, 77 exports, da_agent_*, da_session_*, Fornax trace)
+- [x] Analisar arquivos `.lua` dos watermarks (`infoSticker.lua`: autoAtlas, director:getViewer(), scale dinâmico, addSpriteComponent)
+- [x] Analisar arquivos `ani_info.json` dos watermarks (formato de animação atlas: 90 frames, SequenceMap 1024x1024, trims e rotações)
 
 ### 1.3 Análise de Configuração e Recursos
 - [x] Identificar Lynx pages de assinatura (`image_lynx_videocutpc_*`)
@@ -44,22 +44,22 @@
 - [x] Identificar uso de `bun.exe` (runtime JS embarcado, 107MB)
 - [x] Identificar uso de `python311.dll` (processamento Python)
 - [x] Identificar uso de `libcef.dll` (Chromium Embedded Framework para UI)
-- [ ] Analisar `web-manifest.json` completo (mapeamento de assets e checksums)
-- [ ] Analisar bundle JS `commonagent/assets/App-*.js` (lógica da UI principal)
-- [ ] Analisar `server.json` na raiz do repositório rea
-- [ ] Analisar `smart_cut.ofx.bundle` (plugin de corte inteligente)
+- [x] Analisar `web-manifest.json` completo (schema common-agent.web-manifest.v1, packageStamp, entries commonagent/videoStudio, SHA256 hashes de todos os assets)
+- [x] Analisar bundles JS da UI (`renderApp-CIJPeLBB.js` 1.59MB, `AgentHubTask-CF1zzZ02.js` 262KB, `App-DpNZSMvJ.js` 3.18MB, tracking)
+- [x] Analisar `server.json` na raiz do repositório rea (especificação MCP server do REA v6.4.0 com pacote rea-agents via stdio)
+- [x] Analisar `smart_cut.ofx.bundle` (plugin standard Open Effects OFX 603KB, libGLESv2, OfxGetNumberOfPlugins, OfxGetPlugin)
 
 ---
 
 ## 🏗️ Fase 2 — Análise de Arquitetura e Componentes
 
 ### 2.1 Processo de Inicialização (Bootstrap)
-- [ ] Rastrear fluxo de inicialização do `JianyingLauncher.exe` → `CapCut.exe`
-- [ ] Mapear comunicação entre launcher e `bun.exe` (runtime JS)
-- [ ] Entender papel do `agent_runtime_addon.node` (521KB) — bridge Node.js/Nativo
-- [ ] Analisar `taskcontainer.exe` (44KB) — container de processos filhos
-- [ ] Analisar papel do `ttdaemon.exe` (daemon TikTok services)
-- [ ] Mapear IPC entre processos: launcher ↔ renderer ↔ native services
+- [x] Rastrear fluxo de inicialização do `JianyingLauncher.exe` → `CapCut.exe` (launcher raiz 4.97MB lê `ProductInfo.xml`, faz diff updates e spawna `9.6.0.4097\CapCut.exe` 90KB)
+- [x] Mapear comunicação entre launcher e `bun.exe` (runtime JS embarcado executado em background para o `common_agent`)
+- [x] Entender papel do `agent_runtime_addon.node` (521KB) — N-API bridge Node/Bun nativo com `startParentProcessWatchdog` atrelado ao PID pai
+- [x] Analisar `taskcontainer.exe` (44KB) — container de tarefas isoladas e benchmarking (`bytebench::ByteBenchConfigurationBuilder`)
+- [x] Analisar papel do `ttdaemon.exe` (411KB) — worker out-of-process CUDA com `FRAMEWORK::LENS` para efeitos e filtros pesados
+- [x] Mapear IPC entre processos: launcher ↔ renderer ↔ native services (Mojo IPC, WebSocket/HTTP localhost e Chromium message router)
 
 ### 2.2 Arquitetura da UI (Multi-Framework)
 - [x] Identificar Qt6 como framework de janela principal
@@ -67,22 +67,22 @@
 - [x] Identificar Lynx como framework de UI mobile-style (lynx.dll 24MB)
 - [x] Identificar Video Studio como app React/Vite embutida
 - [x] Identificar Common Agent como sub-app React/Vite embutida
-- [ ] Entender como Qt ↔ CEF ↔ Lynx coexistem na mesma janela
-- [ ] Mapear IPC Qt ↔ CEF (JavaScript Bridge, `window.capcut.*` APIs)
-- [ ] Analisar bundle JS `index-DJ4o9hAr.js` (241KB) — entry point lógica
-- [ ] Analisar bundle JS `services-Bqx5Pz17.js` (50KB) — serviços de API
-- [ ] Documentar API JavaScript exposta pelo bridge C++ → JS
+- [x] Entender como Qt ↔ CEF ↔ Lynx coexistem na mesma janela (Qt6 QMainWindow/QQuickView viewport hospeda views CEF para painéis web e Lynx para cards)
+- [x] Mapear IPC Qt ↔ CEF (JavaScript Bridge, `window.capcut.*` APIs, `window.cefQuery` com roteamento JSON `callType`)
+- [x] Analisar bundle JS `index-DJ4o9hAr.js` (241KB) — entry point e lifecycle events (`beforeCreate`, `transaction`, `selectionUpdate`)
+- [x] Analisar bundle JS `services-Bqx5Pz17.js` (50KB) — serviços de rede Slardar e endpoints comerciais
+- [x] Documentar API JavaScript exposta pelo bridge C++ → JS (`window.Capcut.JSBridge` com `call`, `invoke`, `postMessage` e `window.videoStudioNativeBridge`)
 
 ### 2.3 Motor de Edição de Vídeo (VECreator / videoeditor)
-- [ ] Mapear funções exportadas de `VECreator.dll` (271MB)
-- [ ] Mapear funções exportadas de `videoeditor.dll` (72MB)
-- [ ] Mapear funções exportadas de `cccreator.dll` (158MB)
-- [ ] Entender estrutura interna de um "Draft" (projeto salvo)
-- [ ] Identificar formato binário do projeto CapCut
-- [ ] Mapear pipeline: Track → Clip → Effect → Filter
-- [ ] Mapear pipeline de renderização: Timeline → Compositor → FFmpeg encoder
-- [ ] Analisar `lens.dll` (88MB) — engine de filtros e efeitos em tempo real
-- [ ] Analisar integração com FFmpeg (`avcodec-61.dll`)
+- [x] Mapear funções exportadas de `VECreator.dll` (271MB) (1.808 exports Davinci/EffectPlatform)
+- [x] Mapear funções exportadas de `videoeditor.dll` (72MB) (8.192 exports Lyra/VESDK)
+- [x] Mapear funções exportadas de `cccreator.dll` (158MB) (7.401 exports AmazingEngine)
+- [x] Entender estrutura interna de um "Draft" (projeto salvo analisado em `User Data/.../0923/draft_content.json`: tempo em microsegundos, 55 categorias globais de `materials`)
+- [x] Identificar formato binário do projeto CapCut (`draft_content.json` JSON estruturado referenciando assets, keyframes e timers)
+- [x] Mapear pipeline: Track → Clip → Effect → Filter (Tracks tipadas apontando para `materials` via `material_id`)
+- [x] Mapear pipeline de renderização: Timeline → Compositor → FFmpeg encoder (`VESDKModule` → `SegmentPreRenderCacheManager` → `AmazingEngine` → OFX GPU Shaders → `avcodec-61.dll`)
+- [x] Analisar `lens.dll` (88MB) — engine de filtros e efeitos em tempo real (`FRAMEWORK::LENS` acelerado por `fastcv.dll` e CUDA)
+- [x] Analisar integração com FFmpeg (`avcodec-61.dll`, `avutil-59.dll`, `avfilter-10.dll`)
 
 ### 2.4 Motor de IA e Modelos
 - [x] Identificar modelos de matting (remoção de fundo local)
@@ -95,18 +95,18 @@
 - [x] Identificar modelos generativos de vídeo via cloud (SeedDance 2.0/2.5, MiniMax H3, Gemini)
 - [x] Identificar modelos de imagem via cloud (SeedDream 4.x/5, GPT-Image2, NanoBanana)
 - [x] Identificar modelo de invisible watermark local
-- [ ] Analisar `deepagents_capi.dll` — C API para modelos de IA
-- [ ] Analisar `metasecml.dll` — framework ML
-- [ ] Mapear como modelos `.model` e `.bytenn` são carregados em runtime
-- [ ] Identificar quais modelos são locais vs. cloud (API)
-- [ ] Analisar `SegmentJS/` — segmentação via JavaScript/WASM
+- [x] Analisar `deepagents_capi.dll` — C API para modelos de IA (Go/CGo runtime, 77 exports, Fornax trace)
+- [x] Analisar `metasecml.dll` — framework ML ByteDance
+- [x] Mapear como modelos `.model` e `.bytenn` são carregados em runtime (magic header `BM\x00\x04` para ByteNN e `SAMI` para áudio via OpenVINO/AmazingEngine)
+- [x] Identificar quais modelos são locais vs. cloud (API)
+- [x] Analisar `SegmentJS/` — segmentação via JavaScript/WASM
 
 ### 2.5 Processamento de Áudio
-- [ ] Mapear exports de `audioeffect.dll` (14MB)
-- [ ] Analisar `speechsdk.dll` (8.3MB) — reconhecimento de voz
-- [ ] Analisar `lyra_cli_client.dll` (10.8MB) — codec Lyra (Google)
-- [ ] Mapear pipeline: waveform → effects → export
-- [ ] Identificar algoritmos de denoise, normalização, separação de stems
+- [x] Mapear exports de `audioeffect.dll` (14MB) (2.102 exports do motor de áudio `mammon`)
+- [x] Analisar `speechsdk.dll` (8.3MB) — reconhecimento de voz (778 exports motor Panther `PthInfer` / `PthLMDecoderOptions`)
+- [x] Analisar `lyra_cli_client.dll` (10.8MB) — codec Lyra Google (53 exports `Client@lyra_cli`, `MaterialAdapter`, `ProjectAdapter`)
+- [x] Mapear pipeline: waveform → effects → export (`WaveformVisualizer@mammon` → `DynamicDelayAdjustX` / `AecMicSelection` → FFmpeg)
+- [x] Identificar algoritmos de denoise, normalização, separação de stems (`vocal_separations`, `nn_denoise.bytenn`, `aec44k_resnet`)
 
 ---
 

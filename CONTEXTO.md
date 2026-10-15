@@ -1,4 +1,4 @@
-﻿# 🧠 Contexto — Projeto LeccorCut vs CapCut (Engenharia Reversa)
+# 🧠 Contexto — Projeto LeccorCut vs CapCut (Engenharia Reversa)
 
 > Este documento serve como **memória de contexto** para sessões de IA.
 > Resumo do que foi feito, o que está em andamento e o que falta.
@@ -68,34 +68,61 @@ via engenharia reversa estática com as ferramentas **REA v6.4.0** + **Ghidra 12
 - **Identificação do formato interno de projeto** (campos JSON de segmento/clipe via strings do videoeditor.dll)
 - **Identificação do sistema Lua de migração de versão** de projetos
 
+- **Extração de tabelas completas de imports/exports PE**:
+  - `CapCut.exe`: 17 DLLs / 408 imports, 88 exports Chromium base.
+  - `cccreator.dll`: 62 DLLs / 1.701 imports, 7.401 exports AmazingEngine.
+  - `videoeditor.dll`: 28 DLLs / 854 imports, 8.192 exports Lyra/VESDK.
+  - `lens.dll`: 19 DLLs / 370 imports, 379 exports FRAMEWORK::LENS.
+  - `VECreator.dll`: 23 DLLs / 4.087 imports, 1.808 exports Davinci/EffectPlatform.
+- **Análise do DeepAgents C-API (`deepagents_capi.dll`)**:
+  - Go runtime + CGo trampolines, 77 exports C-API (`da_agent_*`, `da_session_*`, `da_tool_call_*`, Fornax trace).
+- **Análise do Sistema de Watermark**:
+  - Lua scripts (`infoSticker.lua`), atlas spritesheets 1024x1024 com 90 frames (`ani_info.json`, `heycanInfo.json`).
+- **Análise de Interoperabilidade e Plugins**:
+  - Plugin standard Open Effects (`smart_cut.ofx.bundle`) acelerado via OpenGL ES 2.0 / `libGLESv2.dll`.
+  - Adaptadores OpenTimelineIO nativos encontrados (`otio_aaf`, `otio_fcpx_xml`, `otio_fcp`).
+  - Especificação e verificação estrita de integridade via `web-manifest.json` com SHA-256 hashes.
+- **Análise do Pipeline VECreator**:
+  - `SceneCoreUtils::initVESDK`, `agent::AgentMaterialPipelineOrchestrator`, `EffectPlatformService` Mojo IPC, UI QML integrada (`LokiAuthorPopupWindow.qml`).
+- **Arquitetura de Bootstrap e Processos (Fase 2.1)**:
+  - Launcher `CapCut.exe` (4.97MB) despacha `9.6.0.4097\CapCut.exe` (90KB).
+  - Processos auxiliares: `VEDetector.exe` (GPU NVIDIA/AMD), `VEHelper.exe` (telemetria), `ttdaemon.exe` (CUDA/Lens worker), `bun.exe` (backend common_agent) e watchdog nativo `agent_runtime_addon.node`.
+- **Arquitetura da UI & JavaScript Bridge (Fase 2.2)**:
+  - Janela Qt6 hospeda CEF (`libcef.dll`) para o Video Studio / Agent Hub e Lynx para cards móveis.
+  - Bridge trifuncional: `window.cefQuery` (JSON router), `window.Capcut?.JSBridge` (`call`, `invoke`, `postMessage`) e `window.videoStudioNativeBridge`.
+  - Mapeadas 14 chamadas principais de host e ciclo de vida de transações da timeline.
+- **Motor de Edição e Formato Real de Draft (Fase 2.3)**:
+  - `draft_content.json` real inspecionado: base temporal em microsegundos ($\mu s$), tracks tipadas referenciando 55 tabelas globais de `materials` por `material_id`.
+  - Pipeline de renderização: `VESDKModule` → `SegmentPreRenderCacheManager` → `AmazingEngine` → OFX GPU Shaders → FFmpeg.
+- **Subsistema de Áudio e Fala (Fase 2.5)**:
+  - Motor `mammon` (`audioeffect.dll`): amostragem de waveforms (`WaveformVisualizer`), buffers circulares e cancelamento de eco.
+  - Reconhecimento de fala offline Panther (`speechsdk.dll`): inferência `PthInfer` com decodificador de linguagem para legendas automáticas.
+- **Formatos Binários de Redes Neurais (Fase 2.4)**:
+  - Modelos ByteNN com magic header `BM\x00\x04` (`.bytenn`) e modelos de áudio SAMI com magic header `SAMI` (`.model`).
+
 ### Arquivos Gerados
-- [PASSOS.md](PASSOS.md) — Roteiro com checkboxes em 5 fases
-- [DOCUMENTACAO.md](DOCUMENTACAO.md) — Documentação técnica completa
-- [CONTEXTO.md](CONTEXTO.md) — Este arquivo (memória de contexto)
+- [PASSOS.md](file:///d:/0000000-PROJETOS/LeccorCut/PASSOS.md) — Roteiro com checkboxes (Fases 1 e 2 100% concluídas)
+- [DOCUMENTACAO.md](file:///d:/0000000-PROJETOS/LeccorCut/DOCUMENTACAO.md) — Documentação técnica completa (Seções 1 a 17)
+- [CONTEXTO.md](file:///d:/0000000-PROJETOS/LeccorCut/CONTEXTO.md) — Memória de contexto atualizada
 
 ---
 
-## ❌ O que ainda falta (Engenharia Reversa)
+## ❌ O que ainda falta (Engenharia Reversa — Fases 3, 4 e 5)
 
-### Alta Prioridade
-- [ ] Extrair imports/exports do `VECreator.dll` (271MB) via Ghidra headless
-- [ ] Extrair imports/exports do `videoeditor.dll` (72MB) via Ghidra headless
-- [ ] Identificar e documentar o formato completo do arquivo de draft (projeto salvo)
-- [ ] Mapear a base URL da API principal (domínio de produção)
-- [ ] Analisar o bridge JavaScript C++ → JS no CEF (`window.capcut.*`)
-- [ ] Analisar `agent_runtime_addon.node` (521KB) — bridge Node.js/Nativo
+### Alta Prioridade (Fase 3 — Rede e APIs)
+- [ ] Mapear fluxo de autenticação e tokens (TikTok/CapCut OAuth, Bearer tokens)
+- [ ] Mapear base URLs e domínios de produção (`feed-api-sg.capcutapi.com`, `pc-mon-va.byteoversea.com`)
+- [ ] Interceptar chamadas reais via proxy MITM (Fiddler/mitmproxy) durante renderização e IA cloud
+- [ ] Mapear endpoints de upload de mídia e geração de efeitos generativos (SeedDance, MiniMax)
 
-### Média Prioridade
-- [ ] Capturar tráfego de rede real via proxy MITM durante uso do CapCut
-- [ ] Analisar `deepagents_capi.dll` (42MB) — API C de modelos de IA
-- [ ] Analisar `smart_cut.ofx.bundle` — plugin de corte inteligente
-- [ ] Mapear como modelos `.model` e `.bytenn` são carregados
-- [ ] Instrumentação com Frida para análise dinâmica
+### Média Prioridade (Fase 4 — Dinâmica e Frida)
+- [ ] Instrumentação via Frida para inspecionar chamadas nativas em `audioeffect.dll` e `cccreator.dll`
+- [ ] Inspecionar runtime do `bun.exe` e portas IPC locais ativas durante execução
 
-### Baixa Prioridade
-- [ ] Analisar sistema de crash reporting (Breakpad/Parfait)
-- [ ] Investigar `tt_c2pa_sdk.dll` em detalhe (padrão C2PA)
-- [ ] Documentar formato completo de animação de watermark (`.lua` + `ani_info.json`)
+### Baixa Prioridade (Fase 5 — Re-implementação no LeccorCut)
+- [ ] Implementar parser/conversor de `draft_content.json` do CapCut para a timeline do LeccorCut
+- [ ] Adicionar suporte a OpenTimelineIO no LeccorCut
+- [ ] Implementar visualizador de waveforms nativo inspirado no `WaveformVisualizer`
 
 ---
 
