@@ -829,6 +829,35 @@ Pilha de monitoramento de crash própria da ByteDance, o **Parfait** (análogo a
 - API interna (strings do `VECreator.dll`): `ParfaitWrapperClient::InitGlobalEnv`, `initNetwork`, `initCrashPostHandler`, `initGWPAsanMonitor` (amostragem de segurança de memória GWP-ASan), `crash_upload`, `openParfaitLog`, `setVEParfaitCallback`. Caminho de build: `C:\90741\CapCutPC\AppMonitor\VECrashMonitor\VEParfaitWrapper\`.
 - O minidump é gerado fora do processo (handler dedicado) e enviado via rede (`crash_upload`), no mesmo padrão dos demais serviços ByteDance.
 
+### 18.6 Captura de Tráfego (MITM) — Resultados Empíricos
+
+Captura com mitmproxy + CA de usuário temporário (runbook em `FASE4_MITM.md`), exercitando startup, abertura de projeto, exportação e ociosidade. **30 MB de flows / 1181 linhas de resumo.**
+
+**Confirmação-chave: o Cronet ignora o proxy do sistema por completo.** Não houve POST de login, nem chamada a `/lv/v1/*`, `/commerce/*` ou `/passport/*`, **nem sequer erro de handshake/pinning** — porque o Cronet (`sscronet.dll`) não tenta o proxy: conecta direto pelo adaptador de rede, invisível a um MITM baseado em proxy. Isso confirma empiricamente a arquitetura de rede da seção 9.4 (as APIs privadas trafegam fora do stack HTTP padrão do SO).
+
+**O que foi capturado** (respeita proxy — CEF/web, CDN e parte da telemetria):
+
+| Host | Hits | Categoria |
+|---|---|---|
+| `pc-mon-v2-boot.capcutapi.com` | 19 | Telemetria / configuração do coletor |
+| `p16-capcut-sg.ibyteimg.com` | 13 | CDN de imagens (assets da UI) |
+| `p16-capcut-sign-sg.ibyteimg.com` | 12 | CDN assinado (conteúdo do usuário) |
+| `www.pippit.ai` | 6 | Pippit (produto de IA do CapCut) |
+| `lf16-beecdn.ibytedtos.com` | 4 | CDN de GIFs (ByteDance) |
+| `p16-dreamina-sign-sg.ibyteimg.com` | 3 | CDN Dreamina (gerador de imagem, assinado) |
+| `www.capcut.com` | 2 | Web |
+| `dreamina.capcut.com` | 1 | Home Dreamina |
+| `commercepro.capcut.com` | 1 | Commerce (só redirect 301) |
+| `p16-dreamina-sign.tiktokcdn.com` | 1 | CDN TikTok (Dreamina) |
+
+**Telemetria — endpoint `monitor_pc/settings_v2`** (em `pc-mon-*`): chamado a cada **600 s** (`settings_interval: 600`), devolve a configuração do coletor de performance. Ativa monitoramento de **CPU, disco (info + I/O) e memória de processo**, com agregação a cada 5 s e upload a cada 30 s (`network_monitor_settings.enable_open` alternou 0/1 na sessão). Parâmetros enviados, relevantes para privacidade:
+
+- `aid=359289` (App ID do CapCut PC), `app_version=9.6.0.4097`, `channel=capcutpc_google`
+- `device_id=7688503925200619015` — **mesmo tipo de identificador embutido nos drafts** (seção 18.1)
+- Cookie `store-country-code=br; store-country-code-src=did` — geolocalização por país derivada do device-id
+
+**Limite do método e nota de escopo:** para ver as chamadas Cronet (login, licença, APIs privadas) seria preciso capturar no nível do adaptador (Wireshark — mostraria só os hosts via SNI/DNS, sem descriptografar) ou hookar o `libcronet` antes do TLS. O hook de transporte **não foi feito** — derrotar o TLS do cliente para ler tráfego autenticado está fora do escopo definido (mesma razão da seção 18 e 10.1: não serve a um editor offline). O inventário de hosts reais + telemetria já é o objetivo da Fase 4.0, e foi atingido.
+
 ---
 
-*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática, arquitetural e dinâmica/comportamental (Fases 1 a 4; itens de circunvenção de licença/anti-fraude deliberadamente fora de escopo) do CapCut v9.6.0.4097*
+*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática, arquitetural e dinâmica/comportamental, incluindo captura MITM (Fases 1 a 4; itens de circunvenção de licença/anti-fraude e de TLS deliberadamente fora de escopo) do CapCut v9.6.0.4097*

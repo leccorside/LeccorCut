@@ -120,6 +120,7 @@ via engenharia reversa estática com as ferramentas **REA v6.4.0** + **Ghidra 12
   - Crash: framework **Parfait** da ByteDance (`VECrashHandler.exe`, `parfait_*`, `minidump_stackwalk`, GWP-ASan, `crash_upload`).
   - **Privacidade:** todo draft embute `device_id`, `mac_address` (hash) e `hard_disk_id`.
   - **Escopo:** itens de circunvenção (hook de licença, derrotar anti-fraude) foram **deliberadamente deixados de fora** — não servem a um editor offline.
+  - **Captura MITM executada (seção 18.6):** confirmado empiricamente que **o Cronet ignora o proxy do SO** — login/`/lv/v1`/`/commerce`/`/passport` invisíveis, sem nem erro de pinning. Capturou-se só o que respeita proxy: telemetria `pc-mon-*` (endpoint `monitor_pc/settings_v2`, a cada 600s, coleta CPU/disco/memória, envia `device_id`/`aid`/país), CDNs ByteDance, Pippit, Dreamina e web. Ler o canal Cronet exigiria hook de TLS no `libcronet` — fora de escopo.
 
 ### Arquivos Gerados
 - [PASSOS.md](file:///d:/0000000-PROJETOS/LeccorCut/PASSOS.md) — Roteiro com checkboxes (Fases 1 e 2 concluídas; Fase 3 estática concluída; Fase 4 só com MITM pendente)

@@ -142,8 +142,8 @@
 > **Nota de escopo (2026-10-15):** itens de **circunvenção** foram removidos do roteiro. Hookear validação de licença/assinatura e derrotar o anti-debug/anti-fraude (`metasecml.dll`) para forjar requisições assinadas não serve ao LeccorCut (editor offline independente) — só contornaria o controle de acesso do CapCut. A existência desses mecanismos já está documentada (Fase 3, seções 9.4 e 10.1). A instrumentação dinâmica aqui fica restrita a comportamento observável.
 
 ### 4.0 Captura de Tráfego (herdado da Fase 3)
-- [ ] Capturar tráfego com mitmproxy/Fiddler (CA raiz no repositório do Windows; verificar se o Cronet aceita o CA de usuário)
-- [ ] Confirmar quais hosts da seção 9.3 são realmente chamados no startup, na exportação e na IA cloud
+- [x] Capturar tráfego com mitmproxy + CA de usuário (runbook `FASE4_MITM.md`); **confirmado empiricamente que o Cronet ignora o proxy do SO** — APIs privadas invisíveis, sem erro de pinning (seção 18.6)
+- [x] Confirmar quais hosts são realmente chamados: telemetria (`pc-mon-*`), CDNs (`ibyteimg`, `ibytedtos`), Pippit, Dreamina e web capturados; `/lv/v1`, `/commerce`, `/passport` trafegam por fora (Cronet)
 
 ### 4.1 Observação de Runtime (não intrusiva)
 - [x] Mapear parâmetros reais de exportação (via UI: 8K/2K, H.264, MP4, 30fps, Rec.709 SDR) e confirmar que o encode escreve direto no destino, sem intermediário em `User Data`
@@ -155,8 +155,8 @@
 - [x] Monitorar arquivos criados durante edição e exportação (`FileSystemWatcher`, 596 eventos; taxonomia de cache documentada na seção 18.2)
 - [x] Identificar estrutura do arquivo de draft (`draft_content.json`) — **modelo multi-timeline descoberto** (`Timelines/<id>/`, `project.json`, escrita atômica `.tmp`/`.bak`); seção 18.1
 - [x] Analisar a ferramenta de interop embarcada (`draft-converter.exe`: OTIO 0.18.1, AAF/FCPX/FCP7 → FCPXML); seção 18.4
-- [ ] Analisar comportamento de telemetria (`push_detect.exe`) — pendente, requer captura MITM (4.0)
-- [ ] Mapear dados enviados ao servidor durante uso normal — pendente, requer captura MITM (4.0)
+- [x] Analisar comportamento de telemetria — endpoint `monitor_pc/settings_v2` (a cada 600s; coleta CPU/disco/memória, agrega 5s, upload 30s; envia `device_id`, `aid`, `channel`, país) na seção 18.6
+- [x] Mapear dados enviados ao servidor durante uso normal — feito para o tráfego que respeita proxy (telemetria/CDN/web); o canal Cronet fica fora do alcance do MITM por proxy
 
 ### 4.3 Crash Analysis
 - [x] Analisar `minidump_stackwalk.exe` (ferramenta de minidump do Breakpad)
@@ -198,8 +198,8 @@
 |------|-----------|------------|
 | Fase 1 — Reconhecimento Estático | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 2 — Arquitetura e Componentes | ✅ Concluída (100%) | 🔴 Alta |
-| Fase 3 — Rede e APIs | 🟢 Parte estática concluída (19/20; MITM movido para a Fase 4) | 🟡 Média |
-| Fase 4 — Análise Dinâmica | 🟢 Comportamento e crash OK; falta só captura MITM (telemetria/rede) | 🟡 Média |
+| Fase 3 — Rede e APIs | ✅ Concluída (parte estática 19/20; MITM feito na Fase 4) | 🟡 Média |
+| Fase 4 — Análise Dinâmica | ✅ Concluída no escopo definido (comportamento, crash, MITM); circunvenção de TLS/licença fora de escopo | 🟡 Média |
 | Fase 5 — Aplicação ao LeccorCut | 🟡 Em andamento (40%) | 🟢 Contínuo |
 
 ---
