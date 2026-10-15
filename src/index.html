@@ -65,6 +65,7 @@
       <button id="tabSfx" class="panel-tab" title="Biblioteca de Efeitos Sonoros Nativos">🔊 Efeitos (SFX)</button>
       <button id="tabAssets" class="panel-tab" title="Biblioteca de Stickers, Molduras e Overlays Vetoriais">✨ Stickers</button>
       <button id="tabAi" class="panel-tab" title="Ferramentas de IA Local (Fase 7)">🤖 IA</button>
+      <button id="tabFx" class="panel-tab" title="Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs (Fase 11)">🎭 Efeitos & LUTs</button>
     </div>
     <div id="mediaView">
       <button id="btnImport" class="primary wide">+ Importar</button>
@@ -168,6 +169,134 @@
         <button id="btnSuperRes" class="wide primary">🔬 Aplicar Super-Resolução</button>
         <div id="srProgress" class="ai-progress-bar" hidden><div id="srProgressFill"></div></div>
         <div id="srStatus" class="ai-status" hidden></div>
+      </details>
+    </div>
+    <!-- ── Fase 11: Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs ── -->
+    <div id="fxView" hidden>
+      <!-- 11.1a: Modos de Mesclagem (Blend Modes) -->
+      <details class="fx-section" open>
+        <summary>🎨 Modos de Mesclagem (Blend Modes)</summary>
+        <p class="fx-desc">Composição avançada de camadas (Screen para luzes/fogo, Multiply para sombras, Overlay para texturas):</p>
+        <label class="fx-label">Modo:
+          <select id="blendModeSelect">
+            <option value="normal" selected>Normal</option>
+            <option value="screen">Tela / Screen (Fundo Preto)</option>
+            <option value="multiply">Multiplicar / Multiply (Texturas)</option>
+            <option value="overlay">Sobrepor / Overlay (Contraste)</option>
+            <option value="lighten">Clarear / Lighten</option>
+            <option value="darken">Escurecer / Darken</option>
+            <option value="addition">Adicionar / Add (Glow intenso)</option>
+            <option value="difference">Diferença / Difference</option>
+          </select>
+        </label>
+        <label class="fx-label">Opacidade:
+          <input type="range" id="blendOpacityRange" min="0" max="100" value="100" step="1">
+          <span id="blendOpacityVal">100%</span>
+        </label>
+      </details>
+
+      <!-- 11.1b: Máscaras de Forma Geométrica (Shape Masks) -->
+      <details class="fx-section" open>
+        <summary>✂️ Máscara de Camada (Shape Mask)</summary>
+        <p class="fx-desc">Recorte geométrico com suavização de bordas (feather) e inversão:</p>
+        <label class="fx-label">Tipo de Máscara:
+          <select id="maskTypeSelect">
+            <option value="none" selected>Nenhuma</option>
+            <option value="rectangle">Retângulo</option>
+            <option value="circle">Círculo / Elipse</option>
+            <option value="linear">Linear (Split Screen)</option>
+            <option value="mirror">Espelho (Mirror)</option>
+          </select>
+        </label>
+        <div id="maskControls" hidden>
+          <label class="fx-label">Tamanho / Cobertura:
+            <input type="range" id="maskSizeRange" min="10" max="100" value="80" step="1">
+            <span id="maskSizeVal">80%</span>
+          </label>
+          <label class="fx-label">Suavização (Feather):
+            <input type="range" id="maskFeatherRange" min="0" max="50" value="5" step="1">
+            <span id="maskFeatherVal">5px</span>
+          </label>
+          <label class="fx-label">Rotação:
+            <input type="range" id="maskRotationRange" min="-180" max="180" value="0" step="5">
+            <span id="maskRotationVal">0°</span>
+          </label>
+          <div class="fx-checkboxes">
+            <label><input type="checkbox" id="maskInvertCheck"> Inverter Máscara</label>
+          </div>
+        </div>
+      </details>
+
+      <!-- 11.2a: 3D LUTs e Color Grading Cinematográfico -->
+      <details class="fx-section">
+        <summary>🎬 3D LUTs & Color Grading</summary>
+        <p class="fx-desc">Tabelas de calibração 3D LUT padrão industrial (.cube / .3dl) e graduação tonal fina:</p>
+        <label class="fx-label">Preset 3D LUT:
+          <select id="lutPresetSelect">
+            <option value="none" selected>Nenhum (Cores Naturais)</option>
+            <option value="teal_orange">🎬 Teal & Orange (Blockbuster)</option>
+            <option value="vintage_kodak">📷 Vintage Kodak 1970</option>
+            <option value="cyberpunk_neon">🌆 Cyberpunk Neon</option>
+            <option value="noir_cinema">🎞️ Noir Cinema B&W</option>
+            <option value="warm_sunset">🌅 Warm Sunset Glow</option>
+          </select>
+        </label>
+        <button id="btnImportLut" class="btn-small wide" style="margin: 6px 0;">📁 Importar Arquivo .cube / .3dl...</button>
+        <div id="activeLutPathLabel" class="fx-sublabel" hidden></div>
+
+        <div class="fx-grading-group">
+          <label class="fx-label">Temperatura:
+            <input type="range" id="gradingTempRange" min="-100" max="100" value="0" step="2">
+            <span id="gradingTempVal">0</span>
+          </label>
+          <label class="fx-label">Matiz / Tint:
+            <input type="range" id="gradingTintRange" min="-100" max="100" value="0" step="2">
+            <span id="gradingTintVal">0</span>
+          </label>
+          <label class="fx-label">Destaques (Highlights):
+            <input type="range" id="gradingHighlightsRange" min="-100" max="100" value="0" step="2">
+            <span id="gradingHighlightsVal">0</span>
+          </label>
+          <label class="fx-label">Sombras (Shadows):
+            <input type="range" id="gradingShadowsRange" min="-100" max="100" value="0" step="2">
+            <span id="gradingShadowsVal">0</span>
+          </label>
+          <button id="btnResetGrading" class="btn-small" style="margin-top:6px">↺ Resetar Cores</button>
+        </div>
+      </details>
+
+      <!-- 11.2b: Shaders e Efeitos de Estilização -->
+      <details class="fx-section">
+        <summary>⚡ Shaders & Efeitos de Estilização</summary>
+        <p class="fx-desc">Efeitos visuais dinâmicos de câmera, ruído e dispersão cromática:</p>
+        <div class="fx-effect-item">
+          <label><input type="checkbox" id="fxGlitchCheck"> <strong>Glitch / RGB Split</strong></label>
+          <div class="fx-slider-row" id="fxGlitchRow" hidden>
+            <input type="range" id="fxGlitchIntensity" min="0.2" max="3.0" value="1.0" step="0.1">
+            <span id="fxGlitchVal">1.0x</span>
+          </div>
+        </div>
+        <div class="fx-effect-item">
+          <label><input type="checkbox" id="fxGrainCheck"> <strong>Ruído de Película (Film Grain)</strong></label>
+          <div class="fx-slider-row" id="fxGrainRow" hidden>
+            <input type="range" id="fxGrainIntensity" min="0.2" max="3.0" value="1.0" step="0.1">
+            <span id="fxGrainVal">1.0x</span>
+          </div>
+        </div>
+        <div class="fx-effect-item">
+          <label><input type="checkbox" id="fxShakeCheck"> <strong>Tremor de Câmera (Camera Shake)</strong></label>
+          <div class="fx-slider-row" id="fxShakeRow" hidden>
+            <input type="range" id="fxShakeIntensity" min="0.2" max="3.0" value="1.0" step="0.1">
+            <span id="fxShakeVal">1.0x</span>
+          </div>
+        </div>
+        <div class="fx-effect-item">
+          <label><input type="checkbox" id="fxBloomCheck"> <strong>Bloom / Brilho Suave</strong></label>
+          <div class="fx-slider-row" id="fxBloomRow" hidden>
+            <input type="range" id="fxBloomIntensity" min="0.2" max="3.0" value="1.0" step="0.1">
+            <span id="fxBloomVal">1.0x</span>
+          </div>
+        </div>
       </details>
     </div>
   </section>

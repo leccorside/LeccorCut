@@ -37,7 +37,7 @@ function clipAt(t) {
 }
 
 const CSS_PRESETS = { sepia: 'sepia(1)', vintage: 'sepia(.5) contrast(1.1)', warm: 'sepia(.3) saturate(1.2)', cool: 'hue-rotate(15deg) saturate(1.1)', cinematic: 'contrast(1.15) saturate(.9)', vivid: 'saturate(1.6) contrast(1.1)' };
-function cssFilter(f = {}) {
+function cssFilter(f = {}, grading = {}) {
   let b = 1 + (f.brightness || 0) / 100;
   let c = 1 + (f.contrast || 0) / 100;
   let s = 1 + (f.saturation || 0) / 100;
@@ -46,7 +46,24 @@ function cssFilter(f = {}) {
     c += 0.03;
     s += 0.05;
   }
-  return `brightness(${b.toFixed(3)}) contrast(${c.toFixed(3)}) saturate(${s.toFixed(3)}) blur(${f.blur || 0}px) grayscale(${f.grayscale ? 1 : 0}) ${CSS_PRESETS[f.preset] || ''}`;
+  let extraGrading = '';
+  if (grading) {
+    if (grading.temp) {
+      const t = grading.temp;
+      if (t > 0) extraGrading += ` sepia(${Math.min(0.6, t / 160).toFixed(2)})`;
+      else extraGrading += ` hue-rotate(${Math.max(-45, t * 0.4).toFixed(1)}deg)`;
+    }
+    if (grading.tint) {
+      extraGrading += ` hue-rotate(${(grading.tint * 0.4).toFixed(1)}deg)`;
+    }
+    if (grading.highlights) {
+      b += grading.highlights * 0.002;
+    }
+    if (grading.shadows) {
+      c += grading.shadows * 0.002;
+    }
+  }
+  return `brightness(${b.toFixed(3)}) contrast(${c.toFixed(3)}) saturate(${s.toFixed(3)}) blur(${f.blur || 0}px) grayscale(${f.grayscale ? 1 : 0}) ${CSS_PRESETS[f.preset] || ''}${extraGrading}`;
 }
 function cssTransform(f = {}) {
   return `scale(${(f.hflip ? -1 : 1) * (f.zoom || 1)}, ${(f.vflip ? -1 : 1) * (f.zoom || 1)}) rotate(${f.rotate || 0}deg)`;
@@ -550,6 +567,25 @@ function syncOverlay() {
     el.style.boxShadow = 'none';
     el.style.filter = 'none';
   }
+
+  // Fase 11: Modos de Mesclagem (mix-blend-mode) e Máscaras Geométricas (clip-path)
+  el.style.mixBlendMode = o.blendMode || 'normal';
+  if (o.mask && o.mask.type && o.mask.type !== 'none') {
+    const s = o.mask.size ?? 80;
+    if (o.mask.type === 'rectangle') {
+      const half = s / 2;
+      el.style.clipPath = `inset(${(50 - half).toFixed(1)}% ${(50 - half).toFixed(1)}% ${(50 - half).toFixed(1)}% ${(50 - half).toFixed(1)}% round ${o.mask.roundness || 0}px)`;
+    } else if (o.mask.type === 'circle') {
+      el.style.clipPath = `circle(${(s / 2).toFixed(1)}% at 50% 50%)`;
+    } else if (o.mask.type === 'linear') {
+      el.style.clipPath = `polygon(0 0, ${s}% 0, ${s}% 100%, 0 100%)`;
+    } else if (o.mask.type === 'mirror') {
+      const half = s / 2;
+      el.style.clipPath = `polygon(${50 - half}% 0, ${50 + half}% 0, ${50 + half}% 100%, ${50 - half}% 100%)`;
+    }
+  } else {
+    el.style.clipPath = 'none';
+  }
   if (!o.isImage) {
     const target = (o.in || 0) + state.time - o.start;
     if (!state.playing || Math.abs(v.currentTime - target) > 0.3) v.currentTime = target;
@@ -679,8 +715,26 @@ function renderPreview() {
   $('vignetteLayer').hidden = !view.filters?.vignette;
   player.style.visibility = 'visible';
   const src = fileUrl(view.path);
-  const f = cssFilter(view.filters);
+  const f = cssFilter(view.filters, view.colorGrading);
   const fillMode = view.filters?.fillMode || 'fit';
+
+  // Fase 11: Máscara Geométrica no player principal
+  if (view.mask && view.mask.type && view.mask.type !== 'none') {
+    const s = view.mask.size ?? 80;
+    if (view.mask.type === 'rectangle') {
+      const half = s / 2;
+      player.style.clipPath = img.style.clipPath = `inset(${(50 - half).toFixed(1)}% ${(50 - half).toFixed(1)}% ${(50 - half).toFixed(1)}% ${(50 - half).toFixed(1)}% round ${view.mask.roundness || 0}px)`;
+    } else if (view.mask.type === 'circle') {
+      player.style.clipPath = img.style.clipPath = `circle(${(s / 2).toFixed(1)}% at 50% 50%)`;
+    } else if (view.mask.type === 'linear') {
+      player.style.clipPath = img.style.clipPath = `polygon(0 0, ${s}% 0, ${s}% 100%, 0 100%)`;
+    } else if (view.mask.type === 'mirror') {
+      const half = s / 2;
+      player.style.clipPath = img.style.clipPath = `polygon(${50 - half}% 0, ${50 + half}% 0, ${50 + half}% 100%, ${50 - half}% 100%)`;
+    }
+  } else {
+    player.style.clipPath = img.style.clipPath = 'none';
+  }
 
   if (fillMode === 'blur' && state.tracks.video?.visible !== false) {
     if (view.isImage) {
@@ -906,7 +960,7 @@ function renderTimeline() {
   updateTime();
 }
 
-function select(s) { state.selected = s; renderTimeline(); renderProps(); }
+function select(s) { state.selected = s; renderTimeline(); renderProps(); if (typeof syncFxPanel === 'function') syncFxPanel(); }
 
 function slider(label, key, min, max, obj) {
   return `<div class="prop">${label}<input type="range" min="${min}" max="${max}" value="${obj[key] || 0}" data-k="${key}"></div>`;
@@ -1980,7 +2034,8 @@ function initPanelTabs() {
     { btn: $('tabMedia'), view: $('mediaView') },
     { btn: $('tabSfx'), view: $('sfxView') },
     { btn: $('tabAssets'), view: $('assetsView') },
-    { btn: $('tabAi'), view: $('aiView') }
+    { btn: $('tabAi'), view: $('aiView') },
+    { btn: $('tabFx'), view: $('fxView') }
   ].filter(t => t.btn && t.view);
 
   tabs.forEach(activeTab => {
@@ -2964,4 +3019,300 @@ function initProxyManagerUI() {
 
 initGpuDetection();
 initProxyManagerUI();
+
+// ─── Fase 11: Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs 3D ─────────
+function getActiveTarget() {
+  if (!state.selected) return null;
+  if (state.selected.kind === 'overlay') {
+    return state.overlays.find(o => o.id === state.selected.id);
+  }
+  return state.clips.find(c => c.id === state.selected.id);
+}
+
+function syncFxPanel() {
+  const target = getActiveTarget();
+  if (!target) return;
+
+  // 1. Blend Mode & Opacidade
+  if ($('blendModeSelect')) $('blendModeSelect').value = target.blendMode || 'normal';
+  if ($('blendOpacityRange')) {
+    const opVal = Math.round((target.opacity ?? 1) * 100);
+    $('blendOpacityRange').value = opVal;
+    if ($('blendOpacityVal')) $('blendOpacityVal').textContent = `${opVal}%`;
+  }
+
+  // 2. Máscara de Camada
+  const mask = target.mask || {};
+  if ($('maskTypeSelect')) {
+    $('maskTypeSelect').value = mask.type || 'none';
+    if ($('maskControls')) $('maskControls').hidden = !mask.type || mask.type === 'none';
+  }
+  if ($('maskSizeRange')) {
+    $('maskSizeRange').value = mask.size ?? 80;
+    if ($('maskSizeVal')) $('maskSizeVal').textContent = `${mask.size ?? 80}%`;
+  }
+  if ($('maskFeatherRange')) {
+    $('maskFeatherRange').value = mask.feather ?? 5;
+    if ($('maskFeatherVal')) $('maskFeatherVal').textContent = `${mask.feather ?? 5}px`;
+  }
+  if ($('maskRotationRange')) {
+    $('maskRotationRange').value = mask.rotation ?? 0;
+    if ($('maskRotationVal')) $('maskRotationVal').textContent = `${mask.rotation ?? 0}°`;
+  }
+  if ($('maskInvertCheck')) $('maskInvertCheck').checked = !!mask.invert;
+
+  // 3. Color Grading & 3D LUT
+  const grading = target.colorGrading || {};
+  if ($('gradingTempRange')) {
+    $('gradingTempRange').value = grading.temp ?? 0;
+    if ($('gradingTempVal')) $('gradingTempVal').textContent = grading.temp ?? 0;
+  }
+  if ($('gradingTintRange')) {
+    $('gradingTintRange').value = grading.tint ?? 0;
+    if ($('gradingTintVal')) $('gradingTintVal').textContent = grading.tint ?? 0;
+  }
+  if ($('gradingHighlightsRange')) {
+    $('gradingHighlightsRange').value = grading.highlights ?? 0;
+    if ($('gradingHighlightsVal')) $('gradingHighlightsVal').textContent = grading.highlights ?? 0;
+  }
+  if ($('gradingShadowsRange')) {
+    $('gradingShadowsRange').value = grading.shadows ?? 0;
+    if ($('gradingShadowsVal')) $('gradingShadowsVal').textContent = grading.shadows ?? 0;
+  }
+
+  const activeLutLabel = $('activeLutPathLabel');
+  if (activeLutLabel) {
+    if (target.lutPath) {
+      activeLutLabel.hidden = false;
+      activeLutLabel.textContent = `LUT ativa: ${target.lutPath.split(/[\\/]/).pop()}`;
+    } else {
+      activeLutLabel.hidden = true;
+    }
+  }
+
+  // 4. Efeitos de Estilização
+  const effs = target.effects || [];
+  const hasEff = (k) => effs.some(e => (typeof e === 'string' ? e : e.type) === k);
+  if ($('fxGlitchCheck')) {
+    $('fxGlitchCheck').checked = hasEff('glitch');
+    if ($('fxGlitchRow')) $('fxGlitchRow').hidden = !hasEff('glitch');
+  }
+  if ($('fxGrainCheck')) {
+    $('fxGrainCheck').checked = hasEff('film_grain');
+    if ($('fxGrainRow')) $('fxGrainRow').hidden = !hasEff('film_grain');
+  }
+  if ($('fxShakeCheck')) {
+    $('fxShakeCheck').checked = hasEff('camera_shake');
+    if ($('fxShakeRow')) $('fxShakeRow').hidden = !hasEff('camera_shake');
+  }
+  if ($('fxBloomCheck')) {
+    $('fxBloomCheck').checked = hasEff('bloom');
+    if ($('fxBloomRow')) $('fxBloomRow').hidden = !hasEff('bloom');
+  }
+}
+
+function initVisualEffects() {
+  // 1. Modos de Mesclagem
+  if ($('blendModeSelect')) {
+    $('blendModeSelect').onchange = (e) => {
+      const target = getActiveTarget();
+      if (!target) return toast('Selecione um clipe ou sobreposição primeiro');
+      target.blendMode = e.target.value;
+      renderPreview();
+    };
+  }
+
+  if ($('blendOpacityRange')) {
+    $('blendOpacityRange').oninput = (e) => {
+      const target = getActiveTarget();
+      if (!target) return;
+      const v = +e.target.value;
+      target.opacity = v / 100;
+      if ($('blendOpacityVal')) $('blendOpacityVal').textContent = `${v}%`;
+      renderPreview();
+    };
+  }
+
+  // 2. Máscaras Geométricas
+  if ($('maskTypeSelect')) {
+    $('maskTypeSelect').onchange = (e) => {
+      const target = getActiveTarget();
+      if (!target) return toast('Selecione um clipe ou sobreposição primeiro');
+      const val = e.target.value;
+      if (!target.mask) target.mask = {};
+      target.mask.type = val;
+      if ($('maskControls')) $('maskControls').hidden = val === 'none';
+      renderPreview();
+    };
+  }
+
+  if ($('maskSizeRange')) {
+    $('maskSizeRange').oninput = (e) => {
+      const target = getActiveTarget();
+      if (!target || !target.mask) return;
+      const v = +e.target.value;
+      target.mask.size = v;
+      if ($('maskSizeVal')) $('maskSizeVal').textContent = `${v}%`;
+      renderPreview();
+    };
+  }
+
+  if ($('maskFeatherRange')) {
+    $('maskFeatherRange').oninput = (e) => {
+      const target = getActiveTarget();
+      if (!target || !target.mask) return;
+      const v = +e.target.value;
+      target.mask.feather = v;
+      if ($('maskFeatherVal')) $('maskFeatherVal').textContent = `${v}px`;
+      renderPreview();
+    };
+  }
+
+  if ($('maskRotationRange')) {
+    $('maskRotationRange').oninput = (e) => {
+      const target = getActiveTarget();
+      if (!target || !target.mask) return;
+      const v = +e.target.value;
+      target.mask.rotation = v;
+      if ($('maskRotationVal')) $('maskRotationVal').textContent = `${v}°`;
+      renderPreview();
+    };
+  }
+
+  if ($('maskInvertCheck')) {
+    $('maskInvertCheck').onchange = (e) => {
+      const target = getActiveTarget();
+      if (!target || !target.mask) return;
+      target.mask.invert = e.target.checked;
+      renderPreview();
+    };
+  }
+
+  // 3. 3D LUTs e Color Grading
+  if ($('lutPresetSelect')) {
+    $('lutPresetSelect').onchange = async (e) => {
+      const target = getActiveTarget();
+      if (!target) return toast('Selecione um clipe ou sobreposição primeiro');
+      const val = e.target.value;
+      if (val === 'none') {
+        target.lutPath = null;
+        if ($('activeLutPathLabel')) $('activeLutPathLabel').hidden = true;
+      } else if (window.api?.ensureBuiltinLut) {
+        try {
+          const res = await window.api.ensureBuiltinLut(val);
+          if (res.ok && res.path) {
+            target.lutPath = res.path;
+            if ($('activeLutPathLabel')) {
+              $('activeLutPathLabel').hidden = false;
+              $('activeLutPathLabel').textContent = `LUT ativa: ${res.path.split(/[\\/]/).pop()}`;
+            }
+            toast(`Preset 3D LUT "${val}" aplicado!`);
+          }
+        } catch (err) {
+          toast('Falha ao aplicar LUT: ' + err.message);
+        }
+      }
+      renderPreview();
+    };
+  }
+
+  if ($('btnImportLut')) {
+    $('btnImportLut').onclick = async () => {
+      const target = getActiveTarget();
+      if (!target) return toast('Selecione um clipe ou sobreposição primeiro');
+      if (window.api?.importLut) {
+        const filePath = await window.api.importLut();
+        if (filePath) {
+          target.lutPath = filePath;
+          if ($('lutPresetSelect')) $('lutPresetSelect').value = 'none';
+          if ($('activeLutPathLabel')) {
+            $('activeLutPathLabel').hidden = false;
+            $('activeLutPathLabel').textContent = `LUT custom: ${filePath.split(/[\\/]/).pop()}`;
+          }
+          toast('Arquivo 3D LUT importado com sucesso!');
+          renderPreview();
+        }
+      }
+    };
+  }
+
+  // Sliders de Color Grading
+  const gradingInputs = [
+    { id: 'gradingTempRange', valId: 'gradingTempVal', key: 'temp', unit: '' },
+    { id: 'gradingTintRange', valId: 'gradingTintVal', key: 'tint', unit: '' },
+    { id: 'gradingHighlightsRange', valId: 'gradingHighlightsVal', key: 'highlights', unit: '' },
+    { id: 'gradingShadowsRange', valId: 'gradingShadowsVal', key: 'shadows', unit: '' }
+  ];
+
+  gradingInputs.forEach(({ id, valId, key, unit }) => {
+    const el = $(id);
+    if (!el) return;
+    el.oninput = (e) => {
+      const target = getActiveTarget();
+      if (!target) return;
+      if (!target.colorGrading) target.colorGrading = {};
+      const v = +e.target.value;
+      target.colorGrading[key] = v;
+      if ($(valId)) $(valId).textContent = `${v}${unit}`;
+      renderPreview();
+    };
+  });
+
+  if ($('btnResetGrading')) {
+    $('btnResetGrading').onclick = () => {
+      const target = getActiveTarget();
+      if (!target) return;
+      target.colorGrading = {};
+      target.lutPath = null;
+      if ($('lutPresetSelect')) $('lutPresetSelect').value = 'none';
+      if ($('activeLutPathLabel')) $('activeLutPathLabel').hidden = true;
+      gradingInputs.forEach(({ id, valId, unit }) => {
+        if ($(id)) $(id).value = 0;
+        if ($(valId)) $(valId).textContent = `0${unit}`;
+      });
+      renderPreview();
+      toast('Color grading resetado');
+    };
+  }
+
+  // 4. Shaders e Efeitos de Estilização
+  const fxToggles = [
+    { checkId: 'fxGlitchCheck', rowId: 'fxGlitchRow', sliderId: 'fxGlitchIntensity', valId: 'fxGlitchVal', key: 'glitch' },
+    { checkId: 'fxGrainCheck', rowId: 'fxGrainRow', sliderId: 'fxGrainIntensity', valId: 'fxGrainVal', key: 'film_grain' },
+    { checkId: 'fxShakeCheck', rowId: 'fxShakeRow', sliderId: 'fxShakeIntensity', valId: 'fxShakeVal', key: 'camera_shake' },
+    { checkId: 'fxBloomCheck', rowId: 'fxBloomRow', sliderId: 'fxBloomIntensity', valId: 'fxBloomVal', key: 'bloom' }
+  ];
+
+  fxToggles.forEach(({ checkId, rowId, sliderId, valId, key }) => {
+    const chk = $(checkId);
+    const row = $(rowId);
+    const sld = $(sliderId);
+    const val = $(valId);
+    if (!chk) return;
+
+    function updateEff() {
+      const target = getActiveTarget();
+      if (!target) return;
+      if (!target.effects) target.effects = [];
+      target.effects = target.effects.filter(e => (typeof e === 'string' ? e : e.type) !== key);
+      if (chk.checked) {
+        const intensity = sld ? +sld.value : 1.0;
+        target.effects.push({ type: key, intensity });
+      }
+      if (row) row.hidden = !chk.checked;
+      renderPreview();
+    }
+
+    chk.onchange = updateEff;
+    if (sld) {
+      sld.oninput = () => {
+        if (val) val.textContent = `${sld.value}x`;
+        updateEff();
+      };
+    }
+  });
+}
+
+initVisualEffects();
+
 

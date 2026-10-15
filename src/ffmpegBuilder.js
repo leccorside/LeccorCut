@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const pathMod = require('path');
+const { buildColorGradingFilter, buildLutFilter, buildFfmpegMaskFilter, BLEND_MODES } = require('./visualEffects');
 const FONTS = {
   'Arial': ['arial.ttf', 'arialbd.ttf'], 'Impact': ['impact.ttf', 'impact.ttf'], 'Segoe UI': ['segoeui.ttf', 'segoeuib.ttf'],
   'Comic Sans MS': ['comic.ttf', 'comicbd.ttf'], 'Times New Roman': ['times.ttf', 'timesbd.ttf'], 'Courier New': ['cour.ttf', 'courbd.ttf']
@@ -302,6 +303,36 @@ function buildFfmpeg(project, outPath) {
       const bGlow = (gw * 0.0008).toFixed(3);
       postFilters.push(`smartblur=lr=${lr}:ls=0.6:lt=${lt},unsharp=5:5:0.5:5:5:0.0,eq=brightness=${bGlow}:contrast=1.03:saturation=1.05`);
     }
+    // Fase 11: Color Grading Fino (Temperatura, Tint, Highlights, Shadows)
+    if (c.colorGrading) {
+      const cgf = buildColorGradingFilter(c.colorGrading);
+      if (cgf) postFilters.push(cgf);
+    }
+    // Fase 11: 3D LUTs (.cube / .3dl)
+    if (c.lutPath && fs.existsSync(c.lutPath)) {
+      const lutF = buildLutFilter(c.lutPath);
+      if (lutF) postFilters.push(lutF);
+    }
+    // Fase 11: Efeitos de Estilização (Glitch, Film Grain, Camera Shake, Bloom)
+    if (c.effects && Array.isArray(c.effects)) {
+      c.effects.forEach(eff => {
+        const effKey = typeof eff === 'string' ? eff : eff.type;
+        const effIntensity = (typeof eff === 'object' && eff.intensity) ? eff.intensity : 1;
+        if (effKey === 'film_grain') {
+          postFilters.push(`noise=alls=${Math.round(15 * effIntensity)}:allf=t+u`);
+        } else if (effKey === 'camera_shake') {
+          const amp = (0.015 * effIntensity).toFixed(4);
+          postFilters.push(`crop=w='in_w*(1-${amp})':h='in_h*(1-${amp})':x='in_w*${amp}*abs(sin(2*PI*3*t))':y='in_h*${amp}*abs(cos(2*PI*4*t))',scale=${W}:${H}`);
+        } else if (effKey === 'bloom') {
+          postFilters.push(`unsharp=7:7:-1.5:7:7:0.0,eq=brightness=0.06:contrast=1.1`);
+        }
+      });
+    }
+    // Fase 11: Máscara Geométrica de Camada no Clipe
+    if (c.mask && c.mask.type && c.mask.type !== 'none') {
+      const maskFilter = buildFfmpegMaskFilter(c.mask, W, H);
+      if (maskFilter) postFilters.push(maskFilter);
+    }
     if (!isVideoVisible) postFilters.push('drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill');
 
     const allFilters = [...preFilters, ...postFilters];
@@ -385,7 +416,13 @@ function buildFfmpeg(project, outPath) {
       const gColor = (o.glowColor || '#00e5c3').replace('#', '');
       borderFilter = `pad=w=iw+${gw * 2}:h=ih+${gw * 2}:x=${gw}:y=${gw}:color=0x${gColor},`;
     }
-    f.push(`[${idx}:v]${trim}scale=${Math.round(W * o.scale / 100 / 2) * 2}:-2,${flip}${rot}${ck}${borderFilter}format=yuva420p,colorchannelmixer=aa=${o.opacity ?? 1}${fadeFilter},setpts=PTS-STARTPTS+${o.start}/TB[ov${k}]`);
+    const targetW = Math.round(W * o.scale / 100 / 2) * 2;
+    let maskF = '';
+    if (o.mask && o.mask.type && o.mask.type !== 'none') {
+      const mf = buildFfmpegMaskFilter(o.mask, targetW, Math.round(H * o.scale / 100 / 2) * 2);
+      if (mf) maskF = `,${mf}`;
+    }
+    f.push(`[${idx}:v]${trim}scale=${targetW}:-2,${flip}${rot}${ck}${borderFilter}format=yuva420p,colorchannelmixer=aa=${o.opacity ?? 1}${fadeFilter}${maskF},setpts=PTS-STARTPTS+${o.start}/TB[ov${k}]`);
 
     let pr = o.motion ? `min(1\\,max(0\\,(t-${o.start})/${o.duration}))` : '0';
     if (o.motion && o.easing === 'smooth') {
@@ -402,7 +439,13 @@ function buildFfmpeg(project, outPath) {
       ey = `(${ey}+sin((t-${o.start})*PI)*0.03)`;
     }
 
-    f.push(`[${last}][ov${k}]overlay=x='(W-w)*${ex}':y='(H-h)*${ey}':enable='between(t,${o.start},${o.start + o.duration})':eof_action=pass[o${k}]`);
+    const bMode = o.blendMode && BLEND_MODES[o.blendMode]?.ffmpegMode;
+    if (bMode) {
+      f.push(`[ov${k}]pad=${W}:${H}:'(ow-iw)*${ex}':'(oh-ih)*${ey}':color=black@0[ov_pad_${k}]`);
+      f.push(`[${last}][ov_pad_${k}]blend=all_mode=${bMode}:enable='between(t,${o.start},${o.start + o.duration})'[o${k}]`);
+    } else {
+      f.push(`[${last}][ov${k}]overlay=x='(W-w)*${ex}':y='(H-h)*${ey}':enable='between(t,${o.start},${o.start + o.duration})':eof_action=pass[o${k}]`);
+    }
     last = `o${k}`;
   });
   const texts = isTextVisible ? (project.texts || []) : [];

@@ -259,14 +259,14 @@
 ## 🎭 Fase 11 — Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs
 
 ### 11.1 Modos de Mesclagem e Máscaras de Camada
-- [ ] Implementar Modos de Mesclagem (Blend Modes: `Tela / Screen`, `Multiplicar / Multiply`, `Sobrepor / Overlay`, `Clarear / Lighten`, `Escurecer / Darken`, `Adicionar / Add`)
-- [ ] Implementar Máscaras de Forma Geométrica (Shape Masks: Retangular, Circular, Linear/Split e Espelho com suavização de borda *feather*)
-- [ ] Adicionar suporte a inversão de máscara e opacidade graduada
+- [x] Implementar Modos de Mesclagem (Blend Modes: `Tela / Screen`, `Multiplicar / Multiply`, `Sobrepor / Overlay`, `Clarear / Lighten`, `Escurecer / Darken`, `Adicionar / Add`)
+- [x] Implementar Máscaras de Forma Geométrica (Shape Masks: Retangular, Circular, Linear/Split e Espelho com suavização de borda *feather*)
+- [x] Adicionar suporte a inversão de máscara e opacidade graduada
 
 ### 11.2 Efeitos de Estilização e Color Grading Profissional (LUTs)
-- [ ] Implementar biblioteca de efeitos de estilização (Glitch / RGB Split, Shake de Câmera, Ruído de Película/Film Grain, Lens Flare)
-- [ ] Implementar importação e aplicação de arquivos 3D LUT (`.cube` e `.3dl` via filtro FFmpeg `lut3d`)
-- [ ] Implementar controles refinados de Color Grading (Highlight, Shadow, Midtones, Temperatura, Matiz e Curvas RGB)
+- [x] Implementar biblioteca de efeitos de estilização (Glitch / RGB Split, Shake de Câmera, Ruído de Película/Film Grain, Lens Flare)
+- [x] Implementar importação e aplicação de arquivos 3D LUT (`.cube` e `.3dl` via filtro FFmpeg `lut3d`)
+- [x] Implementar controles refinados de Color Grading (Highlight, Shadow, Midtones, Temperatura, Matiz e Curvas RGB)
 
 ---
 

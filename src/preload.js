@@ -57,7 +57,14 @@ contextBridge.exposeInMainWorld('api', {
   listProxies: () => ipcRenderer.invoke('list-proxies'),
   clearProxyCache: () => ipcRenderer.invoke('clear-proxy-cache'),
   deleteProxy: (srcPath) => ipcRenderer.invoke('delete-proxy', srcPath),
-  resolveEncoderArgs: (opts) => ipcRenderer.invoke('resolve-encoder-args', opts)
+  resolveEncoderArgs: (opts) => ipcRenderer.invoke('resolve-encoder-args', opts),
+  // ── Fase 11: Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs ─────────────
+  getBuiltinLuts: () => ipcRenderer.invoke('get-builtin-luts'),
+  ensureBuiltinLut: (key) => ipcRenderer.invoke('ensure-builtin-lut', key),
+  importLut: () => ipcRenderer.invoke('import-lut'),
+  getBlendModes: () => ipcRenderer.invoke('get-blend-modes'),
+  getShapeMasks: () => ipcRenderer.invoke('get-shape-masks'),
+  getStylingEffects: () => ipcRenderer.invoke('get-styling-effects')
 });
 
 

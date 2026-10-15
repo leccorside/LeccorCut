@@ -213,4 +213,22 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .proxy-progress-bar-outer{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;border:1px solid var(--line)}
 .proxy-progress-bar-inner{height:100%;background:linear-gradient(90deg, var(--a1), var(--a2));border-radius:3px;transition:width .15s ease}
 
+/* ── Fase 11: Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs ── */
+.fx-section{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:8px}
+.fx-section summary{font-size:12px;font-weight:600;color:var(--txt);cursor:pointer;user-select:none;outline:none}
+.fx-desc{font-size:11px;color:var(--mut);margin:6px 0 8px;line-height:1.4}
+.fx-label{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--txt);margin-bottom:6px;gap:6px}
+.fx-label select, .fx-label input[type="range"]{background:var(--bg);border:1px solid var(--line);color:var(--txt);border-radius:4px;padding:2px 4px;font-size:11px}
+.fx-label select{flex:1;max-width:170px}
+.fx-label input[type="range"]{flex:1;margin:0 4px}
+.fx-checkboxes{display:flex;gap:10px;font-size:11px;color:var(--txt);margin:6px 0}
+.fx-grading-group{margin-top:8px;padding-top:6px;border-top:1px dashed var(--line)}
+.fx-sublabel{font-size:10px;color:var(--a1);word-break:break-all;margin-bottom:6px;font-family:monospace}
+.fx-effect-item{display:flex;flex-direction:column;gap:4px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:11px}
+.fx-effect-item:last-child{border-bottom:none}
+.fx-slider-row{display:flex;align-items:center;gap:6px;padding-left:18px}
+.fx-slider-row input[type="range"]{flex:1}
+.fx-slider-row span{font-size:10px;color:var(--mut);min-width:30px}
+
+
 

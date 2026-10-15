@@ -6,7 +6,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/export-smoke.js && node tests/cutout-smoke.js && node tests/sfx-smoke.js && node tests/capcut-converter-smoke.js && node tests/video-matting-smoke.js && node tests/stabilize-smoke.js && node tests/reframe-track-smoke.js && node tests/phase62-smoke.js && node tests/phase7-smoke.js && node tests/phase8-smoke.js && node tests/phase9-smoke.js && node tests/phase10-smoke.js",
+    "test": "node tests/export-smoke.js && node tests/cutout-smoke.js && node tests/sfx-smoke.js && node tests/capcut-converter-smoke.js && node tests/video-matting-smoke.js && node tests/stabilize-smoke.js && node tests/reframe-track-smoke.js && node tests/phase62-smoke.js && node tests/phase7-smoke.js && node tests/phase8-smoke.js && node tests/phase9-smoke.js && node tests/phase10-smoke.js && node tests/phase11-smoke.js",
     "icons": "node scripts/generate-icons.js",
     "dist": "node scripts/generate-icons.js && electron-builder --win --x64"
   },

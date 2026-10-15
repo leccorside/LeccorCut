@@ -13,6 +13,8 @@ const backupManager = require('./backupManager');
 // ── Fase 10: Aceleração GPU e Proxy ─────────────────────────────────────────
 const { detectGpuEncoders, resolveEncoderArgs } = require('./gpuDetector');
 const proxyManager = require('./proxyManager');
+// ── Fase 11: Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs ─────────────
+const { BUILTIN_LUTS, ensureBuiltinLut, BLEND_MODES, SHAPE_MASKS, STYLING_EFFECTS } = require('./visualEffects');
 
 let win;
 function createWindow() {
@@ -1370,4 +1372,67 @@ ipcMain.handle('resolve-encoder-args', async (_e, opts) => {
   const gpuInfo = await detectGpuEncoders(ffmpegPath);
   return resolveEncoderArgs(gpuInfo, userPref || 'auto', format || 'mp4', colorProfile || 'bt709');
 });
+
+// ── Fase 11: Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs ─────────────
+
+/**
+ * Retorna os metadados dos presets de 3D LUT embutidos.
+ */
+ipcMain.handle('get-builtin-luts', async () => {
+  return Object.entries(BUILTIN_LUTS).map(([key, item]) => ({
+    key,
+    name: item.name,
+    desc: item.desc
+  }));
+});
+
+/**
+ * Garante que a 3D LUT selecionada está gravada em disco no formato .cube.
+ */
+ipcMain.handle('ensure-builtin-lut', async (_e, presetKey) => {
+  const lutsDir = path.join(app.getPath('userData'), 'luts');
+  const filePath = ensureBuiltinLut(presetKey, lutsDir);
+  return { ok: true, path: filePath };
+});
+
+/**
+ * Diálogo para importação de arquivo 3D LUT (.cube ou .3dl) personalizado pelo usuário.
+ */
+ipcMain.handle('import-lut', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Importar 3D LUT (.cube / .3dl)',
+    filters: [
+      { name: '3D Lookup Table', extensions: ['cube', '3dl'] },
+      { name: 'Todos os Arquivos', extensions: ['*'] }
+    ],
+    properties: ['openFile']
+  });
+  if (r.canceled || !r.filePaths.length) return null;
+  return r.filePaths[0];
+});
+
+/**
+ * Retorna os modos de mesclagem disponíveis e seus metadados.
+ */
+ipcMain.handle('get-blend-modes', async () => {
+  return BLEND_MODES;
+});
+
+/**
+ * Retorna as opções de máscaras de forma geométrica.
+ */
+ipcMain.handle('get-shape-masks', async () => {
+  return SHAPE_MASKS;
+});
+
+/**
+ * Retorna os efeitos de estilização disponíveis.
+ */
+ipcMain.handle('get-styling-effects', async () => {
+  return Object.entries(STYLING_EFFECTS).map(([key, val]) => ({
+    key,
+    label: val.label
+  }));
+});
+
 
