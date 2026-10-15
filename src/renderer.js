@@ -44,6 +44,144 @@ function cssTransform(f = {}) {
   return `scale(${(f.hflip ? -1 : 1) * (f.zoom || 1)}, ${(f.vflip ? -1 : 1) * (f.zoom || 1)}) rotate(${f.rotate || 0}deg)`;
 }
 
+const SPEED_CURVES = {
+  hero: {
+    label: '⚡ Heroico',
+    badge: '⚡ Heroico',
+    desc: '2.2x rápido na introdução → 0.4x câmera lenta dramática no clímax → 2.2x no encerramento',
+    segments: [
+      { start: 0, end: 0.25, speed: 2.2 },
+      { start: 0.25, end: 0.75, speed: 0.4 },
+      { start: 0.75, end: 1.0, speed: 2.2 }
+    ]
+  },
+  bullet: {
+    label: '💥 Bala (Bullet)',
+    badge: '💥 Bala',
+    desc: '3.0x ultra rápido no início → 0.35x super câmera lenta → 1.0x velocidade normal',
+    segments: [
+      { start: 0, end: 0.2, speed: 3.0 },
+      { start: 0.2, end: 0.7, speed: 0.35 },
+      { start: 0.7, end: 1.0, speed: 1.0 }
+    ]
+  },
+  montage: {
+    label: '🎬 Montagem (Ritmo Alternado)',
+    badge: '🎬 Montagem',
+    desc: 'Ritmo pulsante: 2.5x rápido → 0.5x lento → 2.5x rápido → 0.5x lento',
+    segments: [
+      { start: 0, end: 0.25, speed: 2.5 },
+      { start: 0.25, end: 0.5, speed: 0.5 },
+      { start: 0.5, end: 0.75, speed: 2.5 },
+      { start: 0.75, end: 1.0, speed: 0.5 }
+    ]
+  },
+  flash_in: {
+    label: '⏩ Flash In',
+    badge: '⏩ Flash In',
+    desc: 'Impacto veloz inicial (3.0x) desacelerando suavemente para 1.0x normal',
+    segments: [
+      { start: 0, end: 0.3, speed: 3.0 },
+      { start: 0.3, end: 1.0, speed: 1.0 }
+    ]
+  },
+  flash_out: {
+    label: '🏎️ Flash Out',
+    badge: '🏎️ Flash Out',
+    desc: 'Inicia em velocidade normal (1.0x) e acelera para 3.0x no final para transição explosiva',
+    segments: [
+      { start: 0, end: 0.7, speed: 1.0 },
+      { start: 0.7, end: 1.0, speed: 3.0 }
+    ]
+  }
+};
+
+function getClipSample(clip, localTimelineTime) {
+  if (clip.isImage) return { targetTime: 0, speed: 1 };
+  if (!clip.speedCurve || clip.speedCurve === 'none' || !SPEED_CURVES[clip.speedCurve]) {
+    const sp = clip.speed || 1;
+    return {
+      targetTime: clip.in + localTimelineTime * sp,
+      speed: sp
+    };
+  }
+  const curve = SPEED_CURVES[clip.speedCurve];
+  const srcDur = clip.srcDurUsed || (clip.duration * (clip.speed || 1));
+  let curTl = 0;
+  for (let i = 0; i < curve.segments.length; i++) {
+    const seg = curve.segments[i];
+    const segIn = clip.in + seg.start * srcDur;
+    const segEnd = clip.in + seg.end * srcDur;
+    const segTlDur = (segEnd - segIn) / seg.speed;
+    if (localTimelineTime <= curTl + segTlDur || i === curve.segments.length - 1) {
+      const dt = Math.max(0, localTimelineTime - curTl);
+      return {
+        targetTime: Math.min(segEnd, segIn + dt * seg.speed),
+        speed: seg.speed
+      };
+    }
+    curTl += segTlDur;
+  }
+  return { targetTime: clip.in, speed: 1 };
+}
+
+function applySpeedCurve(clip, curveKey) {
+  const oldSrcDur = clip.srcDurUsed || (clip.duration * (clip.speed || 1));
+  clip.srcDurUsed = oldSrcDur;
+  if (!curveKey || curveKey === 'none' || !SPEED_CURVES[curveKey]) {
+    clip.speedCurve = 'none';
+    const sp = clip.speed || 1;
+    clip.duration = oldSrcDur / sp;
+  } else {
+    clip.speedCurve = curveKey;
+    const curve = SPEED_CURVES[curveKey];
+    let totalTl = 0;
+    for (const seg of curve.segments) {
+      const inStart = clip.in + seg.start * oldSrcDur;
+      const inEnd = clip.in + seg.end * oldSrcDur;
+      totalTl += (inEnd - inStart) / seg.speed;
+    }
+    clip.duration = Math.max(0.2, totalTl);
+  }
+}
+
+function speedToY(s) {
+  const minS = 0.2, maxS = 3.2;
+  const norm = Math.max(0, Math.min(1, (s - minS) / (maxS - minS)));
+  return Math.round(52 - norm * 42);
+}
+
+function renderSpeedCurveSvg(curveKey) {
+  const curve = SPEED_CURVES[curveKey];
+  if (!curve) return '';
+  const pts = [];
+  pts.push({ x: 10, y: speedToY(curve.segments[0].speed) });
+  let lastX = 10;
+  curve.segments.forEach((seg) => {
+    const xEnd = 10 + Math.round(seg.end * 190);
+    const yVal = speedToY(seg.speed);
+    pts.push({ x: xEnd, y: yVal });
+    lastX = xEnd;
+  });
+  const pathD = pts.reduce((acc, p, i) => i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`, '');
+  const areaD = `${pathD} L ${lastX} 56 L 10 56 Z`;
+  const yNormal = speedToY(1.0);
+  return `<svg viewBox="0 0 210 60" class="speed-curve-svg">
+    <defs>
+      <linearGradient id="scGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#00e5c3" stop-opacity="0.45"/>
+        <stop offset="100%" stop-color="#7c5cff" stop-opacity="0.05"/>
+      </linearGradient>
+    </defs>
+    <line x1="10" y1="${yNormal}" x2="200" y2="${yNormal}" stroke="#2a2e3f" stroke-dasharray="3,3" stroke-width="1"/>
+    <text x="186" y="${yNormal - 3}" fill="#8a90a8" font-size="8">1.0x</text>
+    <path d="${areaD}" fill="url(#scGrad)" />
+    <path d="${pathD}" fill="none" stroke="#00e5c3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    ${pts.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="#7c5cff" stroke="#fff" stroke-width="1"/>`).join('')}
+  </svg>`;
+}
+
+
 function syncOverlay() {
   const v = $('ovPlayer'), im = $('ovImg');
   if (state.tracks.overlay?.visible === false) { v.hidden = im.hidden = true; v.pause(); return; }
@@ -170,8 +308,9 @@ function renderPreview() {
       if (bgV) {
         bgV.hidden = false;
         if (bgV.dataset.src !== src) { bgV.src = src; bgV.dataset.src = src; }
-        bgV.playbackRate = view.speed || 1;
-        const target = view.in + hit.local * (view.speed || 1);
+        const sample = getClipSample(view, hit.local);
+        bgV.playbackRate = sample.speed;
+        const target = sample.targetTime;
         if (!state.playing || Math.abs(bgV.currentTime - target) > 0.3) bgV.currentTime = target;
         if (state.playing && bgV.paused) bgV.play().catch(() => {});
         else if (!state.playing) bgV.pause();
@@ -189,10 +328,11 @@ function renderPreview() {
   else {
     img.hidden = true;
     if (player.dataset.src !== src) { player.src = src; player.dataset.src = src; }
-    player.style.filter = f; player.style.transform = cssTransform(view.filters); player.playbackRate = view.speed || 1;
+    const sample = getClipSample(view, hit.local);
+    player.style.filter = f; player.style.transform = cssTransform(view.filters); player.playbackRate = sample.speed;
     const isMuted = !!state.tracks.video?.mute || !!state.tracks.audio?.solo;
     player.muted = isMuted; player.volume = isMuted ? 0 : Math.min(1, view.volume ?? 1);
-    const target = view.in + hit.local * (view.speed || 1);
+    const target = sample.targetTime;
     if (!state.playing || Math.abs(player.currentTime - target) > 0.3) player.currentTime = target;
     if (state.playing && player.paused) player.play().catch(() => {});
   }
@@ -342,7 +482,15 @@ function renderTimeline() {
   state.clips.forEach((c, i) => {
     const acc = starts[i];
     const e = document.createElement('div'); e.className = 'clip' + (state.selected?.id === c.id ? ' sel' : '');
-    e.style.left = acc * pxPerSec + 'px'; e.style.width = c.duration * pxPerSec + 'px'; e.textContent = (c.transition && c.transition !== 'none' ? '⇆ ' : '') + c.name;
+    e.style.left = acc * pxPerSec + 'px'; e.style.width = c.duration * pxPerSec + 'px';
+    const baseName = (c.transition && c.transition !== 'none' ? '⇆ ' : '') + c.name;
+    if (c.speedCurve && c.speedCurve !== 'none' && SPEED_CURVES[c.speedCurve]) {
+      e.innerHTML = `<span class="clip-title">${baseName}</span><span class="clip-speed-badge">${SPEED_CURVES[c.speedCurve].badge}</span>`;
+    } else if (c.speed && c.speed !== 1) {
+      e.innerHTML = `<span class="clip-title">${baseName}</span><span class="clip-speed-badge">${c.speed}x</span>`;
+    } else {
+      e.textContent = baseName;
+    }
     if (c.thumb) { e.style.backgroundImage = `linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.4)),url(${c.thumb})`; e.style.backgroundSize = 'auto 100%'; e.style.backgroundRepeat = 'repeat-x'; }
     decorate(e, 'clip', c);
     tv.appendChild(e);
@@ -485,6 +633,32 @@ function renderProps() {
   const c = state.clips.find(x => x.id === s.id); if (!c) return;
   c.filters = c.filters || {};
   const fillMode = c.filters.fillMode || 'fit';
+  const isCurve = !c.isImage && c.speedCurve && c.speedCurve !== 'none' && SPEED_CURVES[c.speedCurve];
+  const speedHtml = c.isImage ? '' : `
+    <div class="prop-group">
+      <div class="prop" style="font-weight:700;color:var(--txt)">⚡ Velocidade do Clipe</div>
+      <div class="speed-toggle-row">
+        <button type="button" class="btn-speed-tab ${!isCurve ? 'active' : ''}" id="tabSpeedLinear">Linear</button>
+        <button type="button" class="btn-speed-tab ${isCurve ? 'active' : ''}" id="tabSpeedCurve">Curva (Ramping)</button>
+      </div>
+      ${!isCurve ? `
+        <div class="prop">Velocidade constante
+          <select id="pSpeed">
+            ${[0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4].map(v => `<option ${c.speed === v || (!c.speed && v === 1) ? 'selected' : ''} value="${v}">${v}x</option>`).join('')}
+          </select>
+        </div>
+      ` : `
+        <div class="prop">Preset de Curva
+          <select id="pCurvePreset">
+            ${Object.keys(SPEED_CURVES).map(k => `<option ${c.speedCurve === k ? 'selected' : ''} value="${k}">${SPEED_CURVES[k].label}</option>`).join('')}
+          </select>
+        </div>
+        <div class="speed-curve-card">
+          ${renderSpeedCurveSvg(c.speedCurve || 'hero')}
+          <div class="speed-curve-desc">${SPEED_CURVES[c.speedCurve || 'hero']?.desc || ''}</div>
+        </div>
+      `}
+    </div>`;
   p.innerHTML = `<div class="prop">Enquadramento<select id="pFill">
       <option value="fit" ${fillMode === 'fit' ? 'selected' : ''}>Ajustar (Barras pretas)</option>
       <option value="blur" ${fillMode === 'blur' ? 'selected' : ''}>Desfoque de Fundo (Canvas Blur)</option>
@@ -500,9 +674,9 @@ function renderProps() {
        <div class="prop"><label><input type="checkbox" id="pVin" ${c.filters.vignette ? 'checked' : ''}> Vinheta (bordas escuras)</label></div>
        <div class="prop"><label><input type="checkbox" id="pFade" ${c.filters.fade ? 'checked' : ''}> Fade in/out</label></div>
        <div class="prop">Filtro de cor<select id="pPreset">${['none', 'sepia', 'vintage', 'warm', 'cool', 'cinematic', 'vivid'].map(v => `<option ${(c.filters.preset || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-       <div class="prop">Transição para o próximo clipe<select id="pTrans">${['none', 'fade', 'dissolve', 'wipeleft', 'slideleft', 'circleopen', 'pixelize'].map(v => `<option ${(c.transition || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-       <div class="prop">Velocidade<select id="pSpeed">${[0.5, 1, 1.5, 2].map(v => `<option ${c.speed === v || (!c.speed && v === 1) ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-       <div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>
+       <div class="prop">Transição para o próximo clipe<select id="pTrans">${['none', 'fade', 'dissolve', 'wipeleft', 'slideleft', 'circleopen', 'pixelize'].map(v => `<option ${(c.transition || 'none') === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>`
+       + speedHtml
+       + `<div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>
        <div class="prop"><label><input type="checkbox" id="pDenoise" ${c.filters.denoise ? 'checked' : ''}> Redução de ruído (chiado)</label></div>
        <div class="prop"><label><input type="checkbox" id="pLoudnorm" ${c.filters.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>`
        + (c.hasAudio && !c.isImage ? `<button id="btnDetach" class="wide">Separar Áudio do Vídeo</button>` : '');
@@ -521,9 +695,23 @@ function renderProps() {
   $('pTrans').onchange = (e) => { c.transition = e.target.value; renderTimeline(); renderPreview(); };
   $('pFade').onchange = (e) => { c.filters.fade = e.target.checked; };
   $('pVol').oninput = (e) => { c.volume = +e.target.value; renderPreview(); };
-  $('pSpeed').onchange = (e) => {
+  if ($('tabSpeedLinear')) $('tabSpeedLinear').onclick = () => {
+    applySpeedCurve(c, 'none');
+    renderTimeline(); renderProps(); renderPreview();
+  };
+  if ($('tabSpeedCurve')) $('tabSpeedCurve').onclick = () => {
+    applySpeedCurve(c, c.speedCurve && c.speedCurve !== 'none' ? c.speedCurve : 'hero');
+    renderTimeline(); renderProps(); renderPreview();
+  };
+  if ($('pSpeed')) $('pSpeed').onchange = (e) => {
     const sp = +e.target.value, old = c.speed || 1;
-    c.duration = c.duration * old / sp; c.speed = sp; renderTimeline(); renderPreview();
+    c.duration = c.duration * old / sp;
+    c.speed = sp;
+    renderTimeline(); renderProps(); renderPreview();
+  };
+  if ($('pCurvePreset')) $('pCurvePreset').onchange = (e) => {
+    applySpeedCurve(c, e.target.value);
+    renderTimeline(); renderProps(); renderPreview();
   };
 }
 
@@ -560,12 +748,12 @@ async function freezeFrame() {
   const c = hit.c;
   if (c.isImage) return toast('O clipe atual já é uma imagem estática');
   toast('Extraindo quadro congelado...');
-  const sp = c.speed || 1;
-  const timeInSource = c.in + hit.local * sp;
+  const sample = getClipSample(c, hit.local);
+  const timeInSource = sample.targetTime;
   try {
     const framePath = await window.api.freezeFrame(c.path, timeInSource);
     const idx = state.clips.indexOf(c);
-    const b = { ...c, id: uid++, filters: { ...(c.filters || {}) }, in: c.in + hit.local * sp, duration: c.duration - hit.local };
+    const b = { ...c, id: uid++, filters: { ...(c.filters || {}) }, in: sample.targetTime, duration: c.duration - hit.local };
     const freezeClip = {
       id: uid++,
       path: framePath,
@@ -629,8 +817,9 @@ function jumpCut(dir) {
 
 function split() {
   const hit = clipAt(state.time); if (!hit || hit.local < 0.1 || hit.c.duration - hit.local < 0.1) return toast('Posicione o cursor dentro de um clipe');
-  const c = hit.c, sp = c.speed || 1, idx = state.clips.indexOf(c);
-  const b = { ...c, id: uid++, filters: { ...(c.filters || {}) }, in: c.in + hit.local * sp, duration: c.duration - hit.local };
+  const c = hit.c, idx = state.clips.indexOf(c);
+  const sample = getClipSample(c, hit.local);
+  const b = { ...c, id: uid++, filters: { ...(c.filters || {}) }, in: sample.targetTime, duration: c.duration - hit.local };
   c.duration = hit.local; c.transition = 'none'; state.clips.splice(idx + 1, 0, b); renderTimeline();
 }
 function del() {

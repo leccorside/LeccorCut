@@ -58,7 +58,28 @@ try {
   console.log(`OK: exportação com controles de trilha gerada (${size2} bytes) em ${outTracks}`);
 } catch (e) {
   console.error('FALHA na exportação com controles de trilha');
-  console.error('filter_complex:\n' + argsTracks[argsTracks.indexOf('-filter_complex') + 1].split(';').join(';\n'));
   process.exit(1);
 }
 
+// Teste com Curva de Velocidade (Speed Ramping Heroico)
+const outSpeedCurve = path.join(dir, 'out-speedcurve.mp4');
+const projectWithSpeedCurve = {
+  ...project,
+  clips: [
+    mk(1, a, { speedCurve: 'hero', duration: 2.5, in: 0.2, filters: { fillMode: 'blur', denoise: true } }),
+    mk(2, b, { speedCurve: 'flash_out', duration: 2.0, in: 0.5, filters: { fillMode: 'fit' } })
+  ],
+  texts: [],
+  overlays: [],
+  audios: []
+};
+const { args: argsSpeed } = buildFfmpeg(projectWithSpeedCurve, outSpeedCurve);
+try {
+  execFileSync(ffmpeg, ['-v', 'error', ...argsSpeed], { stdio: 'inherit' });
+  const size3 = fs.statSync(outSpeedCurve).size;
+  console.log(`OK: exportação com Speed Ramping gerada (${size3} bytes) em ${outSpeedCurve}`);
+} catch (e) {
+  console.error('FALHA na exportação com Speed Ramping');
+  console.error('filter_complex:\n' + argsSpeed[argsSpeed.indexOf('-filter_complex') + 1].split(';').join(';\n'));
+  process.exit(1);
+}

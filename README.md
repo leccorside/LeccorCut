@@ -28,10 +28,17 @@
   - *Ajustar*: proporção original com margens pretas.
   - *Desfoque de Fundo*: o próprio vídeo é espelhado no fundo em tela cheia com desfoque gaussiano suave e contraste balanceado, mantendo o conteúdo original nítido no centro.
   - *Preencher*: corte inteligente com preenchimento total do quadro (*object-fit: cover*).
+- **Curvas de Velocidade (Speed Ramping)**: controle de aceleração e desaceleração dinâmica com presets profissionais inspirados nas melhores edições:
+  - *⚡ Heroico*: aceleração inicial (2.2x) → câmera lenta cinematográfica no clímax da cena (0.4x) → aceleração de fechamento (2.2x).
+  - *💥 Bala (Bullet)*: velocidade veloz de aproximação (3.0x) → desaceleração ultra dramática em super slow motion (0.35x) → retorno para velocidade padrão (1.0x).
+  - *🎬 Montagem*: ritmo alternado e dinâmico (2.5x → 0.5x → 2.5x → 0.5x) ideal para sincronizar com batidas de música.
+  - *⏩ Flash In*: entrada acelerada com impacto (3.0x) suavizando para velocidade normal (1.0x).
+  - *🏎️ Flash Out*: reprodução em tempo real que acelera repentinamente no final (3.0x) para transições energéticas.
+  - *Preview Visual com Gráfico Vetorial (SVG)*: visualização em tempo real da curva de velocidade no painel de propriedades, badge no clipe da timeline e processamento fiel tanto no preview instantâneo quanto na renderização via `setpts` e encadeamento suave `atempo` no FFmpeg.
 - **Transições Suaves entre Clipes**: `fade`, `dissolve`, `wipeleft`, `slideleft`, `circleopen`, `pixelize` processados via `xfade`/`acrossfade`.
 - **Filtros e Presets de Cor**: `sepia`, `vintage`, `warm`, `cool`, `cinematic`, `vivid`.
 - **Efeito Vinheta Cinematográfica**: escurecimento elegante das bordas do vídeo com preview instantâneo e processamento nativo FFmpeg.
-- **Ajustes Finos de Imagem e Áudio**: brilho, contraste, saturação, desfoque gaussiano, preto e branco (P&B), velocidade de reprodução (0.5x até 2x), redução de ruído de chiado e normalização de volume.
+- **Ajustes Finos de Imagem e Áudio**: brilho, contraste, saturação, desfoque gaussiano, preto e branco (P&B), velocidade linear contínua (0.25x até 4x), redução de ruído de chiado e normalização de volume.
 - **Transformações**: espelhamento horizontal, vertical, rotações (90°, 180°, 270°) e zoom digital.
 
 ### 📐 Formatos e Exportação

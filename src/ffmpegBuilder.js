@@ -21,6 +21,63 @@ const PRESETS = {
   vivid: 'eq=saturation=1.6:contrast=1.1'
 };
 
+const SPEED_CURVES = {
+  hero: [
+    { start: 0, end: 0.25, speed: 2.2 },
+    { start: 0.25, end: 0.75, speed: 0.4 },
+    { start: 0.75, end: 1.0, speed: 2.2 }
+  ],
+  bullet: [
+    { start: 0, end: 0.2, speed: 3.0 },
+    { start: 0.2, end: 0.7, speed: 0.35 },
+    { start: 0.7, end: 1.0, speed: 1.0 }
+  ],
+  montage: [
+    { start: 0, end: 0.25, speed: 2.5 },
+    { start: 0.25, end: 0.5, speed: 0.5 },
+    { start: 0.5, end: 0.75, speed: 2.5 },
+    { start: 0.75, end: 1.0, speed: 0.5 }
+  ],
+  flash_in: [
+    { start: 0, end: 0.3, speed: 3.0 },
+    { start: 0.3, end: 1.0, speed: 1.0 }
+  ],
+  flash_out: [
+    { start: 0, end: 0.7, speed: 1.0 },
+    { start: 0.7, end: 1.0, speed: 3.0 }
+  ]
+};
+
+function buildAtempo(speed) {
+  let s = speed;
+  const parts = [];
+  while (s > 2.0) {
+    parts.push('atempo=2.0');
+    s /= 2.0;
+  }
+  while (s < 0.5) {
+    parts.push('atempo=0.5');
+    s /= 0.5;
+  }
+  parts.push(`atempo=${Number(s.toFixed(4))}`);
+  return parts.join(',');
+}
+
+function getCurveSegments(c) {
+  const curve = SPEED_CURVES[c.speedCurve];
+  if (!curve) return null;
+  const srcDur = c.srcDurUsed || (c.duration * (c.speed || 1));
+  let tlAcc = 0;
+  return curve.map(seg => {
+    const inStart = c.in + seg.start * srcDur;
+    const inEnd = c.in + seg.end * srcDur;
+    const tlDur = (inEnd - inStart) / seg.speed;
+    const sObj = { ...seg, inStart, inEnd, tlDur, tlStart: tlAcc, tlEnd: tlAcc + tlDur };
+    tlAcc += tlDur;
+    return sObj;
+  });
+}
+
 // Trilha principal: clips em sequência. Textos: sobreposição por tempo.
 function buildFfmpeg(project, outPath) {
   const S = project.settings || {};
@@ -46,13 +103,38 @@ function buildFfmpeg(project, outPath) {
     const fl = c.filters || {};
     const speed = c.speed || 1;
     const fillMode = fl.fillMode || 'fit';
-    const trim = (c.isImage ? '' : `trim=start=${c.in}:end=${c.in + c.duration * speed},setpts=(PTS-STARTPTS)/${speed},`)
-      + (c.isImage ? 'setpts=PTS-STARTPTS,' : '');
+    const curveSegs = !c.isImage && c.speedCurve && SPEED_CURVES[c.speedCurve] ? getCurveSegments(c) : null;
 
     let inLabel = `[${i}:v]`;
+    let audioLabel = `[${i}:a]`;
+    let trim = '';
+
+    if (curveSegs) {
+      const hasAudioTrack = c.hasAudio && !c.isImage && !isVideoMuted;
+      curveSegs.forEach((seg, k) => {
+        f.push(`[${i}:v]trim=start=${seg.inStart.toFixed(4)}:end=${seg.inEnd.toFixed(4)},setpts=(PTS-STARTPTS)/${seg.speed}[v_${i}_${k}]`);
+        if (hasAudioTrack) {
+          f.push(`[${i}:a]atrim=start=${seg.inStart.toFixed(4)}:end=${seg.inEnd.toFixed(4)},asetpts=PTS-STARTPTS,${buildAtempo(seg.speed)}[a_${i}_${k}]`);
+        }
+      });
+      if (hasAudioTrack) {
+        const segInputs = curveSegs.map((_, k) => `[v_${i}_${k}][a_${i}_${k}]`).join('');
+        f.push(`${segInputs}concat=n=${curveSegs.length}:v=1:a=1[v_raw_${i}][a_raw_${i}]`);
+        audioLabel = `[a_raw_${i}]`;
+      } else {
+        const segInputs = curveSegs.map((_, k) => `[v_${i}_${k}]`).join('');
+        f.push(`${segInputs}concat=n=${curveSegs.length}:v=1:a=0[v_raw_${i}]`);
+      }
+      inLabel = `[v_raw_${i}]`;
+      trim = '';
+    } else {
+      trim = (c.isImage ? '' : `trim=start=${c.in}:end=${c.in + c.duration * speed},setpts=(PTS-STARTPTS)/${speed},`)
+        + (c.isImage ? 'setpts=PTS-STARTPTS,' : '');
+    }
+
     const preFilters = [];
     if (fillMode === 'blur') {
-      f.push(`[${i}:v]${trim}split=2[raw_bg_${i}][raw_fg_${i}]`);
+      f.push(`${inLabel}${trim}split=2[raw_bg_${i}][raw_fg_${i}]`);
       f.push(`[raw_bg_${i}]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=30,eq=brightness=-0.15,setsar=1,fps=${FPS}[bg_${i}]`);
       f.push(`[raw_fg_${i}]scale=${W}:${H}:force_original_aspect_ratio=decrease,setsar=1,fps=${FPS}[fg_${i}]`);
       f.push(`[bg_${i}][fg_${i}]overlay=(W-w)/2:(H-h)/2[c_base_${i}]`);
@@ -81,12 +163,20 @@ function buildFfmpeg(project, outPath) {
     const allFilters = [...preFilters, ...postFilters];
     f.push(`${inLabel}${allFilters.join(',')}[v${i}]`);
     if (c.hasAudio && !c.isImage && !isVideoMuted) {
-      const tempo = speed !== 1 ? `,atempo=${speed}` : '';
-      let af = `atrim=start=${c.in}:end=${c.in + c.duration * speed},asetpts=PTS-STARTPTS${tempo},volume=${c.volume ?? 1}`;
-      if (fl.denoise) af += ',afftdn=nf=-25';
-      if (fl.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
-      af += ',aresample=44100,aformat=channel_layouts=stereo';
-      f.push(`[${i}:a]${af}[a${i}]`);
+      if (curveSegs) {
+        let af = `volume=${c.volume ?? 1}`;
+        if (fl.denoise) af += ',afftdn=nf=-25';
+        if (fl.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
+        af += ',aresample=44100,aformat=channel_layouts=stereo';
+        f.push(`${audioLabel}${af}[a${i}]`);
+      } else {
+        const tempo = speed !== 1 ? `,${buildAtempo(speed)}` : '';
+        let af = `atrim=start=${c.in}:end=${c.in + c.duration * speed},asetpts=PTS-STARTPTS${tempo},volume=${c.volume ?? 1}`;
+        if (fl.denoise) af += ',afftdn=nf=-25';
+        if (fl.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
+        af += ',aresample=44100,aformat=channel_layouts=stereo';
+        f.push(`[${i}:a]${af}[a${i}]`);
+      }
     } else {
       f.push(`anullsrc=r=44100:cl=stereo,atrim=duration=${c.duration}[a${i}]`);
     }
@@ -191,4 +281,4 @@ function buildFfmpeg(project, outPath) {
   return { args };
 }
 
-module.exports = { buildFfmpeg };
+module.exports = { buildFfmpeg, SPEED_CURVES, buildAtempo, getCurveSegments };
