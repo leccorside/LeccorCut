@@ -97,3 +97,26 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .prop-card-title{font-size:11px;font-weight:700;color:var(--txt);margin-bottom:6px;display:flex;align-items:center;gap:4px}
 
 
+
+/* -- Fase 7: Painel de IA Local ----------------------------------------------- */
+.ai-section{margin-bottom:8px;background:rgba(255,255,255,0.025);border:1px solid var(--line);border-radius:10px;overflow:hidden;transition:.15s}
+.ai-section:hover{border-color:rgba(124,92,255,0.4)}
+.ai-section summary{padding:10px 12px;font-size:12px;font-weight:700;cursor:pointer;list-style:none;display:flex;align-items:center;gap:6px;color:var(--txt);user-select:none}
+.ai-section summary::-webkit-details-marker{display:none}
+.ai-section summary::before{content:'>';font-size:9px;color:var(--mut);transition:.15s;display:inline-block}
+.ai-section[open] summary::before{transform:rotate(90deg);color:var(--a1)}
+.ai-section[open]{border-color:rgba(0,229,195,0.3)}
+.ai-section > *:not(summary){padding:0 12px 12px}
+.ai-desc{font-size:11px;color:var(--mut);line-height:1.45;margin-bottom:8px}
+.ai-label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--mut);margin-bottom:8px}
+.ai-label input[type=range]{padding:0}
+.ai-row{display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.ai-row label{flex:1;font-size:11px;color:var(--mut);display:flex;flex-direction:column;gap:3px;min-width:80px}
+.ai-checkboxes{display:flex;flex-direction:column;gap:5px;margin-bottom:10px;font-size:12px;color:var(--mut)}
+.ai-checkboxes label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.ai-status{font-size:11px;color:var(--a1);padding:6px 0;line-height:1.4;margin-top:4px}
+.ai-progress-bar{width:100%;height:6px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;margin:6px 0}
+.ai-progress-bar > div{height:100%;background:linear-gradient(90deg,var(--a1),var(--a2));border-radius:3px;transition:width .3s ease;width:0%}
+.beat-btn{background:rgba(255,159,67,0.18);border:1px solid rgba(255,159,67,0.5);color:#ffb347;font-weight:600}
+.beat-btn:hover{background:rgba(255,159,67,0.32);border-color:#ff9f43;color:#fff}
+.beat-marker{position:absolute;top:0;height:22px;width:3px;background:#ff9f43;box-shadow:0 0 5px #ff9f43;border-radius:2px;z-index:6;transform:translateX(-50%);pointer-events:none}

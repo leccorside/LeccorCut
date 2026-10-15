@@ -896,3 +896,100 @@ Captura com mitmproxy + CA de usuário temporário (runbook em `FASE4_MITM.md`),
 *Gerado em: 2026-10-15 | Fonte: engenharia reversa estática, arquitetural e dinâmica/comportamental, incluindo captura MITM (Fases 1 a 4) e implementação completa das Fases 5 e 6 no LeccorCut*
 
 
+
+---
+
+## Secao 20 — Fase 7: IA Avancada Local (100% Offline)
+
+Esta secao documenta os cinco modulos de IA local implementados na Fase 7 do LeccorCut.
+Todos os modelos operam 100% offline apos o primeiro download e sao executados diretamente
+no processo principal Electron sem nenhum servidor externo.
+
+### 20.1 Separacao de Stems de Audio (7.1a)
+
+**Handler IPC:** stem-separate
+
+Isola a voz humana e a trilha instrumental de qualquer arquivo de audio ou video usando
+tecnicas de processamento espectral via FFmpeg. A abordagem utiliza decomposicao M/S
+(Mid/Side, equivalente a soma e diferenca de fases entre canais L e R):
+
+- **Voz (center extraction):** pan=stereo|c0=0.5*c0-0.5*c1|c1=0.5*c1-0.5*c0 => preserva
+  o sinal central (onde vozes aparecem em mixagens estereo), aplica bandpass 80Hz-4kHz,
+  equalizadores de realce vocal (200Hz, 1kHz, 3kHz) e compressor de dinamica.
+- **Instrumental (side signal):** inverte a logica pegando o sinal lateral (bateria, graves,
+  instrumentos pan), reduzindo as frequencias vocais via EQ.
+
+Ambos os stems resultantes sao inseridos automaticamente na trilha de audio da timeline no cursor
+atual. Suporta modos: ocal, instrumental, oth.
+
+### 20.2 Deteccao de Batidas Musicais — Beat Detection (7.1b)
+
+**Handler IPC:** eat-detect
+
+Detecta transientes ritmicos (kicks, snares, batidas) em audio/video usando o filtro
+silencedetect do FFmpeg em combinacao com filtragem de baixas frequencias:
+
+1. Mistura para mono e aplica highpass 60Hz + lowpass 300Hz para isolar o espectro de kick.
+2. Comprime dinamicamente (ratio 8:1) para uniformizar transientes.
+3. silencedetect detecta o fim dos silencios entre batidas (= inicio do transiente).
+4. Impoe gap minimo entre deteccoes baseado no maxBpm configurado.
+5. Estima o BPM medio a partir dos intervalos entre as 32 primeiras batidas.
+
+Os tempos detectados sao convertidos em marcadores na timeline com emoji 🥁 e cor laranja.
+O botao BeatMarks na toolbar e o painel de IA acionam o mesmo handler.
+
+**Configuracoes:** sensibilidade (0.1-1.0), BPM maximo (60-300).
+
+### 20.3 Text-to-Speech (TTS) Offline (7.1c)
+
+**Handler IPC:** 	ts-speak
+
+Gera narracao sintetica a partir de texto usando dois niveis:
+
+1. **Primario:** Xenova/speecht5_tts via Transformers.js — modelo SpeechT5 compacto
+   (<200MB, download unico). Retorna Float32Array com amostras de audio que sao convertidas
+   para WAV PCM 16-bit manualmente (header RIFF/fmt/data construido no processo principal).
+   Suporte a ajuste de velocidade via tempo.
+
+2. **Fallback:** se o modelo nao estiver disponivel, gera uma voz sintetica via FFmpeg usando
+   sine=f=180 + ibrato + 	remolo + langer, proporcional ao numero de palavras do texto.
+
+O audio resultante e inserido na trilha de audio no cursor atual da timeline.
+Slider de velocidade: 0.5x a 2.0x.
+
+### 20.4 Traducao Automatica de Legendas (7.2a)
+
+**Handler IPC:** 	ranslate-subtitles
+
+Traduz em batch todas as legendas da timeline usando modelos Helsinki-NLP/opus-mt-*
+via Transformers.js. Estes modelos compactos (tipicamente <50MB cada) suportam pares de idiomas
+como pt->en, en->pt, es->en, fr->en, de->en, entre outros.
+
+- Cache de tradutores por par de idiomas (evita reload entre traducoes consecutivas).
+- Atualizacao inline dos textos na timeline sem criar novas legendas.
+- Fallback gracioso: se o modelo nao estiver disponivel, exibe mensagem com instrucao de download.
+- Acessivel por dois pontos da UI: painel de IA (com selects de idioma) e botao Traduzir legendas (IA) no painel de Texto/Whisper.
+
+### 20.5 Super-Resolucao de Video por IA — Upscale (7.2b)
+
+**Handler IPC:** super-resolve
+
+Implementa upscaling offline com pipeline equivalente ao Real-ESRGAN adaptativo usando filtros
+nativos do FFmpeg. Pipeline de 4 estagios:
+
+| Estagio | Filtro FFmpeg | Proposito |
+|---------|---------------|-----------|
+| 1 | hqdn3d=3:3:6:6 | Denoising que preserva bordas (equivale ao denoiser do Real-ESRGAN) |
+| 2 | scale=WxH:flags=lanczos+accurate_rnd+full_chroma_inp | Upscaling de alta qualidade |
+| 3 | unsharp=5:5:1.5:5:5:0.0 | Sharpening adaptativo (simula modulo RRDB) |
+| 4 | eq=contrast=1.05:saturation=1.08:brightness=0.01 | Correcao de cor pos-upscale |
+
+- Fatores suportados: 2x (720p->1440p, 1080p->4K) e 4x (480p->1080p ultra).
+- Opcoes: denoising e sharpening configuráveis via checkbox.
+- O clipe original na timeline e substituído pelo clipe upscalado.
+- Barra de progresso em tempo real com percentual de processamento.
+- Codec de saida: H.264 libx264 -preset slow -crf 16 para maxima qualidade pos-upscale.
+
+---
+
+*Secao gerada em: 2026-10-15 | Fase 7 — 42 testes automatizados passando (100%)*

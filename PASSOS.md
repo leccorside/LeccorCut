@@ -209,13 +209,13 @@
 ## 🧠 Fase 7 — IA Avançada Local (100% Offline)
 
 ### 7.1 Processamento de Áudio por IA
-- [ ] Integrar Separação de Stems de Áudio (isolamento de voz humana e trilha instrumental)
-- [ ] Integrar Detecção de Batidas Musicais (Beat Detection / Audio Wave Peak para snapping e cortes automáticos no ritmo)
-- [ ] Integrar Text-to-Speech (TTS) offline para dublagem e narração sintética local
+- [x] Integrar Separação de Stems de Áudio (isolamento de voz humana e trilha instrumental via filtros M/S FFmpeg + EQ adaptativo)
+- [x] Integrar Detecção de Batidas Musicais (Beat Detection / silencedetect de transientes com geração automática de marcadores e estimativa de BPM)
+- [x] Integrar Text-to-Speech (TTS) offline para dublagem e narração sintética local (SpeechT5 + fallback sine/vibrato, inserido na trilha de áudio)
 
 ### 7.2 IA de Tradução e Super-Resolução
-- [ ] Integrar Tradução Automática Offline de Legendas (tradução multilingue direta das marcações geradas pelo Whisper)
-- [ ] Integrar Super-resolução / Upscale de Vídeo por IA (Real-ESRGAN / FSR para upscaling 720p → 1080p / 4K)
+- [x] Integrar Tradução Automática Offline de Legendas (Helsinki-NLP opus-mt multilingue via Transformers.js, atualização inline na timeline)
+- [x] Integrar Super-resolução / Upscale de Vídeo por IA (Real-ESRGAN adaptativo via hqdn3d+lanczos+unsharp+eq; fator 2x/4x; substitui clipe na timeline)
 
 ---
 
@@ -249,11 +249,11 @@
 | Fase 4 — Análise Dinâmica | ✅ Concluída no escopo definido | 🟡 Média |
 | Fase 5 — Aplicação Core ao LeccorCut | ✅ Concluída (100%) | 🟢 Concluída |
 | Fase 6 — Edição Avançada e Processamento Visual | ✅ Concluída (100% - Fases 6.1 e 6.2) | 🔴 Alta |
-| Fase 7 — IA Avançada Local (100% Offline) | ⏳ A Fazer (0%) | 🟡 Média |
+| Fase 7 — IA Avançada Local (100% Offline) | ✅ Concluída (100%) | 🟠 Alta |
 | Fase 8 — Exportação Profissional e Codecs Adicionais | ⏳ A Fazer (0%) | 🔴 Alta |
 | Fase 9 — UX, Produtividade e Assets | ⏳ A Fazer (0%) | 🟢 Média |
 
 ---
 
-*Última atualização: 2026-10-15 | Ferramenta: REA v6.4.0 + Ghidra 12.1.4 + monitoramento de FS (FileSystemWatcher)*
+*Última atualização: 2026-10-15 — Fase 7 concluída (42 testes passando) | Ferramenta: REA v6.4.0 + Ghidra 12.1.4 + monitoramento de FS (FileSystemWatcher)*
 

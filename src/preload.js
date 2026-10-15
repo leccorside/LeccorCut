@@ -24,7 +24,18 @@ contextBridge.exposeInMainWorld('api', {
   autoReframe: (opts) => ipcRenderer.invoke('auto-reframe', opts),
   onReframeProgress: (cb) => ipcRenderer.on('reframe-progress', (_e, data) => cb(data)),
   motionTrack: (opts) => ipcRenderer.invoke('motion-track', opts),
-  onMotionTrackProgress: (cb) => ipcRenderer.on('motion-track-progress', (_e, data) => cb(data))
+  onMotionTrackProgress: (cb) => ipcRenderer.on('motion-track-progress', (_e, data) => cb(data)),
+  // ── Fase 7: IA Avançada Local ──────────────────────────────────────────────
+  stemSeparate: (opts) => ipcRenderer.invoke('stem-separate', opts),
+  onStemProgress: (cb) => ipcRenderer.on('stem-progress', (_e, data) => cb(data)),
+  beatDetect: (opts) => ipcRenderer.invoke('beat-detect', opts),
+  onBeatProgress: (cb) => ipcRenderer.on('beat-progress', (_e, data) => cb(data)),
+  ttsSpeak: (opts) => ipcRenderer.invoke('tts-speak', opts),
+  onTtsProgress: (cb) => ipcRenderer.on('tts-progress', (_e, m) => cb(m)),
+  translateSubtitles: (opts) => ipcRenderer.invoke('translate-subtitles', opts),
+  onTranslateProgress: (cb) => ipcRenderer.on('translate-progress', (_e, m) => cb(m)),
+  superResolve: (opts) => ipcRenderer.invoke('super-resolve', opts),
+  onSuperResProgress: (cb) => ipcRenderer.on('superres-progress', (_e, data) => cb(data))
 });
 
 

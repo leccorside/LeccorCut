@@ -34,6 +34,7 @@
     <div class="panel-tabs">
       <button id="tabMedia" class="panel-tab active" title="Arquivos de Mídia do Projeto">📁 Mídia</button>
       <button id="tabSfx" class="panel-tab" title="Biblioteca de Efeitos Sonoros Nativos">🔊 Efeitos (SFX)</button>
+      <button id="tabAi" class="panel-tab" title="Ferramentas de IA Local (Fase 7)">🤖 IA</button>
     </div>
     <div id="mediaView">
       <button id="btnImport" class="primary wide">+ Importar</button>
@@ -42,6 +43,88 @@
     <div id="sfxView" hidden>
       <div class="sfx-header-desc">Efeitos sonoros nativos sintetizados em tempo real, prontos para cortes e transições:</div>
       <div id="sfxList"></div>
+    </div>
+    <!-- ── Fase 7: Painel de IA Local ─────────────────────────────── -->
+    <div id="aiView" hidden>
+      <!-- 7.1a: Separação de Stems -->
+      <details class="ai-section" open>
+        <summary>🎙️ Separação de Stems</summary>
+        <p class="ai-desc">Isola voz humana e trilha instrumental de qualquer clipe de áudio/vídeo.</p>
+        <select id="stemMode">
+          <option value="both" selected>🎙️ + 🎵 Voz e Instrumental</option>
+          <option value="vocal">🎙️ Só Voz</option>
+          <option value="instrumental">🎵 Só Instrumental</option>
+        </select>
+        <button id="btnStemSep" class="wide primary">🎚️ Separar Stems (Clipe Selecionado)</button>
+        <div id="stemStatus" class="ai-status" hidden></div>
+      </details>
+      <!-- 7.1b: Beat Detection -->
+      <details class="ai-section">
+        <summary>🥁 Detecção de Batidas</summary>
+        <p class="ai-desc">Detecta batidas musicais e gera marcadores automáticos na timeline para cortes no ritmo.</p>
+        <label class="ai-label">Sensibilidade:
+          <input type="range" id="beatSensitivity" min="0.1" max="1.0" step="0.05" value="0.6">
+          <span id="beatSensVal">0.6</span>
+        </label>
+        <label class="ai-label">BPM Máximo:
+          <input type="number" id="beatMaxBpm" value="200" min="60" max="300" style="width:70px">
+        </label>
+        <button id="btnBeatDetect" class="wide primary">🥁 Detectar Batidas</button>
+        <div id="beatStatus" class="ai-status" hidden></div>
+      </details>
+      <!-- 7.1c: TTS -->
+      <details class="ai-section">
+        <summary>🗣️ Text-to-Speech (TTS)</summary>
+        <p class="ai-desc">Gera narração sintética offline a partir de texto. O áudio é inserido na trilha de áudio.</p>
+        <textarea id="ttsText" rows="3" placeholder="Digite o texto para narrar..." style="width:100%;resize:vertical"></textarea>
+        <label class="ai-label">Velocidade:
+          <input type="range" id="ttsSpeed" min="0.5" max="2.0" step="0.1" value="1.0">
+          <span id="ttsSpeedVal">1.0x</span>
+        </label>
+        <button id="btnTtsSpeak" class="wide primary">🗣️ Gerar Narração</button>
+        <div id="ttsStatus" class="ai-status" hidden></div>
+      </details>
+      <!-- 7.2a: Tradução de Legendas -->
+      <details class="ai-section">
+        <summary>🌐 Tradução de Legendas</summary>
+        <p class="ai-desc">Traduz automaticamente todas as legendas da timeline para outro idioma (offline).</p>
+        <div class="ai-row">
+          <label>De: <select id="translateSrc">
+            <option value="pt">Português</option>
+            <option value="en">Inglês</option>
+            <option value="es">Espanhol</option>
+            <option value="fr">Francês</option>
+            <option value="de">Alemão</option>
+          </select></label>
+          <label>Para: <select id="translateTgt">
+            <option value="en" selected>Inglês</option>
+            <option value="pt">Português</option>
+            <option value="es">Espanhol</option>
+            <option value="fr">Francês</option>
+            <option value="de">Alemão</option>
+          </select></label>
+        </div>
+        <button id="btnTranslate" class="wide primary">🌐 Traduzir Legendas</button>
+        <div id="translateStatus" class="ai-status" hidden></div>
+      </details>
+      <!-- 7.2b: Super-Resolução -->
+      <details class="ai-section">
+        <summary>🔬 Super-Resolução (Upscale)</summary>
+        <p class="ai-desc">Aplica upscaling por IA no clipe selecionado com filtragem Real-ESRGAN adaptativa (offline).</p>
+        <label class="ai-label">Fator de escala:
+          <select id="srScale">
+            <option value="2" selected>2x (720p → 1440p, 1080p → 4K)</option>
+            <option value="4">4x (480p → 1080p ultra)</option>
+          </select>
+        </label>
+        <div class="ai-checkboxes">
+          <label><input type="checkbox" id="srDenoise" checked> Redução de ruído</label>
+          <label><input type="checkbox" id="srSharpen" checked> Nitidez adaptativa</label>
+        </div>
+        <button id="btnSuperRes" class="wide primary">🔬 Aplicar Super-Resolução</button>
+        <div id="srProgress" class="ai-progress-bar" hidden><div id="srProgressFill"></div></div>
+        <div id="srStatus" class="ai-status" hidden></div>
+      </details>
     </div>
   </section>
   <section id="previewPanel" class="panel">
@@ -70,6 +153,7 @@
     <button id="btnSrt" class="wide">Importar legendas (.srt)</button>
     <select id="asrLang"><option value="portuguese">Português</option><option value="english">English</option><option value="spanish">Español</option></select>
     <button id="btnAuto" class="wide primary">Legendas automáticas (Whisper)</button>
+    <button id="btnTranslateSubs" class="wide" title="Traduzir legendas da timeline para outro idioma (Fase 7)">🌐 Traduzir legendas (IA)</button>
   </section>
 </main>
 <section id="timelineWrap">
@@ -81,6 +165,7 @@
     <button id="btnFlash" class="accent-btn" title="Inserir Flash Branco de Batida / Impacto no cursor (B)">⚡ Flash Batida</button>
     <button id="btnSplit">✂ Dividir (S)</button>
     <button id="btnDetectScenes" class="scene-btn" title="Detecção Automática de Cenas (equivalente ao Shot Detect do CapCut)">🎬 Detectar Cenas</button>
+    <button id="btnBeatMarks" class="beat-btn" title="Detectar Batidas Musicais e Gerar Marcadores na Timeline (Fase 7)">🥁 BeatMarks</button>
     <button id="btnFreeze" title="Congelar Quadro no cursor (F)">❄ Congelar (F)</button>
     <button id="btnDelete">🗑 Excluir (Del)</button>
     <label>Zoom <input id="zoom" type="range" min="20" max="200" value="60"></label>

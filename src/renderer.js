@@ -2004,5 +2004,411 @@ async function addFlashEffect() {
 }
 
 if ($('btnFlash')) $('btnFlash').onclick = addFlashEffect;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FASE 7 — IA Avançada Local: Lógica de UI e Integração
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Tab IA: controle de visibilidade ────────────────────────────────────────
+function initAiTab() {
+  const tabAi = $('tabAi'), viewAi = $('aiView');
+  const tabMedia = $('tabMedia'), viewMedia = $('mediaView');
+  const tabSfx = $('tabSfx'), viewSfx = $('sfxView');
+  if (!tabAi || !viewAi) return;
+
+  // Registra o tabAi no sistema de tabs existente
+  const origTabMediaClick = tabMedia?.onclick;
+  const origTabSfxClick = tabSfx?.onclick;
+
+  tabAi.onclick = () => {
+    tabAi.classList.add('active');
+    if (tabMedia) { tabMedia.classList.remove('active'); if (viewMedia) viewMedia.hidden = true; }
+    if (tabSfx) { tabSfx.classList.remove('active'); if (viewSfx) viewSfx.hidden = true; }
+    viewAi.hidden = false;
+  };
+
+  // Sobrescreve os clicks das outras abas para também ocultar o aiView
+  if (tabMedia) {
+    tabMedia.onclick = () => {
+      tabMedia.classList.add('active');
+      if (tabSfx) tabSfx.classList.remove('active');
+      tabAi.classList.remove('active');
+      if (viewMedia) viewMedia.hidden = false;
+      if (viewSfx) viewSfx.hidden = true;
+      viewAi.hidden = true;
+    };
+  }
+  if (tabSfx) {
+    tabSfx.onclick = () => {
+      tabSfx.classList.add('active');
+      if (tabMedia) tabMedia.classList.remove('active');
+      tabAi.classList.remove('active');
+      if (viewSfx) viewSfx.hidden = false;
+      if (viewMedia) viewMedia.hidden = true;
+      viewAi.hidden = true;
+    };
+  }
+
+  // Sliders com valor ao vivo
+  const beatSens = $('beatSensitivity'), beatSensVal = $('beatSensVal');
+  if (beatSens && beatSensVal) {
+    beatSens.oninput = () => { beatSensVal.textContent = parseFloat(beatSens.value).toFixed(2); };
+  }
+  const ttsSpeed = $('ttsSpeed'), ttsSpeedVal = $('ttsSpeedVal');
+  if (ttsSpeed && ttsSpeedVal) {
+    ttsSpeed.oninput = () => { ttsSpeedVal.textContent = parseFloat(ttsSpeed.value).toFixed(1) + 'x'; };
+  }
+}
+
+// ─── 7.1a: Separação de Stems ────────────────────────────────────────────────
+function initStemSeparation() {
+  const btn = $('btnStemSep'), status = $('stemStatus');
+  if (!btn || !window.api?.stemSeparate) return;
+
+  window.api.onStemProgress((data) => {
+    if (status) {
+      status.hidden = false;
+      status.textContent = typeof data === 'string' ? data : (data.text || '');
+    }
+  });
+
+  btn.onclick = async () => {
+    // Tenta usar o clipe selecionado ou o primeiro da timeline/áudio
+    let targetPath = null;
+    if (state.selected) {
+      const { kind, id } = state.selected;
+      const item = (kind === 'clip' ? state.clips : kind === 'audio' ? state.audios : []).find(x => x.id === id);
+      if (item?.path) targetPath = item.path;
+    }
+    if (!targetPath && state.clips.length) targetPath = state.clips[0].path;
+    if (!targetPath && state.audios.length) targetPath = state.audios[0].path;
+    if (!targetPath) return toast('Selecione um clipe ou áudio na timeline primeiro');
+
+    btn.disabled = true;
+    if (status) { status.hidden = false; status.textContent = 'Iniciando separação de stems...'; }
+    toast('🎚️ Separando stems de áudio...');
+
+    try {
+      const mode = $('stemMode')?.value || 'both';
+      const res = await window.api.stemSeparate({ inputPath: targetPath, mode });
+      if (!res.ok) {
+        toast('Erro: ' + (res.error || 'Falha na separação'));
+        if (status) status.textContent = '❌ ' + (res.error || 'Falha');
+        return;
+      }
+
+      let added = 0;
+      if (res.vocalPath) {
+        const vInfo = res.vocalInfo || {};
+        const a = {
+          id: uid++,
+          path: res.vocalPath,
+          name: '🎙️ Voz: ' + (vInfo.name || 'vocal.wav'),
+          start: state.time,
+          in: 0,
+          duration: vInfo.duration || 5,
+          max: vInfo.duration || 5,
+          volume: 1,
+          fadeIn: 0,
+          fadeOut: 0,
+          wave: vInfo.wave
+        };
+        state.audios.push(a);
+        added++;
+      }
+      if (res.instrPath) {
+        const iInfo = res.instrInfo || {};
+        const a = {
+          id: uid++,
+          path: res.instrPath,
+          name: '🎵 Instrumental: ' + (iInfo.name || 'instrumental.wav'),
+          start: state.time + (res.vocalPath ? (res.vocalInfo?.duration || 0) + 0.1 : 0),
+          in: 0,
+          duration: iInfo.duration || 5,
+          max: iInfo.duration || 5,
+          volume: 1,
+          fadeIn: 0,
+          fadeOut: 0,
+          wave: iInfo.wave
+        };
+        // Coloca o instrumental abaixo da voz, ambos no cursor atual
+        a.start = state.time;
+        state.audios.push(a);
+        added++;
+      }
+
+      renderTimeline(); renderPreview();
+      const msg = `✅ ${added} stem(s) adicionados na trilha de áudio!`;
+      toast(msg);
+      if (status) status.textContent = msg;
+    } catch (err) {
+      toast('Erro ao separar stems: ' + (err.message || err));
+      if (status) status.textContent = '❌ Erro: ' + (err.message || err);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+}
+
+// ─── 7.1b: Detecção de Batidas ───────────────────────────────────────────────
+async function runBeatDetect(opts = {}) {
+  const btnTool = $('btnBeatDetect'), btnBar = $('btnBeatMarks');
+  const status = $('beatStatus');
+  [btnTool, btnBar].forEach(b => { if (b) b.disabled = true; });
+  if (status) { status.hidden = false; status.textContent = 'Analisando batidas...'; }
+  toast('🥁 Detectando batidas musicais...');
+
+  // Determina o arquivo-alvo
+  let targetPath = opts.inputPath;
+  if (!targetPath) {
+    if (state.selected) {
+      const { kind, id } = state.selected;
+      const item = (kind === 'clip' ? state.clips : kind === 'audio' ? state.audios : []).find(x => x.id === id);
+      if (item?.path) targetPath = item.path;
+    }
+    if (!targetPath && state.clips.length) targetPath = state.clips[0].path;
+    if (!targetPath && state.audios.length) targetPath = state.audios[0].path;
+  }
+  if (!targetPath) {
+    toast('Selecione um clipe ou áudio para detectar batidas');
+    [btnTool, btnBar].forEach(b => { if (b) b.disabled = false; });
+    return;
+  }
+
+  window.api.onBeatProgress((data) => {
+    if (status) status.textContent = typeof data === 'string' ? data : (data.text || '');
+  });
+
+  try {
+    const sensitivity = parseFloat($('beatSensitivity')?.value || 0.6);
+    const maxBpm = parseInt($('beatMaxBpm')?.value || 200);
+    const res = await window.api.beatDetect({ inputPath: targetPath, sensitivity, minBpm: 60, maxBpm });
+    if (!res.ok) {
+      toast('Erro: ' + (res.error || 'Falha na detecção'));
+      if (status) status.textContent = '❌ ' + res.error;
+      return;
+    }
+
+    // Gera marcadores na timeline para cada batida
+    let added = 0;
+    for (const t of res.beats) {
+      const existing = (state.markers || []).some(m => Math.abs(m.time - t) < 0.05);
+      if (!existing) {
+        if (!state.markers) state.markers = [];
+        state.markers.push({ id: uid++, time: t, label: '🥁', color: '#ff9f43' });
+        added++;
+      }
+    }
+
+    renderTimeline();
+    const msg = `✅ ${added} marcadores de batida criados! BPM estimado: ~${res.estimatedBpm}`;
+    toast(msg);
+    if (status) status.textContent = msg;
+  } catch (err) {
+    toast('Erro: ' + (err.message || err));
+    if (status) status.textContent = '❌ ' + (err.message || err);
+  } finally {
+    [btnTool, btnBar].forEach(b => { if (b) b.disabled = false; });
+  }
+}
+
+function initBeatDetect() {
+  if ($('btnBeatDetect')) $('btnBeatDetect').onclick = () => runBeatDetect();
+  if ($('btnBeatMarks')) $('btnBeatMarks').onclick = () => runBeatDetect();
+}
+
+// ─── 7.1c: Text-to-Speech (TTS) ─────────────────────────────────────────────
+function initTts() {
+  const btn = $('btnTtsSpeak'), status = $('ttsStatus');
+  if (!btn || !window.api?.ttsSpeak) return;
+
+  window.api.onTtsProgress((msg) => {
+    if (status) { status.hidden = false; status.textContent = msg; }
+    toast(msg);
+  });
+
+  btn.onclick = async () => {
+    const text = $('ttsText')?.value?.trim();
+    if (!text) return toast('Digite um texto para narrar primeiro');
+    const speed = parseFloat($('ttsSpeed')?.value || 1.0);
+
+    btn.disabled = true;
+    if (status) { status.hidden = false; status.textContent = 'Iniciando TTS...'; }
+    toast('🗣️ Gerando narração...');
+
+    try {
+      const res = await window.api.ttsSpeak({ text, speed });
+      if (!res.ok) {
+        toast('Erro TTS: ' + (res.error || 'Falha'));
+        if (status) status.textContent = '❌ ' + (res.error || 'Falha');
+        return;
+      }
+
+      const info = res.info || {};
+      const a = {
+        id: uid++,
+        path: res.path,
+        name: info.name || `🗣️ TTS: ${text.slice(0, 20)}`,
+        start: state.time,
+        in: 0,
+        duration: info.duration || 3,
+        max: info.duration || 3,
+        volume: 1,
+        fadeIn: 0.1,
+        fadeOut: 0.1,
+        wave: info.wave
+      };
+      state.audios.push(a);
+      select({ kind: 'audio', id: a.id });
+      renderTimeline(); renderPreview();
+
+      const msg = res.fallback
+        ? `⚠️ Narração sintética gerada (modo fallback) — ${Math.round(info.duration || 0)}s`
+        : `✅ Narração TTS inserida — ${Math.round(info.duration || 0)}s`;
+      toast(msg);
+      if (status) status.textContent = msg;
+    } catch (err) {
+      toast('Erro: ' + (err.message || err));
+      if (status) status.textContent = '❌ ' + (err.message || err);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+}
+
+// ─── 7.2a: Tradução de Legendas ──────────────────────────────────────────────
+function initTranslation() {
+  const registerTranslateBtn = (btnId) => {
+    const btn = $(btnId);
+    if (!btn || !window.api?.translateSubtitles) return;
+
+    btn.onclick = async () => {
+      if (!state.texts.length) return toast('Não há legendas na timeline para traduzir');
+
+      const srcLang = $('translateSrc')?.value || 'pt';
+      const tgtLang = $('translateTgt')?.value || 'en';
+      const translateStatus = $('translateStatus');
+
+      btn.disabled = true;
+      if (translateStatus) { translateStatus.hidden = false; translateStatus.textContent = 'Iniciando tradução...'; }
+      toast(`🌐 Traduzindo ${state.texts.length} legendas (${srcLang} → ${tgtLang})...`);
+
+      window.api.onTranslateProgress((msg) => {
+        if (translateStatus) translateStatus.textContent = msg;
+        toast(msg);
+      });
+
+      try {
+        const chunks = state.texts.map(t => ({ id: t.id, text: t.text, start: t.start, end: t.start + t.duration }));
+        const res = await window.api.translateSubtitles({ chunks, srcLang, tgtLang });
+
+        if (!res.ok) {
+          toast('⚠️ ' + (res.error || 'Falha na tradução'));
+          if (translateStatus) translateStatus.textContent = '⚠️ ' + (res.error || 'Falha');
+          return;
+        }
+
+        // Aplica traduções de volta nos textos da timeline
+        let updated = 0;
+        for (const translated of res.chunks) {
+          const textItem = state.texts.find(t => t.id === translated.id);
+          if (textItem && translated.text !== textItem.text) {
+            textItem.text = translated.text;
+            updated++;
+          }
+        }
+
+        renderTimeline(); renderPreview();
+        const msg = `✅ ${updated} legendas traduzidas (${srcLang} → ${tgtLang})`;
+        toast(msg);
+        if (translateStatus) translateStatus.textContent = msg;
+      } catch (err) {
+        toast('Erro: ' + (err.message || err));
+        if (translateStatus) translateStatus.textContent = '❌ ' + (err.message || err);
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  };
+
+  registerTranslateBtn('btnTranslate');
+  registerTranslateBtn('btnTranslateSubs');
+}
+
+// ─── 7.2b: Super-Resolução ───────────────────────────────────────────────────
+function initSuperResolution() {
+  const btn = $('btnSuperRes'), srStatus = $('srStatus');
+  const srProgress = $('srProgress'), srProgressFill = $('srProgressFill');
+  if (!btn || !window.api?.superResolve) return;
+
+  window.api.onSuperResProgress((data) => {
+    const pct = data.percent ?? 0;
+    const text = data.text || '';
+    if (srProgress) srProgress.hidden = false;
+    if (srProgressFill) srProgressFill.style.width = pct + '%';
+    if (srStatus) { srStatus.hidden = false; srStatus.textContent = text; }
+  });
+
+  btn.onclick = async () => {
+    // Determina clipe-alvo (selecionado ou primeiro da timeline)
+    let targetClip = null;
+    if (state.selected?.kind === 'clip') {
+      targetClip = state.clips.find(c => c.id === state.selected.id);
+    }
+    if (!targetClip && state.clips.length) targetClip = state.clips[0];
+    if (!targetClip) return toast('Selecione um clipe de vídeo na timeline primeiro');
+    if (targetClip.isImage) return toast('Super-resolução não se aplica a imagens');
+
+    const scale = parseInt($('srScale')?.value || 2);
+    const denoise = $('srDenoise')?.checked !== false;
+    const sharpen = $('srSharpen')?.checked !== false;
+
+    btn.disabled = true;
+    if (srProgress) srProgress.hidden = false;
+    if (srProgressFill) srProgressFill.style.width = '0%';
+    if (srStatus) { srStatus.hidden = false; srStatus.textContent = `Iniciando upscale ${scale}x...`; }
+    toast(`🔬 Iniciando super-resolução ${scale}x...`);
+
+    try {
+      const res = await window.api.superResolve({ inputPath: targetClip.path, scale, denoise, sharpen });
+
+      if (!res.ok) {
+        toast('Erro: ' + (res.error || 'Falha'));
+        if (srStatus) srStatus.textContent = '❌ ' + (res.error || 'Falha');
+        return;
+      }
+
+      // Substitui o clipe original pelo clipe upscalado na timeline
+      const info = res.info || {};
+      targetClip.path = res.path;
+      targetClip.name = info.name || `↑${scale}x ${targetClip.name}`;
+      if (info.duration) targetClip.duration = Math.min(targetClip.duration, info.duration);
+      if (info.thumb) targetClip.thumb = info.thumb;
+
+      // Adiciona também na biblioteca de mídia
+      const mediaItem = { ...info, name: info.name || `↑${scale}x ${path?.basename?.(res.path) || 'upscaled'}` };
+      state.media.push(mediaItem);
+      renderMedia();
+      renderTimeline(); renderPreview();
+
+      if (srProgressFill) srProgressFill.style.width = '100%';
+      const msg = `✅ Super-resolução ${scale}x concluída! (${res.origW}×${res.origH} → ${res.targetW}×${res.targetH})`;
+      toast(msg);
+      if (srStatus) srStatus.textContent = msg;
+    } catch (err) {
+      toast('Erro: ' + (err.message || err));
+      if (srStatus) srStatus.textContent = '❌ ' + (err.message || err);
+    } finally {
+      btn.disabled = false;
+    }
+  };
+}
+
 initPanelTabs();
 initSfx();
+initAiTab();
+initStemSeparation();
+initBeatDetect();
+initTts();
+initTranslation();
+initSuperResolution();
