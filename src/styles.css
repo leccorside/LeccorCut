@@ -7,7 +7,12 @@ button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);pa
 button:hover{border-color:var(--a1);transform:translateY(-1px)}
 button.primary{background:linear-gradient(90deg,var(--a1),var(--a2));border:none;color:#06121a;font-weight:700}
 button.wide{width:100%;margin:8px 0}
-.actions{display:flex;gap:8px}
+.actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.actions select{width:auto;min-width:70px;padding:5px 8px;font-size:11px}
+.actions input[type=number]{padding:5px 6px;font-size:11px}
+.actions button{padding:6px 11px;font-size:11px}
+#btnExportAudio{background:rgba(0,184,148,0.18);border:1px solid rgba(0,229,195,0.4);color:var(--a1)}
+#btnExportAudio:hover{background:rgba(0,184,148,0.35);border-color:var(--a1);color:#fff}
 #workspace{flex:1;display:grid;grid-template-columns:260px 1fr 280px;gap:8px;padding:8px;min-height:0}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;overflow:auto}
 h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--mut);margin:8px 0}

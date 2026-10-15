@@ -993,3 +993,64 @@ nativos do FFmpeg. Pipeline de 4 estagios:
 ---
 
 *Secao gerada em: 2026-10-15 | Fase 7 — 42 testes automatizados passando (100%)*
+
+---
+
+## 21. Fase 8 — Exportação Profissional e Codecs Adicionais
+
+Implementada na Fase 8 (`PASSOS.md`), esta seção documenta os recursos avançados de renderização e entrega com suporte a múltiplos contêineres, codecs profissionais para broadcast, controle granular de bitrate, perfis de cor/HDR e exportação de áudio independente.
+
+### 21.1 Mapeamento de Codecs e Contêineres de Entrega
+
+O motor de montagem FFmpeg (`src/ffmpegBuilder.js` via `buildCodecArgs`) foi parametrizado para selecionar dinamicamente o pipeline de codificação ideal com base na configuração do projeto (`settings.format`):
+
+| Formato | Extensão | Codec de Vídeo | Codec de Áudio | Pixel Format | Canal Alfa | Uso Recomendado |
+|---|---|---|---|---|:---:|---|
+| **MP4 (H.264)** | `.mp4` | `libx264` | `aac` (192 kbps) | `yuv420p` / `yuv420p10le` | Não | Web, YouTube, TikTok, Instagram e redes sociais |
+| **WebM (VP9)** | `.webm` | `libvpx-vp9` | `libopus` (128 kbps) | `yuva444p` / `yuva420p` | Sim | Stickers animados, overlays transparentes, web moderna |
+| **ProRes 422** | `.mov` | `prores_ks` (perfil 2) | `pcm_s16le` | `yuv422p10le` | Não | Masterização intermediária, broadcast, edição contínua |
+| **ProRes 4444** | `.mov` | `prores_ks` (perfil 4) | `pcm_s16le` | `yuva444p10le` | Sim | Composição VFX, canal alfa sem perda, entrega cinematográfica |
+
+### 21.2 Controle Fino de Bitrate
+
+Configurado via `settings.bitrateMode` e `settings.bitrate` (em kbps):
+
+1. **CRF (Constant Rate Factor - Qualidade Constante)**:
+   - Modo padrão de alta eficiência perceptiva.
+   - MP4: `-crf N` (Normal=23, Alta=18, Máxima=14 ou personalizado de 0 a 51).
+   - WebM VP9: `-crf N -b:v 0`.
+2. **CBR (Constant Bitrate - Taxa de Bits Fixa)**:
+   - Ideal para streaming contínuo e especificações rígidas de entrega.
+   - Parâmetros: `-b:v ${bitrate}k -minrate ${bitrate}k -maxrate ${bitrate}k -bufsize ${bitrate * 2}k`.
+3. **VBR 2-Pass (Variable Bitrate de 2 Passos)**:
+   - **Passo 1 (Análise estatística):** Gera log temporário de complexidade temporal e espacial da cena (`-pass 1 -passlogfile ... -an -f null`).
+   - **Passo 2 (Renderização final):** Aloca os bits de forma ótima em cenas de alta complexidade/movimento (`-pass 2 -passlogfile ...`).
+   - Gerenciamento automático de limpeza dos logs temporários (`cleanPassLogs`) no processo principal.
+
+### 21.3 Perfis de Cor e HDR (High Dynamic Range)
+
+Configurado via `settings.colorProfile`:
+
+1. **Rec.709 (SDR Padrão)**:
+   - `-colorspace bt709 -color_primaries bt709 -color_trc bt709`.
+   - Compatibilidade universal em monitores e dispositivos convencionais.
+2. **BT.2020 (HDR 10-bit)**:
+   - `-colorspace bt2020nc -color_primaries bt2020 -color_trc smpte2084 -pix_fmt yuv420p10le`.
+   - Espaço de cor expandido de ampla gama (WCG) e curva de transferência eletro-óptica Perceptual Quantizer (PQ).
+
+### 21.4 Exportação Independente de Áudio Directa da Timeline
+
+Permite a extração de mixdown estéreo sem necessidade de renderizar vídeo:
+
+- **Handler IPC:** `export-audio-only` (com diálogo de salvamento e seleção de formato).
+- **Formatos suportados:**
+  - `.wav`: PCM Linear não comprimido de 16 bits (`-c:a pcm_s16le`).
+  - `.mp3`: MP3 LAME em bitrate máximo de estúdio (`-c:a libmp3lame -b:a 320k`).
+  - `.aac` / `.m4a`: AAC de alta fidelidade (`-c:a aac -b:a 256k`).
+- **Mixagem:** Renderiza clipes de áudio dos vídeos na timeline (respeitando mute, solo, velocidade atempo, fade in/out, loudness) combinados com clipes da trilha de áudio secundária via filtro `amix=inputs=N:duration=longest`.
+- **Eventos:** Emissão de progresso em tempo real via `'export-audio-progress'`.
+
+---
+
+*Secao gerada em: 2026-10-15 | Fase 8 — 50 testes automatizados passando (100%)*
+

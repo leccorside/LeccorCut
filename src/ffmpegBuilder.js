@@ -1,4 +1,5 @@
 const fs = require('fs');
+const os = require('os');
 const pathMod = require('path');
 const FONTS = {
   'Arial': ['arial.ttf', 'arialbd.ttf'], 'Impact': ['impact.ttf', 'impact.ttf'], 'Segoe UI': ['segoeui.ttf', 'segoeuib.ttf'],
@@ -134,6 +135,78 @@ function getCaptionWords(t) {
     curAcc += wDur;
     return { word, start: wStart, end: wEnd };
   });
+}
+
+function buildCodecArgs(settings, outPath, passNum = 0, passLogPrefix = null) {
+  const S = settings || {};
+  const fmt = (S.format || 'mp4').toLowerCase();
+  const bitrateMode = S.bitrateMode || 'crf';
+  const bitrate = Number(S.bitrate) || 8000;
+  const crf = S.crf ?? 18;
+  const colorProfile = S.colorProfile || 'bt709';
+
+  const vArgs = [];
+  const aArgs = [];
+
+  // 1. Configuração de Vídeo por Formato
+  if (fmt === 'webm') {
+    vArgs.push('-c:v', 'libvpx-vp9');
+    if (colorProfile === 'bt2020') {
+      vArgs.push('-pix_fmt', 'yuv420p10le');
+    } else {
+      vArgs.push('-pix_fmt', 'yuva420p', '-auto-alt-ref', '0');
+    }
+    aArgs.push('-c:a', 'libopus', '-b:a', '128k');
+  } else if (fmt === 'prores422') {
+    vArgs.push('-c:v', 'prores_ks', '-profile:v', '2', '-vendor', 'apl0');
+    vArgs.push('-pix_fmt', 'yuv422p10le');
+    aArgs.push('-c:a', 'pcm_s16le');
+  } else if (fmt === 'prores4444') {
+    vArgs.push('-c:v', 'prores_ks', '-profile:v', '4', '-vendor', 'apl0');
+    vArgs.push('-pix_fmt', 'yuva444p10le');
+    aArgs.push('-c:a', 'pcm_s16le');
+  } else {
+    // mp4 (H.264)
+    vArgs.push('-c:v', 'libx264', '-preset', 'medium');
+    if (colorProfile === 'bt2020') {
+      vArgs.push('-pix_fmt', 'yuv420p10le');
+    } else {
+      vArgs.push('-pix_fmt', 'yuv420p');
+    }
+    aArgs.push('-c:a', 'aac', '-b:a', '192k');
+  }
+
+  // 2. Perfis de Cor / HDR
+  if (colorProfile === 'bt2020') {
+    vArgs.push('-colorspace', 'bt2020nc', '-color_primaries', 'bt2020', '-color_trc', 'smpte2084');
+  } else if (colorProfile === 'bt709') {
+    vArgs.push('-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709');
+  }
+
+  // 3. Taxa de Bits / Modo de Codificação
+  if (fmt.startsWith('prores')) {
+    // ProRes tem bitrate controlado internamente pelo perfil de quantização
+  } else if (bitrateMode === 'cbr') {
+    vArgs.push('-b:v', `${bitrate}k`, '-minrate', `${bitrate}k`, '-maxrate', `${bitrate}k`, '-bufsize', `${bitrate * 2}k`);
+  } else if (bitrateMode === 'vbr2pass') {
+    vArgs.push('-b:v', `${bitrate}k`);
+    if (passNum === 1) {
+      vArgs.push('-pass', '1');
+      if (passLogPrefix) vArgs.push('-passlogfile', passLogPrefix);
+    } else if (passNum === 2) {
+      vArgs.push('-pass', '2');
+      if (passLogPrefix) vArgs.push('-passlogfile', passLogPrefix);
+    }
+  } else {
+    // Modo CRF (Qualidade Constante)
+    if (fmt === 'webm') {
+      vArgs.push('-crf', String(crf), '-b:v', '0');
+    } else {
+      vArgs.push('-crf', String(crf));
+    }
+  }
+
+  return { vArgs, aArgs };
 }
 
 // Trilha principal: clips em sequência. Textos: sobreposição por tempo.
@@ -392,9 +465,144 @@ function buildFfmpeg(project, outPath) {
     f.push(`[${last}]drawtext=text='${esc(t.text)}'${fontFile ? `:fontfile='${fontFile}'` : ''}:fontcolor=${t.color || 'white'}:fontsize='${fsExpr}':x=${xExpr}:y='${animYExpr}':borderw=${Math.round(bw * Math.min(W, H) / 720)}:bordercolor=black${box}${alpha}:enable='between(t,${t.start},${t.start + t.duration})'[t${i}]`);
     last = `t${i}`;
   });
+  if (S.bitrateMode === 'vbr2pass' && !String(S.format || '').startsWith('prores')) {
+    const tmpDir = os.tmpdir();
+    const passPrefix = pathMod.join(tmpDir, `lccut_pass_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
+    const { vArgs: v1 } = buildCodecArgs(S, null, 1, passPrefix);
+    const nullDev = process.platform === 'win32' ? 'NUL' : '/dev/null';
+    const pass1Args = [...args, '-filter_complex', f.join(';'), '-map', `[${last}]`, ...v1, '-an', '-f', 'null', '-y', nullDev];
+    const { vArgs: v2, aArgs } = buildCodecArgs(S, outPath, 2, passPrefix);
+    const pass2Args = [...args, '-filter_complex', f.join(';'), '-map', `[${last}]`, '-map', `[${aOut}]`, ...v2, ...aArgs, '-y', outPath];
+    return {
+      isTwoPass: true,
+      passLogPrefix: passPrefix,
+      pass1Args,
+      pass2Args,
+      args: pass2Args
+    };
+  }
+
+  const { vArgs, aArgs } = buildCodecArgs(S, outPath);
   args.push('-filter_complex', f.join(';'), '-map', `[${last}]`, '-map', `[${aOut}]`,
-    '-c:v', 'libx264', '-preset', 'medium', '-crf', String(CRF), '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-y', outPath);
+    ...vArgs, ...aArgs, '-y', outPath);
   return { args };
 }
 
-module.exports = { buildFfmpeg, SPEED_CURVES, buildAtempo, getCurveSegments, getCaptionWords };
+// Exportação independente de áudio direto da timeline (.wav, .mp3, .aac)
+function buildAudioOnlyFfmpeg(project, outPath) {
+  const tracks = project.tracks || {};
+  const isVideoMuted = !!tracks.video?.mute || !!tracks.audio?.solo;
+  const isAudioMuted = !!tracks.audio?.mute;
+  const clips = project.clips || [];
+  const audios = isAudioMuted ? [] : (project.audios || []);
+  const args = [];
+  const f = [];
+
+  // 1. Carregar arquivos de mídia dos clipes de vídeo
+  clips.forEach((c) => {
+    if (c.isImage) args.push('-loop', '1', '-t', String(c.duration), '-i', c.path);
+    else args.push('-i', c.path);
+  });
+
+  let concatIn = '';
+  clips.forEach((c, i) => {
+    const fl = c.filters || {};
+    const speed = c.speed || 1;
+    const curveSegs = !c.isImage && c.speedCurve && SPEED_CURVES[c.speedCurve] ? getCurveSegments(c) : null;
+    const hasAudioTrack = c.hasAudio && !c.isImage && !isVideoMuted;
+
+    if (hasAudioTrack) {
+      if (curveSegs) {
+        curveSegs.forEach((seg, k) => {
+          f.push(`[${i}:a]atrim=start=${seg.inStart.toFixed(4)}:end=${seg.inEnd.toFixed(4)},asetpts=PTS-STARTPTS,${buildAtempo(seg.speed)}[a_${i}_${k}]`);
+        });
+        const segInputs = curveSegs.map((_, k) => `[a_${i}_${k}]`).join('');
+        let af = `volume=${c.volume ?? 1}`;
+        if (fl.denoise) af += ',afftdn=nf=-25';
+        if (fl.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
+        af += ',aresample=44100,aformat=channel_layouts=stereo';
+        f.push(`${segInputs}concat=n=${curveSegs.length}:v=0:a=1,${af}[a${i}]`);
+      } else {
+        const tempo = speed !== 1 ? `,${buildAtempo(speed)}` : '';
+        let af = `atrim=start=${c.in}:end=${c.in + c.duration * speed},asetpts=PTS-STARTPTS${tempo},volume=${c.volume ?? 1}`;
+        if (fl.denoise) af += ',afftdn=nf=-25';
+        if (fl.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
+        af += ',aresample=44100,aformat=channel_layouts=stereo';
+        f.push(`[${i}:a]${af}[a${i}]`);
+      }
+    } else {
+      f.push(`anullsrc=r=44100:cl=stereo,atrim=duration=${c.duration}[a${i}]`);
+    }
+    concatIn += `[a${i}]`;
+  });
+
+  let baseAudioOut = 'ac0';
+  if (clips.length > 0) {
+    const anyT = clips.some(c => c.transition && c.transition !== 'none');
+    if (!anyT || clips.length === 1) {
+      f.push(`${concatIn}concat=n=${clips.length}:v=0:a=1[ac0]`);
+    } else {
+      let aP = 'a0', L = clips[0].duration;
+      for (let i = 1; i < clips.length; i++) {
+        const prev = clips[i - 1], cur = clips[i];
+        const has = prev.transition && prev.transition !== 'none';
+        const d = has ? Math.max(0.05, Math.min(0.5, prev.duration / 2, cur.duration / 2)) : 0.04;
+        f.push(`[${aP}][a${i}]acrossfade=d=${d}[xa${i}]`);
+        aP = `xa${i}`;
+        L += cur.duration - d;
+      }
+      f.push(`[${aP}]anull[ac0]`);
+    }
+  }
+
+  // 2. Trilha de áudio secundária
+  if (audios.length > 0) {
+    audios.forEach((a, j) => {
+      const idx = clips.length + j;
+      args.push('-i', a.path);
+      const ms = Math.round(a.start * 1000);
+      let af = `atrim=start=${a.in || 0}:end=${(a.in || 0) + a.duration},asetpts=PTS-STARTPTS,volume=${a.volume ?? 1}`;
+      if (a.fadeIn) af += `,afade=t=in:st=0:d=${a.fadeIn}`;
+      if (a.fadeOut) af += `,afade=t=out:st=${Math.max(0, a.duration - a.fadeOut)}:d=${a.fadeOut}`;
+      if (a.denoise) af += ',afftdn=nf=-25';
+      if (a.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
+      af += `,aresample=44100,aformat=channel_layouts=stereo,adelay=${ms}|${ms}`;
+      f.push(`[${idx}:a]${af}[m${j}]`);
+    });
+
+    if (clips.length > 0) {
+      const n = audios.length + 1;
+      f.push(`[ac0]${audios.map((_, j) => `[m${j}]`).join('')}amix=inputs=${n}:duration=longest:dropout_transition=0,volume=${n}[acm]`);
+      baseAudioOut = 'acm';
+    } else {
+      if (audios.length === 1) {
+        baseAudioOut = 'm0';
+      } else {
+        f.push(`${audios.map((_, j) => `[m${j}]`).join('')}amix=inputs=${audios.length}:duration=longest:dropout_transition=0,volume=${audios.length}[acm]`);
+        baseAudioOut = 'acm';
+      }
+    }
+  }
+
+  if (clips.length === 0 && audios.length === 0) {
+    f.push('anullsrc=r=44100:cl=stereo,atrim=duration=1[aempty]');
+    baseAudioOut = 'aempty';
+  }
+
+  const ext = (pathMod.extname(outPath) || '').toLowerCase();
+  const aCodecs = [];
+  if (ext === '.wav') {
+    aCodecs.push('-c:a', 'pcm_s16le');
+  } else if (ext === '.mp3') {
+    aCodecs.push('-c:a', 'libmp3lame', '-b:a', '320k');
+  } else if (ext === '.aac' || ext === '.m4a') {
+    aCodecs.push('-c:a', 'aac', '-b:a', '256k');
+  } else {
+    aCodecs.push('-c:a', 'pcm_s16le');
+  }
+
+  args.push('-filter_complex', f.join(';'), '-map', `[${baseAudioOut}]`, '-vn', ...aCodecs, '-y', outPath);
+  return { args };
+}
+
+module.exports = { buildFfmpeg, buildCodecArgs, buildAudioOnlyFfmpeg, SPEED_CURVES, buildAtempo, getCurveSegments, getCaptionWords };

@@ -222,10 +222,10 @@
 ## 📦 Fase 8 — Exportação Profissional e Codecs Adicionais
 
 ### 8.1 Codecs e Contêineres de Entrega
-- [ ] Implementar seletor de formato na exportação: MP4 (H.264), WebM (VP9 com suporte nativo a canal alfa transparente) e QuickTime MOV (Apple ProRes 422 / 4444)
-- [ ] Implementar controle fino de Bitrate (CBR, VBR 2-pass e controle de CRF customizado)
-- [ ] Implementar suporte a perfis de cor e HDR (conversão Rec.709 e BT.2020)
-- [ ] Implementar exportação independente de áudio (.wav / .mp3 / .aac) diretamente da timeline
+- [x] Implementar seletor de formato na exportação: MP4 (H.264), WebM (VP9 com suporte nativo a canal alfa transparente) e QuickTime MOV (Apple ProRes 422 / 4444)
+- [x] Implementar controle fino de Bitrate (CBR, VBR 2-pass e controle de CRF customizado)
+- [x] Implementar suporte a perfis de cor e HDR (conversão Rec.709 e BT.2020)
+- [x] Implementar exportação independente de áudio (.wav / .mp3 / .aac) diretamente da timeline
 
 ---
 

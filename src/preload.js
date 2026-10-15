@@ -35,7 +35,10 @@ contextBridge.exposeInMainWorld('api', {
   translateSubtitles: (opts) => ipcRenderer.invoke('translate-subtitles', opts),
   onTranslateProgress: (cb) => ipcRenderer.on('translate-progress', (_e, m) => cb(m)),
   superResolve: (opts) => ipcRenderer.invoke('super-resolve', opts),
-  onSuperResProgress: (cb) => ipcRenderer.on('superres-progress', (_e, data) => cb(data))
+  onSuperResProgress: (cb) => ipcRenderer.on('superres-progress', (_e, data) => cb(data)),
+  // ── Fase 8: Exportação Profissional e Áudio ────────────────────────────────
+  exportAudioOnly: (project) => ipcRenderer.invoke('export-audio-only', project),
+  onExportAudioProgress: (cb) => ipcRenderer.on('export-audio-progress', (_e, s) => cb(s))
 });
 
 

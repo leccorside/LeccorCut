@@ -6,7 +6,7 @@ const fs = require('fs');
 const unpacked = (p) => p.replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
 const ffmpegPath = unpacked(require('ffmpeg-static'));
 const ffprobePath = unpacked(require('ffprobe-static').path);
-const { buildFfmpeg } = require('./ffmpegBuilder');
+const { buildFfmpeg, buildAudioOnlyFfmpeg, buildCodecArgs } = require('./ffmpegBuilder');
 const { capcutToLeccor, leccorToCapcut } = require('./capcutConverter');
 
 let win;
@@ -130,16 +130,118 @@ function probe(p) {
   });
 }
 
+function cleanPassLogs(prefix) {
+  if (!prefix) return;
+  try {
+    const dir = path.dirname(prefix);
+    const base = path.basename(prefix);
+    if (!fs.existsSync(dir)) return;
+    const files = fs.readdirSync(dir);
+    for (const f of files) {
+      if (f.startsWith(base)) {
+        try { fs.unlinkSync(path.join(dir, f)); } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+
 ipcMain.handle('export', async (_e, project) => {
-  const r = await dialog.showSaveDialog(win, { defaultPath: 'leccorcut.mp4', filters: [{ name: 'MP4', extensions: ['mp4'] }] });
+  const S = project.settings || {};
+  const fmt = (S.format || 'mp4').toLowerCase();
+  let defaultExt = 'mp4';
+  let filterName = 'MP4 Video (H.264)';
+  if (fmt === 'webm') {
+    defaultExt = 'webm';
+    filterName = 'WebM Video (VP9 + Alfa)';
+  } else if (fmt === 'prores422') {
+    defaultExt = 'mov';
+    filterName = 'QuickTime Apple ProRes 422 (.mov)';
+  } else if (fmt === 'prores4444') {
+    defaultExt = 'mov';
+    filterName = 'QuickTime Apple ProRes 4444 (.mov + Alfa)';
+  }
+
+  const r = await dialog.showSaveDialog(win, {
+    defaultPath: `leccorcut.${defaultExt}`,
+    filters: [
+      { name: filterName, extensions: [defaultExt] },
+      { name: 'Todos os Arquivos', extensions: ['*'] }
+    ]
+  });
   if (r.canceled) return { ok: false };
-  const { args } = buildFfmpeg(project, r.filePath);
+  const ffmpegRes = buildFfmpeg(project, r.filePath);
+
+  if (ffmpegRes.isTwoPass) {
+    // 1º Passo: Análise estatística de taxa de bits
+    const pass1Success = await new Promise((resolve) => {
+      const p1 = spawn(ffmpegPath, ffmpegRes.pass1Args);
+      p1.stderr.on('data', d => {
+        const m = /time=(\d+):(\d+):([\d.]+)/.exec(d.toString());
+        if (m) {
+          const sec = (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]);
+          win.webContents.send('export-progress', { pass: 1, time: sec, text: 'Passo 1/2 (Análise VBR)...' });
+        }
+      });
+      p1.on('close', code => resolve(code === 0));
+    });
+
+    if (!pass1Success) {
+      cleanPassLogs(ffmpegRes.passLogPrefix);
+      return { ok: false, log: 'Falha no Passo 1 da codificação VBR 2-Pass' };
+    }
+
+    // 2º Passo: Renderização final com base no log do passo 1
+    return new Promise((resolve) => {
+      const p2 = spawn(ffmpegPath, ffmpegRes.pass2Args);
+      let log2 = '';
+      p2.stderr.on('data', d => {
+        log2 += d;
+        const m = /time=(\d+):(\d+):([\d.]+)/.exec(d.toString());
+        if (m) {
+          const sec = (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]);
+          win.webContents.send('export-progress', { pass: 2, time: sec, text: 'Passo 2/2 (Renderizando)...' });
+        }
+      });
+      p2.on('close', code => {
+        cleanPassLogs(ffmpegRes.passLogPrefix);
+        resolve({ ok: code === 0, path: r.filePath, log: code === 0 ? '' : log2.slice(-1500) });
+      });
+    });
+  }
+
+  // Codificação de Passo Único (CRF ou CBR)
+  return new Promise((resolve) => {
+    const p = spawn(ffmpegPath, ffmpegRes.args);
+    let log = '';
+    p.stderr.on('data', d => {
+      log += d;
+      const m = /time=(\d+):(\d+):([\d.]+)/.exec(d.toString());
+      if (m) win.webContents.send('export-progress', (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]));
+    });
+    p.on('close', code => resolve({ ok: code === 0, path: r.filePath, log: code === 0 ? '' : log.slice(-1500) }));
+  });
+});
+
+// Handler para exportação independente de áudio direto da timeline
+ipcMain.handle('export-audio-only', async (_e, project) => {
+  const r = await dialog.showSaveDialog(win, {
+    defaultPath: 'leccorcut-audio.wav',
+    filters: [
+      { name: 'Áudio WAV (16-bit PCM Linear)', extensions: ['wav'] },
+      { name: 'Áudio MP3 (320 kbps)', extensions: ['mp3'] },
+      { name: 'Áudio AAC (Alta Fidelidade)', extensions: ['aac', 'm4a'] },
+      { name: 'Todos os Arquivos', extensions: ['*'] }
+    ]
+  });
+  if (r.canceled) return { ok: false };
+  const { args } = buildAudioOnlyFfmpeg(project, r.filePath);
   return new Promise((resolve) => {
     const p = spawn(ffmpegPath, args);
     let log = '';
     p.stderr.on('data', d => {
-      log += d; const m = /time=(\d+):(\d+):([\d.]+)/.exec(d.toString());
-      if (m) win.webContents.send('export-progress', (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]));
+      log += d;
+      const m = /time=(\d+):(\d+):([\d.]+)/.exec(d.toString());
+      if (m) win.webContents.send('export-audio-progress', (+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]));
     });
     p.on('close', code => resolve({ ok: code === 0, path: r.filePath, log: code === 0 ? '' : log.slice(-1500) }));
   });

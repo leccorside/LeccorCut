@@ -1821,15 +1821,83 @@ if ($('btnExportCapcut')) {
     if (ok) toast('Projeto exportado no formato CapCut (draft_content.json)');
   };
 }
+// ── Fase 8: Controles Dinâmicos de Formato, Bitrate e Exportação de Áudio ─────
+function updateExportControls() {
+  const fmt = $('expFormat') ? $('expFormat').value : 'mp4';
+  const mode = $('expBitrateMode') ? $('expBitrateMode').value : 'crf';
+  const isProRes = fmt.startsWith('prores');
+
+  if ($('expBitrateMode')) $('expBitrateMode').style.display = isProRes ? 'none' : 'inline-block';
+
+  if (isProRes) {
+    if ($('expBitrate')) $('expBitrate').style.display = 'none';
+    if ($('expQ')) $('expQ').style.display = 'none';
+  } else if (mode === 'cbr' || mode === 'vbr2pass') {
+    if ($('expBitrate')) $('expBitrate').style.display = 'inline-block';
+    if ($('expQ')) $('expQ').style.display = 'none';
+  } else {
+    // Modo CRF
+    if ($('expBitrate')) $('expBitrate').style.display = 'none';
+    if ($('expQ')) $('expQ').style.display = 'inline-block';
+  }
+}
+if ($('expFormat')) $('expFormat').onchange = updateExportControls;
+if ($('expBitrateMode')) $('expBitrateMode').onchange = updateExportControls;
+updateExportControls();
+
 $('btnExport').onclick = async () => {
   if (!state.clips.length) return toast('Adicione clipes à timeline');
-  toast('Exportando...'); window.api.onProgress(s => toast(`Exportando... ${Math.min(99, Math.round(s / total() * 100))}%`));
+  toast('Exportando...');
+  window.api.onProgress(s => {
+    const tot = total() || 1;
+    if (typeof s === 'object' && s !== null) {
+      toast(`${s.text} ${Math.min(99, Math.round(s.time / tot * 100))}%`);
+    } else {
+      toast(`Exportando... ${Math.min(99, Math.round(s / tot * 100))}%`);
+    }
+  });
+
+  const format = $('expFormat') ? $('expFormat').value : 'mp4';
+  const bitrateMode = $('expBitrateMode') ? $('expBitrateMode').value : 'crf';
+  const bitrate = $('expBitrate') ? +$('expBitrate').value : 8000;
+  const colorProfile = $('expColorProfile') ? $('expColorProfile').value : 'bt709';
+
   const r = await window.api.exportVideo({
     clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays, tracks: state.tracks,
-    settings: { height: +$('expRes').value, fps: +$('expFps').value, crf: +$('expQ').value, aspect: $('expAspect').value }
+    settings: {
+      height: +$('expRes').value,
+      fps: +$('expFps').value,
+      crf: +$('expQ').value,
+      aspect: $('expAspect').value,
+      format,
+      bitrateMode,
+      bitrate,
+      colorProfile
+    }
   });
-  toast(r.ok ? 'Exportado: ' + r.path : (r.log ? 'Erro: ' + r.log.slice(-200) : 'Cancelado'));
+  toast(r.ok ? 'Exportado com sucesso: ' + r.path : (r.log ? 'Erro: ' + r.log.slice(-200) : 'Cancelado'));
 };
+
+if ($('btnExportAudio')) {
+  $('btnExportAudio').onclick = async () => {
+    if (!state.clips.length && (!state.audios || !state.audios.length)) {
+      return toast('Adicione clipes ou áudios à timeline');
+    }
+    toast('Exportando áudio...');
+    if (window.api.onExportAudioProgress) {
+      window.api.onExportAudioProgress(s => {
+        const tot = total() || 1;
+        toast(`Exportando áudio... ${Math.min(99, Math.round(s / tot * 100))}%`);
+      });
+    }
+    const r = await window.api.exportAudioOnly({
+      clips: state.clips,
+      audios: state.audios,
+      tracks: state.tracks
+    });
+    toast(r.ok ? 'Áudio exportado: ' + r.path : (r.log ? 'Erro: ' + r.log.slice(-200) : 'Cancelado'));
+  };
+}
 
 function applyAspect() {
   const [a, b] = $('expAspect').value.split(':').map(Number), st = $('stage');

@@ -21,11 +21,28 @@
     <select id="expAspect" title="Proporção"><option>16:9</option><option>9:16</option><option>1:1</option><option>4:5</option></select>
     <select id="expRes" title="Resolução"><option value="720">720p</option><option value="1080" selected>1080p</option><option value="1440">1440p</option><option value="2160">4K</option></select>
     <select id="expFps" title="FPS"><option>24</option><option selected>30</option><option>60</option></select>
-    <select id="expQ" title="Qualidade"><option value="23">Normal</option><option value="18" selected>Alta</option><option value="14">Máxima</option></select>
+    <select id="expFormat" title="Formato / Codec de Entrega">
+      <option value="mp4" selected>MP4 (H.264)</option>
+      <option value="webm">WebM (VP9 + Alfa)</option>
+      <option value="prores422">ProRes 422 (.mov)</option>
+      <option value="prores4444">ProRes 4444 (.mov + Alfa)</option>
+    </select>
+    <select id="expBitrateMode" title="Controle de Bitrate">
+      <option value="crf" selected>CRF (Qualidade)</option>
+      <option value="cbr">CBR (Taxa Fixa)</option>
+      <option value="vbr2pass">VBR 2-Pass</option>
+    </select>
+    <input id="expBitrate" type="number" value="8000" min="500" max="100000" step="500" title="Bitrate Alvo (kbps)" style="display:none; width:72px;">
+    <select id="expQ" title="Nível de Qualidade CRF"><option value="23">Normal (CRF 23)</option><option value="18" selected>Alta (CRF 18)</option><option value="14">Máxima (CRF 14)</option></select>
+    <select id="expColorProfile" title="Perfil de Cor e HDR">
+      <option value="bt709" selected>Rec.709 (SDR)</option>
+      <option value="bt2020">BT.2020 (HDR 10-bit)</option>
+    </select>
     <button id="btnOpen">Abrir</button>
     <button id="btnSave">Salvar</button>
     <button id="btnImportCapcut" class="capcut-btn" title="Importar Projeto do CapCut (draft_content.json)">📥 CapCut</button>
     <button id="btnExportCapcut" class="capcut-btn" title="Exportar Projeto para CapCut (draft_content.json)">📤 CapCut</button>
+    <button id="btnExportAudio" title="Exportar Áudio Independente da Timeline (.wav, .mp3, .aac)">🎵 Áudio</button>
     <button id="btnExport" class="primary">Exportar</button>
   </div>
 </header>
