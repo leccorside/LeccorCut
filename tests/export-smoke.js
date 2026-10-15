@@ -19,8 +19,8 @@ run(['-f', 'lavfi', '-i', 'color=c=red:size=320x240:duration=1', '-frames:v', '1
 const mk = (id, p, extra = {}) => ({ id, path: p, name: path.basename(p), duration: 3, srcDur: 4, in: 0.5, hasVideo: true, hasAudio: true, isImage: false, filters: {}, speed: 1, volume: 1, ...extra });
 const project = {
   clips: [
-    mk(1, a, { transition: 'dissolve', filters: { preset: 'vintage', zoom: 1.3, hflip: true, vignette: true } }),
-    mk(2, b, { transition: 'wipeleft', speed: 1.5, duration: 2, filters: { brightness: 10, fade: true } }),
+    mk(1, a, { transition: 'dissolve', filters: { fillMode: 'blur', preset: 'vintage', zoom: 1.1, hflip: true, vignette: true } }),
+    mk(2, b, { transition: 'wipeleft', speed: 1.5, duration: 2, filters: { fillMode: 'crop', brightness: 10, fade: true } }),
     mk(3, img, { isImage: true, hasAudio: false, duration: 2 })
   ],
   texts: [{ id: 4, text: "Olá: mundo's 100%", color: '#ffffff', size: 48, start: 0.5, duration: 3, px: 0.5, py: 0.2, font: 'Impact', bold: false, box: true, boxColor: '#000000', boxOpacity: 0.5, outline: 3, anim: 'slide' }],

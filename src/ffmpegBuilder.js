@@ -45,21 +45,41 @@ function buildFfmpeg(project, outPath) {
   clips.forEach((c, i) => {
     const fl = c.filters || {};
     const speed = c.speed || 1;
-    let v = `[${i}:v]` + (c.isImage ? '' : `trim=start=${c.in}:end=${c.in + c.duration * speed},setpts=(PTS-STARTPTS)/${speed},`)
-      + (c.isImage ? 'setpts=PTS-STARTPTS,' : '')
-      + `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${FPS},`
-      + ((fl.zoom || 1) > 1 ? `scale=${Math.round(W * fl.zoom)}:${Math.round(H * fl.zoom)},crop=${W}:${H},` : '')
-      + (fl.hflip ? 'hflip,' : '') + (fl.vflip ? 'vflip,' : '')
-      + (fl.rotate === 180 ? 'hflip,vflip,' : '')
-      + (fl.rotate === 90 ? `transpose=1,scale=${W}:${H},` : fl.rotate === 270 ? `transpose=2,scale=${W}:${H},` : '')
-      + `eq=brightness=${(fl.brightness || 0) / 100}:contrast=${1 + (fl.contrast || 0) / 100}:saturation=${1 + (fl.saturation || 0) / 100}`;
-    if (PRESETS[fl.preset]) v += ',' + PRESETS[fl.preset];
-    if (fl.blur) v += `,gblur=sigma=${fl.blur}`;
-    if (fl.grayscale) v += ',hue=s=0';
-    if (fl.vignette) v += ',vignette=PI/4';
-    if (fl.fade) v += `,fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0, c.duration - 0.5)}:d=0.5`;
-    if (!isVideoVisible) v += ',drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill';
-    f.push(v + `[v${i}]`);
+    const fillMode = fl.fillMode || 'fit';
+    const trim = (c.isImage ? '' : `trim=start=${c.in}:end=${c.in + c.duration * speed},setpts=(PTS-STARTPTS)/${speed},`)
+      + (c.isImage ? 'setpts=PTS-STARTPTS,' : '');
+
+    let inLabel = `[${i}:v]`;
+    const preFilters = [];
+    if (fillMode === 'blur') {
+      f.push(`[${i}:v]${trim}split=2[raw_bg_${i}][raw_fg_${i}]`);
+      f.push(`[raw_bg_${i}]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},gblur=sigma=30,eq=brightness=-0.15,setsar=1,fps=${FPS}[bg_${i}]`);
+      f.push(`[raw_fg_${i}]scale=${W}:${H}:force_original_aspect_ratio=decrease,setsar=1,fps=${FPS}[fg_${i}]`);
+      f.push(`[bg_${i}][fg_${i}]overlay=(W-w)/2:(H-h)/2[c_base_${i}]`);
+      inLabel = `[c_base_${i}]`;
+    } else if (fillMode === 'crop') {
+      preFilters.push(trim + `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${FPS}`);
+    } else {
+      preFilters.push(trim + `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=${FPS}`);
+    }
+
+    const postFilters = [];
+    if ((fl.zoom || 1) > 1) postFilters.push(`scale=${Math.round(W * fl.zoom)}:${Math.round(H * fl.zoom)},crop=${W}:${H}`);
+    if (fl.hflip) postFilters.push('hflip');
+    if (fl.vflip) postFilters.push('vflip');
+    if (fl.rotate === 180) postFilters.push('hflip,vflip');
+    if (fl.rotate === 90) postFilters.push(`transpose=1,scale=${W}:${H}`);
+    else if (fl.rotate === 270) postFilters.push(`transpose=2,scale=${W}:${H}`);
+    postFilters.push(`eq=brightness=${(fl.brightness || 0) / 100}:contrast=${1 + (fl.contrast || 0) / 100}:saturation=${1 + (fl.saturation || 0) / 100}`);
+    if (PRESETS[fl.preset]) postFilters.push(PRESETS[fl.preset]);
+    if (fl.blur) postFilters.push(`gblur=sigma=${fl.blur}`);
+    if (fl.grayscale) postFilters.push('hue=s=0');
+    if (fl.vignette) postFilters.push('vignette=PI/4');
+    if (fl.fade) postFilters.push(`fade=t=in:st=0:d=0.5,fade=t=out:st=${Math.max(0, c.duration - 0.5)}:d=0.5`);
+    if (!isVideoVisible) postFilters.push('drawbox=x=0:y=0:w=iw:h=ih:color=black:t=fill');
+
+    const allFilters = [...preFilters, ...postFilters];
+    f.push(`${inLabel}${allFilters.join(',')}[v${i}]`);
     if (c.hasAudio && !c.isImage && !isVideoMuted) {
       const tempo = speed !== 1 ? `,atempo=${speed}` : '';
       f.push(`[${i}:a]atrim=start=${c.in}:end=${c.in + c.duration * speed},asetpts=PTS-STARTPTS${tempo},volume=${c.volume ?? 1},aresample=44100,aformat=channel_layouts=stereo[a${i}]`);

@@ -24,6 +24,10 @@
 - **Estilização em Massa**: configure fonte, caixa de fundo com transparência, contorno, cor, negrito, animações e posição de uma legenda e aplique a **todas as legendas com 1 clique**.
 
 ### 🎨 Efeitos, Ajustes e Transições
+- **Enquadramento Inteligente & Desfoque de Fundo (*Canvas Blur*)**: elimine as barras pretas ao converter vídeos horizontais (16:9) para verticais (9:16 - TikTok/Shorts) ou quadrados (1:1). Escolha entre:
+  - *Ajustar*: proporção original com margens pretas.
+  - *Desfoque de Fundo*: o próprio vídeo é espelhado no fundo em tela cheia com desfoque gaussiano suave e contraste balanceado, mantendo o conteúdo original nítido no centro.
+  - *Preencher*: corte inteligente com preenchimento total do quadro (*object-fit: cover*).
 - **Transições Suaves entre Clipes**: `fade`, `dissolve`, `wipeleft`, `slideleft`, `circleopen`, `pixelize` processados via `xfade`/`acrossfade`.
 - **Filtros e Presets de Cor**: `sepia`, `vintage`, `warm`, `cool`, `cinematic`, `vivid`.
 - **Efeito Vinheta Cinematográfica**: escurecimento elegante das bordas do vídeo com preview instantâneo e processamento nativo FFmpeg.

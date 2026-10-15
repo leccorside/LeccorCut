@@ -148,11 +148,43 @@ function renderPreview() {
       $('textLayer').appendChild(s);
     });
   }
-  if (!view || state.tracks.video?.visible === false) { player.removeAttribute('src'); img.hidden = true; player.style.visibility = 'hidden'; $('vignetteLayer').hidden = true; syncAudio(); updateTime(); return; }
+  const bgV = $('bgPlayer'), bgI = $('bgImg');
+  if (!view || state.tracks.video?.visible === false) {
+    player.removeAttribute('src'); img.hidden = true; player.style.visibility = 'hidden';
+    if (bgV) { bgV.hidden = true; bgV.pause(); }
+    if (bgI) bgI.hidden = true;
+    $('vignetteLayer').hidden = true; syncAudio(); updateTime(); return;
+  }
   $('vignetteLayer').hidden = !view.filters?.vignette;
   player.style.visibility = 'visible';
   const src = fileUrl(view.path);
   const f = cssFilter(view.filters);
+  const fillMode = view.filters?.fillMode || 'fit';
+
+  if (fillMode === 'blur' && state.tracks.video?.visible !== false) {
+    if (view.isImage) {
+      if (bgI) { bgI.hidden = false; if (bgI.src !== src) bgI.src = src; }
+      if (bgV) { bgV.hidden = true; bgV.pause(); }
+    } else {
+      if (bgI) bgI.hidden = true;
+      if (bgV) {
+        bgV.hidden = false;
+        if (bgV.dataset.src !== src) { bgV.src = src; bgV.dataset.src = src; }
+        bgV.playbackRate = view.speed || 1;
+        const target = view.in + hit.local * (view.speed || 1);
+        if (!state.playing || Math.abs(bgV.currentTime - target) > 0.3) bgV.currentTime = target;
+        if (state.playing && bgV.paused) bgV.play().catch(() => {});
+        else if (!state.playing) bgV.pause();
+      }
+    }
+  } else {
+    if (bgV) { bgV.hidden = true; bgV.pause(); }
+    if (bgI) bgI.hidden = true;
+  }
+
+  const objFit = fillMode === 'crop' ? 'cover' : 'contain';
+  player.style.objectFit = img.style.objectFit = objFit;
+
   if (view.isImage) { img.hidden = false; player.style.visibility = 'hidden'; if (img.src !== src) img.src = src; img.style.filter = f; img.style.transform = cssTransform(view.filters); }
   else {
     img.hidden = true;
@@ -182,7 +214,7 @@ function tick(ts) {
 function setPlaying(p) {
   state.playing = p && total() > 0; $('btnPlay').textContent = state.playing ? '⏸' : '▶';
   if (state.playing) { if (state.time >= total()) state.time = 0; lastTs = performance.now(); raf = requestAnimationFrame(tick); }
-  else { player.pause(); $('bgAudio').pause(); $('ovPlayer').pause(); cancelAnimationFrame(raf); }
+  else { player.pause(); if ($('bgPlayer')) $('bgPlayer').pause(); $('bgAudio').pause(); $('ovPlayer').pause(); cancelAnimationFrame(raf); }
 }
 
 // Arrastar (mover/reordenar) e aparar clipes pelas bordas.
@@ -448,7 +480,13 @@ function renderProps() {
   }
   const c = state.clips.find(x => x.id === s.id); if (!c) return;
   c.filters = c.filters || {};
-  p.innerHTML = slider('Brilho', 'brightness', -50, 50, c.filters) + slider('Contraste', 'contrast', -50, 100, c.filters)
+  const fillMode = c.filters.fillMode || 'fit';
+  p.innerHTML = `<div class="prop">Enquadramento<select id="pFill">
+      <option value="fit" ${fillMode === 'fit' ? 'selected' : ''}>Ajustar (Barras pretas)</option>
+      <option value="blur" ${fillMode === 'blur' ? 'selected' : ''}>Desfoque de Fundo (Canvas Blur)</option>
+      <option value="crop" ${fillMode === 'crop' ? 'selected' : ''}>Preencher (Cortar bordas)</option>
+    </select></div>`
+    + slider('Brilho', 'brightness', -50, 50, c.filters) + slider('Contraste', 'contrast', -50, 100, c.filters)
     + slider('Saturação', 'saturation', -100, 100, c.filters) + slider('Desfoque', 'blur', 0, 20, c.filters)
     + `<div class="prop">Zoom<input type="range" id="pZoom" min="1" max="3" step="0.05" value="${c.filters.zoom || 1}"></div>
        <div class="prop">Rotação<select id="pRot">${[0, 90, 180, 270].map(v => `<option ${(c.filters.rotate || 0) === v ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
@@ -463,6 +501,7 @@ function renderProps() {
        <div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>`
        + (c.hasAudio && !c.isImage ? `<button id="btnDetach" class="wide">Separar Áudio do Vídeo</button>` : '');
   p.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => { c.filters[i.dataset.k] = +i.value; renderPreview(); });
+  $('pFill').onchange = (e) => { c.filters.fillMode = e.target.value; renderPreview(); };
   if ($('btnDetach')) $('btnDetach').onclick = () => detachAudio(c);
   $('pGray').onchange = (e) => { c.filters.grayscale = e.target.checked; renderPreview(); };
   $('pVin').onchange = (e) => { c.filters.vignette = e.target.checked; renderPreview(); };
