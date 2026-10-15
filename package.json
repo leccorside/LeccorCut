@@ -1,12 +1,14 @@
 {
   "name": "leccorcut",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "LeccorCut - editor de vídeo desktop original (Electron + FFmpeg)",
+  "author": "LeccorCut Team",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
     "test": "node tests/export-smoke.js && node tests/cutout-smoke.js",
-    "dist": "electron-builder --win"
+    "icons": "node scripts/generate-icons.js",
+    "dist": "node scripts/generate-icons.js && electron-builder --win --x64"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.1",
@@ -16,13 +18,35 @@
   "devDependencies": {
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3"
-  }
-,
+  },
   "build": {
     "appId": "com.leccorside.leccorcut",
     "productName": "LeccorCut",
-    "files": ["src/**", "package.json"],
-    "asarUnpack": ["node_modules/ffmpeg-static/**", "node_modules/ffprobe-static/**", "node_modules/onnxruntime-node/**", "node_modules/sharp/**"],
-    "win": { "target": "nsis" }
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**",
+      "node_modules/ffprobe-static/**",
+      "node_modules/@huggingface/**",
+      "node_modules/onnxruntime-node/**"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "LeccorCut"
+    }
   }
 }

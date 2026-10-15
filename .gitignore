@@ -4,8 +4,9 @@ node_modules/
 # Build / distribuição
 dist/
 out/
-build/
-*.exe
+build/*.tmp
+!build/icon.ico
+!build/icon.png
 *.msi
 *.dmg
 *.AppImage

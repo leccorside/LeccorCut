@@ -104,11 +104,19 @@ Gera mídias sintéticas via FFmpeg e valida o pipeline completo de exportação
 npm test
 ```
 
-### Gerar Instalador para Windows (.exe)
+### Gerar Ícones Oficiais do Aplicativo
+```bash
+npm run icons
+```
+Gera automaticamente `build/icon.png` (512x512) e `build/icon.ico` (256x256 com múltiplos mipmaps) utilizando o FFmpeg nativo.
+
+### Gerar Instalador e Executável para Windows (.exe)
 ```bash
 npm run dist
 ```
-O instalador NSIS completo será gerado dentro da pasta `dist/`.
+Gera a aplicação completa pronta para distribuição dentro da pasta `dist/`:
+- **Executável Portátil / Desempacotado**: `dist/win-unpacked/LeccorCut.exe`
+- **Instalador Completo NSIS**: `dist/LeccorCut Setup 1.0.0.exe` (com assistente de instalação, atalhos no Desktop e Menu Iniciar).
 
 ---
 
@@ -116,17 +124,21 @@ O instalador NSIS completo será gerado dentro da pasta `dist/`.
 
 ```text
 LeccorCut/
+├── build/                  # Ícones gerados para o aplicativo (icon.png, icon.ico)
+├── scripts/
+│   └── generate-icons.js   # Gerador automatizado de ícones via FFmpeg
 ├── src/
-│   ├── main.js             # Processo principal do Electron, IPCs, janelas e modelos
+│   ├── main.js             # Processo principal do Electron, IPCs, janelas e IA
 │   ├── preload.js          # Context bridge segura entre Node e Renderer
-│   ├── index.html          # Interface de usuário (Layout dark mode)
-│   ├── styles.css          # Design system com tokens HSL e animações
+│   ├── index.html          # Interface de usuário (Layout dark mode moderno)
+│   ├── styles.css          # Design system com tokens HSL, preview e timeline
 │   ├── renderer.js         # Lógica da timeline, preview, estado reativo e interações
-│   └── ffmpegBuilder.js    # Montador do filter_complex para exportação precisa
+│   └── ffmpegBuilder.js    # Montador modular do filter_complex para exportação
 ├── tests/
-│   └── export-smoke.js     # Teste automatizado de renderização FFmpeg
-├── package.json            # Metadados, scripts e dependências
-└── .gitignore              # Ignora builds, node_modules e mídias temporárias
+│   ├── export-smoke.js     # Teste automatizado de renderização FFmpeg
+│   └── cutout-smoke.js     # Teste automatizado do pipeline de Smart Cutout com canal alfa
+├── package.json            # Metadados, scripts e configuração do electron-builder (NSIS)
+└── .gitignore              # Ignora builds, dist, node_modules e arquivos temporários
 ```
 
 ---
