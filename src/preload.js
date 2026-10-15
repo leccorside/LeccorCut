@@ -38,7 +38,15 @@ contextBridge.exposeInMainWorld('api', {
   onSuperResProgress: (cb) => ipcRenderer.on('superres-progress', (_e, data) => cb(data)),
   // ── Fase 8: Exportação Profissional e Áudio ────────────────────────────────
   exportAudioOnly: (project) => ipcRenderer.invoke('export-audio-only', project),
-  onExportAudioProgress: (cb) => ipcRenderer.on('export-audio-progress', (_e, s) => cb(s))
+  onExportAudioProgress: (cb) => ipcRenderer.on('export-audio-progress', (_e, s) => cb(s)),
+  // ── Fase 9: UX, Produtividade, Assets e Backups ─────────────────────────────
+  getAssetsList: (cat) => ipcRenderer.invoke('get-assets-list', cat),
+  ensureAssetFile: (id) => ipcRenderer.invoke('ensure-asset-file', id),
+  saveBackup: (d) => ipcRenderer.invoke('save-backup', d),
+  listBackups: () => ipcRenderer.invoke('list-backups'),
+  restoreBackup: (id) => ipcRenderer.invoke('restore-backup', id),
+  deleteBackup: (id) => ipcRenderer.invoke('delete-backup', id),
+  toggleFullscreen: () => ipcRenderer.invoke('toggle-fullscreen')
 });
 
 

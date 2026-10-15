@@ -1054,3 +1054,65 @@ Permite a extração de mixdown estéreo sem necessidade de renderizar vídeo:
 
 *Secao gerada em: 2026-10-15 | Fase 8 — 50 testes automatizados passando (100%)*
 
+---
+
+## 22. Fase 9 — UX, Produtividade e Assets
+
+Implementada na Fase 9 (`PASSOS.md`), esta seção documenta as melhorias de experiência de usuário, ferramentas de produtividade, biblioteca offline de stickers e molduras, motor de auto-backups e personalização de atalhos.
+
+### 22.1 Modo Cinema e Pré-Visualização em Tela Cheia
+
+- **Atalhos globais:** `F11` e `Ctrl+F` (ou botão `⛶` na barra de transporte de preview).
+- **Comportamento visual:**
+  - O `#stage` recebe a classe `.cinema-mode`, fixando-se sobre toda a janela (`inset: 0`, `z-index: 99999`) com fundo preto absoluto.
+  - O player de vídeo redimensiona-se automaticamente preservando o aspect ratio configurado (`16:9`, `9:16`, `1:1`, `4:5`).
+  - Acionamento concomitante da Fullscreen API nativa (`requestFullscreen()`).
+  - **Barra de Transporte Flutuante (`.cinema-controls`):** Surge suavemente no rodapé ao mover o cursor com botões translúcidos (glassmorphism), indicador de tempo sincronizado em tempo real e botão de saída.
+  - Saída imediata com a tecla `Escape`, `F11` ou clique no botão fechar.
+
+### 22.2 Biblioteca Integrada de Assets e Stickers (`src/assetsLibrary.js`)
+
+Biblioteca nativa offline de gráficos vetoriais de alta fidelidade organizada em 4 categorias essenciais para criadores:
+
+1. **Setas & Indicadores:** Seta Neon Ciano/Roxo, Seta Curva Vermelha de Destaque, Cursor de Clique com onda de pulso, Mira Holográfica de Foco.
+2. **Badges & Interação Social:** Botão "INSCREVA-SE", Curtir / Like Neon com gradiente, Ícone de Fogo / Em Alta, Selo Oficial Verificado.
+3. **Molduras & Overlays:** Moldura de Câmera REC (com ponto vermelho pulsante e linhas de grid), Borda Gradiente Cyberpunk, Faixa de Telejornal "URGENTE".
+4. **Stickers & Efeitos:** Balão de HQ "WOW!", Raio de Energia ⚡, Estrela Dourada ⭐, Coração Pulsante ❤️.
+
+**Arquitetura de Renderização Híbrida:**
+- **UI:** Renderiza os SVGs vetoriais puros diretamente no DOM nos cards da aba `✨ Stickers`.
+- **Motor de Vídeo e Timeline:** O método `ensureAssetFile(id)` salva o SVG e sintetiza instantaneamente um arquivo `.png` com canal alfa RGBA utilizando um compressor PNG puro em Node.js com `zlib.deflateSync`.
+- Isso garante 100% de compatibilidade com o pipeline de overlays do FFmpeg (`-filter_complex ... overlay`) e com o preview em tempo real no Electron, com suporte total a rotação, escala, opacidade, animações (fade, pop, slide, float) e borda/glow.
+
+### 22.3 Histórico Visual de Versões e Backups Automáticos (.lccut)
+
+Gerenciado por `src/backupManager.js`:
+
+- **Diretório seguro:** Snapshots persistidos em `userData/backups/`.
+- **Auto-Backup Periódico:** A cada 2 minutos (120s), se o projeto contiver clipes e tiver sofrido alterações, um snapshot é salvo em background sem travar a interface.
+- **Snapshots Manuais:** Pelo botão `⏱️ Versões`, o usuário pode nomear e salvar marcos do projeto (ex: *"Antes do corte das vozes"*).
+- **Metadados dos Snapshots:** Data/hora legível, contagem de clipes, textos, áudios e stickers salvos.
+- **Pruning Automático:** Limita o histórico aos 50 backups mais recentes, excluindo versões antigas para poupar espaço em disco.
+- **Restauração Instantânea:** Recupera o estado completo (`clips`, `texts`, `audios`, `overlays`, `tracks`, `markers`) através do snapshot pipeline com histórico desfazer/refazer.
+
+### 22.4 Customização de Atalhos de Teclado
+
+- **Modal de Atalhos:** Acessível via botão `⌨️ Atalhos` no cabeçalho.
+- **Mapeamento Flexível:**
+  - `play_pause`: Reproduzir / Pausar (Padrão: `Espaço`)
+  - `split`: Dividir Clipe (Padrão: `S`)
+  - `delete`: Excluir Selecionado (Padrão: `Delete` / `Backspace`)
+  - `freeze`: Congelar Quadro (Padrão: `F`)
+  - `flash`: Flash de Batida (Padrão: `B`)
+  - `marker`: Marcador na Linha do Tempo (Padrão: `M`)
+  - `snap`: Alternar Snap Magnético (Padrão: `N`)
+  - `cinema`: Modo Cinema (Padrão: `F11`)
+- **Gravação Interativa:** Clique na tecla desejada, pressione a nova combinação e salve.
+- **Persistência:** Salvo no `localStorage` sob a chave `leccorcut_custom_shortcuts`.
+- **Botão de Restauração:** Restaura os padrões originais com um clique.
+
+---
+
+*Secao gerada em: 2026-10-15 | Fase 9 — 55 testes automatizados passando (100%)*
+
+

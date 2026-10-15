@@ -724,7 +724,9 @@ function renderPreview() {
 }
 
 function updateTime() {
-  $('timeLabel').textContent = `${fmt(state.time)} / ${fmt(total())}`;
+  const tStr = `${fmt(state.time)} / ${fmt(total())}`;
+  $('timeLabel').textContent = tStr;
+  if ($('cinemaTimeLabel')) $('cinemaTimeLabel').textContent = tStr;
   $('playhead').style.left = (12 + state.time * pxPerSec) + 'px';
 }
 
@@ -735,7 +737,10 @@ function tick(ts) {
   renderPreview(); raf = requestAnimationFrame(tick);
 }
 function setPlaying(p) {
-  state.playing = p && total() > 0; $('btnPlay').textContent = state.playing ? '⏸' : '▶';
+  state.playing = p && total() > 0;
+  const icon = state.playing ? '⏸' : '▶';
+  $('btnPlay').textContent = icon;
+  if ($('btnCinemaPlay')) $('btnCinemaPlay').textContent = icon;
   if (state.playing) { if (state.time >= total()) state.time = 0; lastTs = performance.now(); raf = requestAnimationFrame(tick); }
   else { player.pause(); if ($('bgPlayer')) $('bgPlayer').pause(); $('bgAudio').pause(); $('ovPlayer').pause(); cancelAnimationFrame(raf); }
 }
@@ -1708,22 +1713,51 @@ $('ruler').onclick = (e) => { state.time = Math.max(0, (e.clientX - $('ruler').g
 $('btnMarker').onclick = addOrToggleMarker;
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+
+  // Sair do Modo Cinema com Escape
+  if (e.key === 'Escape' && $('stage')?.classList.contains('cinema-mode')) {
+    e.preventDefault();
+    if (typeof toggleCinemaMode === 'function') toggleCinemaMode();
+    return;
+  }
+
+  // Atalho do Modo Cinema (F11 ou Ctrl+F)
+  const isCinemaShortcut = e.key === 'F11' || ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F'));
+  if (isCinemaShortcut) {
+    e.preventDefault();
+    if (typeof toggleCinemaMode === 'function') toggleCinemaMode();
+    return;
+  }
+
   const fps = +$('expFps').value || 30;
   const frameDur = 1 / fps;
-  if (e.key === 's' || e.key === 'S') split();
-  else if (e.key === 'Delete') del();
-  else if (e.key === 'f' || e.key === 'F') freezeFrame();
-  else if (e.key === 'b' || e.key === 'B') addFlashEffect();
-  else if (e.key === 'm' || e.key === 'M') addOrToggleMarker();
-  else if (e.key === 'n' || e.key === 'N') toggleSnap();
+  const k = e.key;
+  const kLower = k.toLowerCase();
+
+  const matchAction = (actName, fallbackKey) => {
+    if (typeof activeShortcuts !== 'undefined' && activeShortcuts[actName]?.key) {
+      const target = activeShortcuts[actName].key;
+      return target.toLowerCase() === kLower || target === k;
+    }
+    return fallbackKey ? (fallbackKey.toLowerCase() === kLower || fallbackKey === k) : false;
+  };
+
+  if (matchAction('split', 's')) split();
+  else if (matchAction('delete', 'Delete') || k === 'Backspace') del();
+  else if (matchAction('freeze', 'f') && !e.ctrlKey) freezeFrame();
+  else if (matchAction('flash', 'b') && !e.ctrlKey) addFlashEffect();
+  else if (matchAction('marker', 'm')) addOrToggleMarker();
+  else if (matchAction('snap', 'n')) toggleSnap();
+  else if (matchAction('play_pause', ' ')) { e.preventDefault(); setPlaying(!state.playing); }
   else if (e.key === 'ArrowLeft') { e.preventDefault(); state.time = Math.max(0, state.time - (e.shiftKey ? 1 : frameDur)); renderPreview(); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); state.time = Math.min(total(), state.time + (e.shiftKey ? 1 : frameDur)); renderPreview(); }
   else if (e.key === 'ArrowUp') { e.preventDefault(); jumpCut(-1); }
   else if (e.key === 'ArrowDown') { e.preventDefault(); jumpCut(1); }
+  else if (e.key === 'Home') { e.preventDefault(); state.time = 0; renderPreview(); }
+  else if (e.key === 'End') { e.preventDefault(); state.time = total(); renderPreview(); }
   else if (e.key === 'j' || e.key === 'J') { state.time = Math.max(0, state.time - 2); renderPreview(); }
   else if (e.key === 'k' || e.key === 'K') { setPlaying(false); }
   else if (e.key === 'l' || e.key === 'L') { state.time = Math.min(total(), state.time + 2); renderPreview(); }
-  else if (e.key === ' ') { e.preventDefault(); setPlaying(!state.playing); }
 });
 
 const PRESET_CONFIGS = {
@@ -1940,22 +1974,25 @@ renderTimeline(); renderPreview();
 let sfxAudioPlayer = null;
 
 function initPanelTabs() {
-  const tabM = $('tabMedia'), tabS = $('tabSfx');
-  const viewM = $('mediaView'), viewS = $('sfxView');
-  if (tabM && tabS && viewM && viewS) {
-    tabM.onclick = () => {
-      tabM.classList.add('active');
-      tabS.classList.remove('active');
-      viewM.hidden = false;
-      viewS.hidden = true;
+  const tabs = [
+    { btn: $('tabMedia'), view: $('mediaView') },
+    { btn: $('tabSfx'), view: $('sfxView') },
+    { btn: $('tabAssets'), view: $('assetsView') },
+    { btn: $('tabAi'), view: $('aiView') }
+  ].filter(t => t.btn && t.view);
+
+  tabs.forEach(activeTab => {
+    activeTab.btn.onclick = () => {
+      tabs.forEach(t => {
+        const isSel = t === activeTab;
+        t.btn.classList.toggle('active', isSel);
+        t.view.hidden = !isSel;
+      });
+      if (activeTab.btn.id === 'tabAssets' && typeof window.renderAssetsList === 'function') {
+        window.renderAssetsList();
+      }
     };
-    tabS.onclick = () => {
-      tabS.classList.add('active');
-      tabM.classList.remove('active');
-      viewM.hidden = true;
-      viewS.hidden = false;
-    };
-  }
+  });
 }
 
 async function initSfx() {
@@ -2079,45 +2116,6 @@ if ($('btnFlash')) $('btnFlash').onclick = addFlashEffect;
 
 // ─── Tab IA: controle de visibilidade ────────────────────────────────────────
 function initAiTab() {
-  const tabAi = $('tabAi'), viewAi = $('aiView');
-  const tabMedia = $('tabMedia'), viewMedia = $('mediaView');
-  const tabSfx = $('tabSfx'), viewSfx = $('sfxView');
-  if (!tabAi || !viewAi) return;
-
-  // Registra o tabAi no sistema de tabs existente
-  const origTabMediaClick = tabMedia?.onclick;
-  const origTabSfxClick = tabSfx?.onclick;
-
-  tabAi.onclick = () => {
-    tabAi.classList.add('active');
-    if (tabMedia) { tabMedia.classList.remove('active'); if (viewMedia) viewMedia.hidden = true; }
-    if (tabSfx) { tabSfx.classList.remove('active'); if (viewSfx) viewSfx.hidden = true; }
-    viewAi.hidden = false;
-  };
-
-  // Sobrescreve os clicks das outras abas para também ocultar o aiView
-  if (tabMedia) {
-    tabMedia.onclick = () => {
-      tabMedia.classList.add('active');
-      if (tabSfx) tabSfx.classList.remove('active');
-      tabAi.classList.remove('active');
-      if (viewMedia) viewMedia.hidden = false;
-      if (viewSfx) viewSfx.hidden = true;
-      viewAi.hidden = true;
-    };
-  }
-  if (tabSfx) {
-    tabSfx.onclick = () => {
-      tabSfx.classList.add('active');
-      if (tabMedia) tabMedia.classList.remove('active');
-      tabAi.classList.remove('active');
-      if (viewSfx) viewSfx.hidden = false;
-      if (viewMedia) viewMedia.hidden = true;
-      viewAi.hidden = true;
-    };
-  }
-
-  // Sliders com valor ao vivo
   const beatSens = $('beatSensitivity'), beatSensVal = $('beatSensVal');
   if (beatSens && beatSensVal) {
     beatSens.oninput = () => { beatSensVal.textContent = parseFloat(beatSens.value).toFixed(2); };
@@ -2480,3 +2478,312 @@ initBeatDetect();
 initTts();
 initTranslation();
 initSuperResolution();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FASE 9 — UX, Produtividade, Assets e Backups: Lógica de UI e Integração
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── 9.1a: Modo Cinema / Tela Cheia ──────────────────────────────────────────
+function toggleCinemaMode() {
+  const stage = $('stage');
+  const ctrl = $('cinemaControls');
+  if (!stage) return;
+
+  const isCinema = stage.classList.toggle('cinema-mode');
+  if (ctrl) ctrl.hidden = !isCinema;
+
+  if (isCinema) {
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } catch (_) {}
+    toast('Modo Cinema ativado (Pressione Esc ou F11 para sair)');
+  } else {
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+    } catch (_) {}
+  }
+  renderPreview();
+}
+
+function initCinemaMode() {
+  if ($('btnCinema')) $('btnCinema').onclick = toggleCinemaMode;
+  if ($('btnExitCinema')) $('btnExitCinema').onclick = toggleCinemaMode;
+  if ($('btnCinemaPlay')) {
+    $('btnCinemaPlay').onclick = () => setPlaying(!state.playing);
+  }
+}
+
+// ─── 9.1b: Biblioteca Integrada de Assets e Stickers ─────────────────────────
+let cachedAssets = [];
+
+async function initAssetsTab() {
+  const grid = $('assetsGrid');
+  const catFilter = $('assetCategoryFilter');
+  const searchInput = $('assetSearchInput');
+  if (!grid || !window.api?.getAssetsList) return;
+
+  try {
+    cachedAssets = await window.api.getAssetsList();
+  } catch (_) {
+    cachedAssets = [];
+  }
+
+  function renderGrid() {
+    const cat = catFilter ? catFilter.value : 'all';
+    const q = (searchInput?.value || '').toLowerCase().trim();
+
+    const filtered = cachedAssets.filter(item => {
+      const matchCat = cat === 'all' || item.category === cat;
+      const matchQ = !q || item.name.toLowerCase().includes(q) || (item.tags || []).some(t => t.includes(q));
+      return matchCat && matchQ;
+    });
+
+    grid.innerHTML = '';
+    if (!filtered.length) {
+      grid.innerHTML = '<p class="hint" style="grid-column: 1/-1; padding: 16px; text-align: center;">Nenhum sticker localizado.</p>';
+      return;
+    }
+
+    filtered.forEach(asset => {
+      const card = document.createElement('div');
+      card.className = 'asset-card';
+      card.innerHTML = `
+        <div class="asset-card-preview">${asset.svg}</div>
+        <div class="asset-card-title" title="${asset.name}">${asset.name}</div>
+        <button class="asset-card-btn">+ Inserir</button>
+      `;
+      card.onclick = async () => {
+        try {
+          const fileInfo = await window.api.ensureAssetFile(asset.id);
+          if (!fileInfo || !fileInfo.path) return toast('Erro ao carregar asset');
+
+          const newOv = {
+            id: uid++,
+            path: fileInfo.path,
+            name: asset.name,
+            isImage: true,
+            start: state.time,
+            in: 0,
+            duration: 3,
+            max: 3,
+            x: 0.5,
+            y: 0.5,
+            scale: 25,
+            opacity: 1,
+            anim: 'pop'
+          };
+          state.overlays.push(newOv);
+          renderTimeline();
+          renderPreview();
+          toast(`Sticker "${asset.name}" adicionado à timeline`);
+        } catch (e) {
+          toast('Falha ao inserir sticker: ' + (e.message || e));
+        }
+      };
+      grid.appendChild(card);
+    });
+  }
+
+  if (catFilter) catFilter.onchange = renderGrid;
+  if (searchInput) searchInput.oninput = renderGrid;
+  window.renderAssetsList = renderGrid;
+  renderGrid();
+}
+
+// ─── 9.1c: Histórico Visual de Versões e Backups Automáticos (.lccut) ─────────
+function initBackups() {
+  const modal = $('historyModal');
+  const btnHistory = $('btnHistory');
+  const btnClose = $('btnCloseHistory');
+  const listEl = $('historyList');
+  const btnCreate = $('btnCreateSnapshot');
+  const labelInput = $('manualSnapshotLabel');
+
+  if (!btnHistory || !window.api?.saveBackup) return;
+
+  async function loadHistory() {
+    if (!listEl) return;
+    listEl.innerHTML = '<p class="hint" style="text-align: center; padding: 12px;">Carregando versões...</p>';
+    const items = await window.api.listBackups();
+    listEl.innerHTML = '';
+    if (!items || !items.length) {
+      listEl.innerHTML = '<p class="hint" style="text-align: center; padding: 20px;">Nenhum snapshot de backup salvo ainda.</p>';
+      return;
+    }
+    items.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'history-item';
+      const dt = new Date(item.date).toLocaleString('pt-BR');
+      el.innerHTML = `
+        <div class="history-info">
+          <span class="history-title">${item.label || 'Snapshot'}</span>
+          <span class="history-meta">${dt} · ${item.clipsCount} clipe(s) · ${item.overlaysCount} sticker(s)</span>
+        </div>
+        <div class="history-actions">
+          <button class="history-restore-btn">Restaurar</button>
+          <button class="history-del-btn" title="Excluir backup">🗑</button>
+        </div>
+      `;
+      el.querySelector('.history-restore-btn').onclick = async () => {
+        if (!confirm(`Deseja restaurar a versão "${item.label}" de ${dt}? O estado atual será substituído.`)) return;
+        const res = await window.api.restoreBackup(item.id);
+        if (res.ok && res.project) {
+          hApply(JSON.stringify(res.project));
+          modal.hidden = true;
+          toast(`Versão "${item.label}" restaurada com sucesso!`);
+        } else {
+          toast('Falha ao restaurar: ' + (res.error || 'Erro'));
+        }
+      };
+      el.querySelector('.history-del-btn').onclick = async () => {
+        await window.api.deleteBackup(item.id);
+        loadHistory();
+      };
+      listEl.appendChild(el);
+    });
+  }
+
+  btnHistory.onclick = () => {
+    modal.hidden = false;
+    loadHistory();
+  };
+  if (btnClose) btnClose.onclick = () => { modal.hidden = true; };
+  modal.onclick = (e) => { if (e.target === modal) modal.hidden = true; };
+
+  if (btnCreate) {
+    btnCreate.onclick = async () => {
+      const lbl = labelInput?.value?.trim() || 'Manual';
+      const snap = {
+        clips: state.clips, texts: state.texts, audios: state.audios,
+        overlays: state.overlays, tracks: state.tracks, markers: state.markers,
+        settings: { height: +$('expRes')?.value, fps: +$('expFps')?.value, aspect: $('expAspect')?.value }
+      };
+      const res = await window.api.saveBackup({ project: snap, label: lbl });
+      if (res.ok) {
+        toast(`Snapshot "${lbl}" criado com sucesso!`);
+        if (labelInput) labelInput.value = '';
+        loadHistory();
+      }
+    };
+  }
+
+  // Auto-backup periódico a cada 2 minutos se houver clipes
+  let lastAutoBackupHash = '';
+  setInterval(async () => {
+    if (!state.clips.length) return;
+    const curHash = JSON.stringify({ clips: state.clips, texts: state.texts, audios: state.audios, overlays: state.overlays });
+    if (curHash === lastAutoBackupHash) return;
+    lastAutoBackupHash = curHash;
+    const snap = {
+      clips: state.clips, texts: state.texts, audios: state.audios,
+      overlays: state.overlays, tracks: state.tracks, markers: state.markers
+    };
+    await window.api.saveBackup({ project: snap, label: 'Auto-Backup' });
+  }, 120000);
+}
+
+// ─── 9.1d: Painel de Customização de Atalhos de Teclado ──────────────────────
+const DEFAULT_SHORTCUTS = {
+  play_pause: { key: ' ', label: 'Espaço', name: 'Reproduzir / Pausar' },
+  split: { key: 's', label: 'S', name: 'Dividir Clipe (Split)' },
+  delete: { key: 'Delete', label: 'Delete', name: 'Excluir Selecionado' },
+  freeze: { key: 'f', label: 'F', name: 'Congelar Quadro (Freeze)' },
+  flash: { key: 'b', label: 'B', name: 'Flash de Batida' },
+  marker: { key: 'm', label: 'M', name: 'Marcador de Batida' },
+  snap: { key: 'n', label: 'N', name: 'Alternar Snap Magnético' },
+  cinema: { key: 'F11', label: 'F11', name: 'Modo Cinema / Tela Cheia' }
+};
+
+let activeShortcuts = { ...DEFAULT_SHORTCUTS };
+
+function loadCustomShortcuts() {
+  try {
+    const saved = localStorage.getItem('leccorcut_custom_shortcuts');
+    if (saved) activeShortcuts = Object.assign({}, DEFAULT_SHORTCUTS, JSON.parse(saved));
+  } catch (_) {}
+}
+
+function initShortcuts() {
+  loadCustomShortcuts();
+  const modal = $('shortcutsModal');
+  const btn = $('btnShortcuts');
+  const btnClose = $('btnCloseShortcuts');
+  const listEl = $('shortcutsList');
+  const btnReset = $('btnResetShortcuts');
+  const btnSave = $('btnSaveShortcuts');
+  let recordingAction = null;
+
+  function renderShortcutsList() {
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    Object.keys(activeShortcuts).forEach(act => {
+      const cfg = activeShortcuts[act];
+      const row = document.createElement('div');
+      row.className = 'shortcut-row';
+      row.innerHTML = `
+        <span class="shortcut-action-name">${cfg.name}</span>
+        <button class="shortcut-key-badge ${recordingAction === act ? 'recording' : ''}" data-act="${act}">
+          ${recordingAction === act ? 'Pressione tecla...' : cfg.label}
+        </button>
+      `;
+      row.querySelector('.shortcut-key-badge').onclick = () => {
+        recordingAction = act;
+        renderShortcutsList();
+      };
+      listEl.appendChild(row);
+    });
+  }
+
+  if (btn) {
+    btn.onclick = () => {
+      recordingAction = null;
+      modal.hidden = false;
+      renderShortcutsList();
+    };
+  }
+  if (btnClose) btnClose.onclick = () => { modal.hidden = true; };
+  modal.onclick = (e) => { if (e.target === modal) modal.hidden = true; };
+
+  if (btnReset) {
+    btnReset.onclick = () => {
+      activeShortcuts = JSON.parse(JSON.stringify(DEFAULT_SHORTCUTS));
+      localStorage.removeItem('leccorcut_custom_shortcuts');
+      recordingAction = null;
+      renderShortcutsList();
+      toast('Atalhos restaurados para o padrão original');
+    };
+  }
+
+  if (btnSave) {
+    btnSave.onclick = () => {
+      localStorage.setItem('leccorcut_custom_shortcuts', JSON.stringify(activeShortcuts));
+      modal.hidden = true;
+      toast('Atalhos personalizados salvos com sucesso!');
+    };
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (!recordingAction) return;
+    e.preventDefault();
+    e.stopPropagation();
+    let key = e.key;
+    let label = key === ' ' ? 'Espaço' : key.toUpperCase();
+    if (e.ctrlKey && key !== 'Control') {
+      key = 'Ctrl+' + key;
+      label = 'Ctrl+' + label;
+    }
+    activeShortcuts[recordingAction].key = key;
+    activeShortcuts[recordingAction].label = label;
+    recordingAction = null;
+    renderShortcutsList();
+  }, true);
+}
+
+initCinemaMode();
+initAssetsTab();
+initBackups();
+initShortcuts();

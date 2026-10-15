@@ -8,6 +8,8 @@ const ffmpegPath = unpacked(require('ffmpeg-static'));
 const ffprobePath = unpacked(require('ffprobe-static').path);
 const { buildFfmpeg, buildAudioOnlyFfmpeg, buildCodecArgs } = require('./ffmpegBuilder');
 const { capcutToLeccor, leccorToCapcut } = require('./capcutConverter');
+const { getAssetsList, getAssetById, ensureAssetFile } = require('./assetsLibrary');
+const backupManager = require('./backupManager');
 
 let win;
 function createWindow() {
@@ -19,6 +21,7 @@ function createWindow() {
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, webSecurity: false }
   });
   win.setMenuBarVisibility(false);
+  backupManager.setBackupsDir(path.join(app.getPath('userData'), 'backups'));
   win.loadFile(path.join(__dirname, 'index.html'));
 }
 app.whenReady().then(createWindow);
@@ -1232,3 +1235,38 @@ ipcMain.handle('super-resolve', async (_e, opts = {}) => {
     p.on('error', (err) => resolve({ ok: false, error: err.message }));
   });
 });
+
+// ── Fase 9: UX, Produtividade, Assets e Backups ─────────────────────────────
+ipcMain.handle('get-assets-list', async (_e, category) => {
+  return getAssetsList(category);
+});
+
+ipcMain.handle('ensure-asset-file', async (_e, id) => {
+  return ensureAssetFile(id);
+});
+
+ipcMain.handle('save-backup', async (_e, data) => {
+  return backupManager.saveBackup(data?.project, data?.label);
+});
+
+ipcMain.handle('list-backups', async () => {
+  return backupManager.listBackups();
+});
+
+ipcMain.handle('restore-backup', async (_e, idOrFile) => {
+  return backupManager.restoreBackup(idOrFile);
+});
+
+ipcMain.handle('delete-backup', async (_e, idOrFile) => {
+  return backupManager.deleteBackup(idOrFile);
+});
+
+ipcMain.handle('toggle-fullscreen', async () => {
+  if (win) {
+    const nextState = !win.isFullScreen();
+    win.setFullScreen(nextState);
+    return nextState;
+  }
+  return false;
+});
+

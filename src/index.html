@@ -40,6 +40,8 @@
     </select>
     <button id="btnOpen">Abrir</button>
     <button id="btnSave">Salvar</button>
+    <button id="btnHistory" title="Histórico de Versões e Backups Automáticos (.lccut)">⏱️ Versões</button>
+    <button id="btnShortcuts" title="Configurar Atalhos de Teclado">⌨️ Atalhos</button>
     <button id="btnImportCapcut" class="capcut-btn" title="Importar Projeto do CapCut (draft_content.json)">📥 CapCut</button>
     <button id="btnExportCapcut" class="capcut-btn" title="Exportar Projeto para CapCut (draft_content.json)">📤 CapCut</button>
     <button id="btnExportAudio" title="Exportar Áudio Independente da Timeline (.wav, .mp3, .aac)">🎵 Áudio</button>
@@ -51,6 +53,7 @@
     <div class="panel-tabs">
       <button id="tabMedia" class="panel-tab active" title="Arquivos de Mídia do Projeto">📁 Mídia</button>
       <button id="tabSfx" class="panel-tab" title="Biblioteca de Efeitos Sonoros Nativos">🔊 Efeitos (SFX)</button>
+      <button id="tabAssets" class="panel-tab" title="Biblioteca de Stickers, Molduras e Overlays Vetoriais">✨ Stickers</button>
       <button id="tabAi" class="panel-tab" title="Ferramentas de IA Local (Fase 7)">🤖 IA</button>
     </div>
     <div id="mediaView">
@@ -60,6 +63,20 @@
     <div id="sfxView" hidden>
       <div class="sfx-header-desc">Efeitos sonoros nativos sintetizados em tempo real, prontos para cortes e transições:</div>
       <div id="sfxList"></div>
+    </div>
+    <!-- ── Fase 9: Biblioteca Integrada de Assets e Stickers ──────── -->
+    <div id="assetsView" hidden>
+      <div class="assets-header">
+        <select id="assetCategoryFilter">
+          <option value="all">Todas as Categorias</option>
+          <option value="arrows">🏹 Setas & Indicadores</option>
+          <option value="badges">🏷️ Badges & Social</option>
+          <option value="frames">🖼️ Molduras & Overlays</option>
+          <option value="stickers">✨ Stickers & Efeitos</option>
+        </select>
+        <input id="assetSearchInput" type="text" placeholder="Buscar sticker..." class="asset-search-input">
+      </div>
+      <div id="assetsGrid" class="assets-grid"></div>
     </div>
     <!-- ── Fase 7: Painel de IA Local ─────────────────────────────── -->
     <div id="aiView" hidden>
@@ -154,10 +171,16 @@
       <img id="ovImg" hidden>
       <div id="vignetteLayer" hidden></div>
       <div id="textLayer"></div>
+      <div id="cinemaControls" class="cinema-controls" hidden>
+        <button id="btnCinemaPlay">▶</button>
+        <span id="cinemaTimeLabel">00:00.0 / 00:00.0</span>
+        <button id="btnExitCinema" title="Sair do Modo Cinema (Esc ou F11)">✕ Sair do Cinema</button>
+      </div>
     </div>
     <div class="transport">
       <button id="btnPlay">▶</button>
       <span id="timeLabel">00:00.0 / 00:00.0</span>
+      <button id="btnCinema" title="Modo Cinema / Tela Cheia (F11 ou Ctrl+F)">⛶</button>
     </div>
   </section>
   <section id="propsPanel" class="panel">
@@ -230,6 +253,43 @@
 </section>
 <audio id="bgAudio"></audio>
 <div id="toast" hidden></div>
+
+<!-- ── Fase 9: Modal de Histórico de Versões & Backups ──────────── -->
+<div id="historyModal" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>⏱️ Histórico de Versões & Backups (.lccut)</h3>
+      <button id="btnCloseHistory" class="modal-close" title="Fechar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">Snapshots automáticos a cada 2 minutos ou manuais para recuperação instantânea do projeto.</p>
+      <div class="modal-row">
+        <input id="manualSnapshotLabel" placeholder="Rótulo da versão (ex: Antes do corte final)..." />
+        <button id="btnCreateSnapshot" class="primary">+ Criar Snapshot</button>
+      </div>
+      <div id="historyList" class="history-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fase 9: Modal de Customização de Atalhos ─────────────────── -->
+<div id="shortcutsModal" class="modal-overlay" hidden>
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>⌨️ Personalizar Atalhos de Teclado</h3>
+      <button id="btnCloseShortcuts" class="modal-close" title="Fechar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">Clique no atalho para redefinir a tecla desejada ou restaure as configurações padrão.</p>
+      <div id="shortcutsList" class="shortcuts-list"></div>
+      <div class="modal-footer-row">
+        <button id="btnResetShortcuts">Restaurar Padrões</button>
+        <button id="btnSaveShortcuts" class="primary">Salvar Atalhos</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="renderer.js"></script>
 </body>
 </html>
