@@ -139,29 +139,29 @@
 
 ## 🔧 Fase 4 — Análise Dinâmica (Em Execução)
 
+> **Nota de escopo (2026-10-15):** itens de **circunvenção** foram removidos do roteiro. Hookear validação de licença/assinatura e derrotar o anti-debug/anti-fraude (`metasecml.dll`) para forjar requisições assinadas não serve ao LeccorCut (editor offline independente) — só contornaria o controle de acesso do CapCut. A existência desses mecanismos já está documentada (Fase 3, seções 9.4 e 10.1). A instrumentação dinâmica aqui fica restrita a comportamento observável.
+
 ### 4.0 Captura de Tráfego (herdado da Fase 3)
 - [ ] Capturar tráfego com mitmproxy/Fiddler (CA raiz no repositório do Windows; verificar se o Cronet aceita o CA de usuário)
 - [ ] Confirmar quais hosts da seção 9.3 são realmente chamados no startup, na exportação e na IA cloud
 
-### 4.1 Instrumentação com Frida
-- [ ] Hookear funções de inicialização do `VECreator.dll`
-- [ ] Interceptar chamadas ao FFmpeg para capturar parâmetros de codificação
-- [ ] Hookear funções de marca d'água (quando/como é aplicada)
-- [ ] Interceptar chamadas de rede via `sscronet.dll` (QUIC/HTTP3)
-- [ ] Hookear validação de licença/assinatura
-- [ ] Capturar parâmetros de modelos de IA ao serem carregados
+### 4.1 Observação de Runtime (não intrusiva)
+- [x] Mapear parâmetros reais de exportação (via UI: 8K/2K, H.264, MP4, 30fps, Rec.709 SDR) e confirmar que o encode escreve direto no destino, sem intermediário em `User Data`
+- [x] Identificar como a mídia é sondada na importação (cache `mediainfo`/`steAVInfo`: cor, HDR, Dolby Vision) — reproduzível com `ffprobe`
+- [ ] ~~Interceptar chamadas de rede via `sscronet.dll`~~ — exigiria derrotar a assinatura MSSDK (fora de escopo); cobrir pela captura MITM da 4.0
+- [ ] ~~Hookear validação de licença/assinatura~~ — **removido (circunvenção, fora de escopo)**
 
 ### 4.2 Análise de Comportamento
-- [ ] Monitorar arquivos criados durante edição e exportação
-- [ ] Identificar estrutura do arquivo de draft (`draft_content.json`)
-- [ ] Monitorar chamadas de API durante fluxo de exportação
-- [ ] Analisar comportamento de telemetria (`push_detect.exe`)
-- [ ] Mapear dados enviados ao servidor durante uso normal
+- [x] Monitorar arquivos criados durante edição e exportação (`FileSystemWatcher`, 596 eventos; taxonomia de cache documentada na seção 18.2)
+- [x] Identificar estrutura do arquivo de draft (`draft_content.json`) — **modelo multi-timeline descoberto** (`Timelines/<id>/`, `project.json`, escrita atômica `.tmp`/`.bak`); seção 18.1
+- [x] Analisar a ferramenta de interop embarcada (`draft-converter.exe`: OTIO 0.18.1, AAF/FCPX/FCP7 → FCPXML); seção 18.4
+- [ ] Analisar comportamento de telemetria (`push_detect.exe`) — pendente, requer captura MITM (4.0)
+- [ ] Mapear dados enviados ao servidor durante uso normal — pendente, requer captura MITM (4.0)
 
 ### 4.3 Crash Analysis
-- [ ] Analisar `minidump_stackwalk.exe` para entender crash reports
-- [ ] Analisar `parfait_crash_handler.exe` e `VECrashHandler.exe`
-- [ ] Mapear pipeline de crash reporting
+- [x] Analisar `minidump_stackwalk.exe` (ferramenta de minidump do Breakpad)
+- [x] Analisar `parfait_crash_handler.exe` e `VECrashHandler.exe` (framework **Parfait** da ByteDance + `parfait_wer.dll` para Windows Error Reporting)
+- [x] Mapear pipeline de crash reporting (out-of-process → `crash_upload`; GWP-ASan; seção 18.5)
 
 ---
 
@@ -199,9 +199,9 @@
 | Fase 1 — Reconhecimento Estático | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 2 — Arquitetura e Componentes | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 3 — Rede e APIs | 🟢 Parte estática concluída (19/20; MITM movido para a Fase 4) | 🟡 Média |
-| Fase 4 — Análise Dinâmica | ⚪ Não iniciado | 🟡 Média |
+| Fase 4 — Análise Dinâmica | 🟢 Comportamento e crash OK; falta só captura MITM (telemetria/rede) | 🟡 Média |
 | Fase 5 — Aplicação ao LeccorCut | 🟡 Em andamento (40%) | 🟢 Contínuo |
 
 ---
 
-*Última atualização: 2026-10-15 | Ferramenta: REA v6.4.0 + Ghidra 12.1.4*
+*Última atualização: 2026-10-15 | Ferramenta: REA v6.4.0 + Ghidra 12.1.4 + monitoramento de FS (FileSystemWatcher)*

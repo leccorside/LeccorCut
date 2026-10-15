@@ -111,9 +111,19 @@ via engenharia reversa estática com as ferramentas **REA v6.4.0** + **Ghidra 12
   - C2PA: fork Rust do `c2pa-rs` com **assinatura remota** (`/lv/v1/c2pa/sign`), JUMBF + COSE_Sign1, hash BMFF/Merkle, ativado por A/B.
   - Watermark invisível: modelo ByteNN `wm_embed_model_c4_v2` executado pela `TEInvisibleWatermarkUnit` no export, com ID e intervalo de frames vindos do servidor.
 
+- **Análise Dinâmica / Comportamental (Fase 4 — parte não intrusiva, 2026-10-15)**:
+  - Monitoramento de FS (`FileSystemWatcher`, 596 eventos, durante um export) + inspeção de artefatos em disco. Detalhes na seção 18 da documentação.
+  - **Formato de projeto é multi-timeline**: pasta com `draft_content.json` plano (compat) + `Timelines/<uuid>/draft_content.json` (conteúdo real) + `Timelines/project.json` (índice com `main_timeline_id`). Escrita atômica via `template-*.tmp` + `.bak`. Importador do LeccorCut deve ler a timeline principal e cair para o plano como fallback.
+  - Export: o CapCut **codifica direto no destino** (sem intermediário em `User Data`). Parâmetros observados na UI: 8K/2K, H.264, MP4, 30fps, Rec.709 SDR.
+  - Caches de edição: `frameThumbnail/<hash>/82x46/<µs>.jpg`, `audioWave/*.waveDataV2`, `importcache3/mediainfo/*.json` (sondagem tipo ffprobe com cor/HDR/DoVi), SQLite de índice (`ILASDKDB`, `ressdk_db`).
+  - Interop: `draft-converter.exe` = OpenTimelineIO 0.18.1 + adapters AAF/FCPX/FCP7 (AAF/Premiere XML → FCPXML → import). Define o caminho da Fase 5.3.
+  - Crash: framework **Parfait** da ByteDance (`VECrashHandler.exe`, `parfait_*`, `minidump_stackwalk`, GWP-ASan, `crash_upload`).
+  - **Privacidade:** todo draft embute `device_id`, `mac_address` (hash) e `hard_disk_id`.
+  - **Escopo:** itens de circunvenção (hook de licença, derrotar anti-fraude) foram **deliberadamente deixados de fora** — não servem a um editor offline.
+
 ### Arquivos Gerados
-- [PASSOS.md](file:///d:/0000000-PROJETOS/LeccorCut/PASSOS.md) — Roteiro com checkboxes (Fases 1 e 2 concluídas; Fase 3 com a parte estática concluída)
-- [DOCUMENTACAO.md](file:///d:/0000000-PROJETOS/LeccorCut/DOCUMENTACAO.md) — Documentação técnica completa (Seções 1 a 17; rede/APIs em 9.3–9.9; proteções em 10.4–10.8)
+- [PASSOS.md](file:///d:/0000000-PROJETOS/LeccorCut/PASSOS.md) — Roteiro com checkboxes (Fases 1 e 2 concluídas; Fase 3 estática concluída; Fase 4 só com MITM pendente)
+- [DOCUMENTACAO.md](file:///d:/0000000-PROJETOS/LeccorCut/DOCUMENTACAO.md) — Documentação técnica completa (Seções 1 a 18; rede/APIs em 9.3–9.9; proteções em 10.4–10.8; dinâmica em 18)
 - [CONTEXTO.md](file:///d:/0000000-PROJETOS/LeccorCut/CONTEXTO.md) — Memória de contexto atualizada
 
 ---

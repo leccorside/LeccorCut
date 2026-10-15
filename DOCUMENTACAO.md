@@ -747,4 +747,88 @@ A análise de assinatura binária (magic headers) revelou dois padrões primári
 
 ---
 
-*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática e arquitetural (Fases 1, 2 e 3 — parte estática de rede/APIs e proteções) do CapCut v9.6.0.4097*
+## 18. Análise Dinâmica / Comportamental (Fase 4)
+
+> Observação de comportamento **sem instrumentação intrusiva**: monitoramento de sistema de arquivos durante edição/exportação, inspeção dos artefatos em disco e da ferramenta de conversão embarcada. **Fora de escopo e não realizado:** hooks em validação de licença/assinatura e qualquer tentativa de derrotar o anti-debug/anti-fraude (`metasecml.dll`) ou forjar requisições assinadas — isso só serviria para contornar o controle de acesso do CapCut, não para construir um editor independente.
+
+### 18.1 Estrutura Real do Projeto em Disco (multi-timeline)
+
+Um projeto é uma **pasta** em `User Data/Projects/com.lveditor.draft/<nome>/`. A versão 9.6 usa um modelo **multi-timeline** (além do `draft_content.json` plano documentado na seção 5):
+
+```
+<projeto>/
+├── draft_content.json          # timeline principal (compat/espelho plano)
+├── draft_content.json.bak      # backup da escrita anterior
+├── draft_meta_info.json        # metadados: id, capa, tempos (µs), device_id, mac_address
+├── draft_settings              # preferências do projeto
+├── draft_virtual_store.json    # store auxiliar
+├── timeline_layout.json        # layout da UI (zoom/scroll da timeline)
+├── draft_agency_config.json / draft_biz_config.json
+├── template-2.tmp              # arquivo temporário da escrita atômica
+├── .locked                     # lock de projeto aberto
+├── common_attachment/attachment_id_mapping.json
+└── Timelines/
+    ├── project.json            # indice: main_timeline_id + lista de timelines
+    ├── project.json.bak
+    └── <timeline-UUID>/
+        ├── draft_content.json  # conteudo real daquela timeline
+        ├── draft_content.json.bak
+        ├── template.tmp / template-2.tmp
+        └── common_attachment/attachment_id_mapping.json
+```
+
+- **`Timelines/project.json`** lista as timelines: `{ "main_timeline_id": "<uuid>", "timelines": [ { "id", "name", "create_time", "update_time", "is_marked_delete" } ] }`. Tempos em microssegundos. Permite múltiplas linhas do tempo por projeto.
+- **Escrita atômica:** o CapCut escreve em `template-2.tmp`, faz backup do atual em `draft_content.json.bak` e então substitui `draft_content.json` (padrão write-temp → rename). Um importador robusto do LeccorCut deve ler o `draft_content.json` da timeline em `Timelines/<main_timeline_id>/` e cair para o plano da raiz como fallback.
+- **Privacidade:** `draft_meta_info.json` e os campos `platform`/`last_modified_platform` do `draft_content.json` embutem `device_id`, `mac_address` (hasheado), `hard_disk_id` e `app_id` em **todo** projeto salvo.
+
+### 18.2 Comportamento de I/O durante Edição e Exportação
+
+Monitoramento com `FileSystemWatcher` (596 eventos capturados em ~3 min, incluindo uma exportação). O CapCut **não cria arquivo intermediário de encode em `User Data`**: codifica direto no caminho de destino escolhido pelo usuário (observado: o arquivo de saída foi para `D:\...`, fora de `CapCut\Videos`). O que é escrito em `User Data` é cache e autosave:
+
+| Artefato | Caminho | Função |
+|---|---|---|
+| Thumbnails da timeline | `Cache/frameThumbnail/<hash>/82x46/<µs>.jpg` | Tira de miniaturas 82×46 nomeadas pelo timestamp em µs (gerada sob demanda ao navegar) |
+| Waveform de áudio | `Cache/audioWave/<hash>.waveDataV2` | Cache de forma de onda |
+| Sondagem de mídia | `Cache/importcache3/mediainfo/<hash>.json` | Info de stream do arquivo importado (ver 18.3) |
+| Índice de mídia | `Cache/ILASDKDB/scan.db`, `mediasearch.db` | SQLite de indexação/busca de mídia |
+| Recursos | `Cache/ressdk_db/<id>/rp.db` | DB de recursos baixados (efeitos/templates) |
+| Cache do agente | `Cache/agentCache/agent_media_asr.db` | ASR/transcrição do agente de IA |
+| Config de GPU | `Config/gpuSupport.ini`, `commonSetting.ini` | Capacidades de GPU detectadas, preferências |
+| Autosave do draft | `.../draft_content.json` + `.bak` + `template-2.tmp` | Salvo periodicamente durante a edição |
+
+Implicação para o LeccorCut: a estratégia de cache (miniaturas por timestamp, waveform pré-computada, mediainfo em cache) é um bom modelo para performance da timeline, e já é parcialmente replicável com o FFmpeg/ffprobe que o projeto embarca.
+
+### 18.3 Sondagem de Mídia (`mediainfo` cache)
+
+Ao importar um arquivo, o CapCut grava um JSON `steAVInfo` — equivalente a um `ffprobe`, com campos extras para HDR/Dolby Vision. Principais campos por stream de vídeo (`sVideoStreamInfo`):
+- `colorInfo` / `pkgColorInfo`: `color_primaries`, `color_range`, `color_trc`, `colorspace`, `color_depth`, `is_hdr_vivid`.
+- `doviInfo`: perfil/level Dolby Vision (`blPresentFlag`, `rpuPresentFlag`, `profile`, `level`).
+- `bitDepth`, `cleanApertureInfo` (clap), `eDisplayRotation`, `flipX/flipY`, `bByteVC110BitHWdecoder` (decodificação HW do codec ByteVC1/H.266).
+
+O LeccorCut consegue produzir o essencial desse struct com o `ffprobe-static` já presente em `node_modules` (`ffprobe -show_streams -print_format json`), bastando mapear os campos de cor.
+
+### 18.4 Interoperabilidade — `draft-converter.exe`
+
+Ferramenta CLI embarcada (`Tools/draft-converter/`, bundle PyInstaller) construída sobre **OpenTimelineIO 0.18.1** com adapters **AAF** (`pyaaf2` 1.7.1), **FCPX XML** e **FCP7 XML**. O módulo-ponte é `draftconv` (`draftconv.otio_io`, `draftconv.steps.fcpx_adapter_patch`).
+
+CLI pública (`convert.py`):
+
+| Subcomando | Função |
+|---|---|
+| `convert` | Autodetecta AAF/xmeml → FCPXML importável |
+| `aaf2fcpxml` | AAF (Avid) → FCPXML |
+| `xml2fcpxml` | FCP7 XML (xmeml, exportado do Premiere) → FCPXML |
+| `zero-tc` | Zera `tcStart` do FCPXML (reparo de timeline em branco no DaVinci) |
+
+Direção do fluxo: **AAF/Premiere XML → FCPXML → import no CapCut**. Confirma que o caminho de interop profissional do CapCut é via **OpenTimelineIO/FCPXML**, não um parser proprietário. Orienta a Fase 5.3: o importador do LeccorCut deve adotar OTIO/FCPXML como formato de troca para receber timelines de Premiere/DaVinci/Avid (e eventualmente do próprio CapCut).
+
+### 18.5 Crash Reporting (Parfait)
+
+Pilha de monitoramento de crash própria da ByteDance, o **Parfait** (análogo a Breakpad/Crashpad):
+- Binários: `VECrashHandler.exe` (2MB), `parfait_crash_handler.exe` (1.3MB), `parfait.dll`, `parfait_wer.dll` (integração com Windows Error Reporting) e `minidump_stackwalk.exe`/`.dll` (ferramenta de minidump do Breakpad).
+- API interna (strings do `VECreator.dll`): `ParfaitWrapperClient::InitGlobalEnv`, `initNetwork`, `initCrashPostHandler`, `initGWPAsanMonitor` (amostragem de segurança de memória GWP-ASan), `crash_upload`, `openParfaitLog`, `setVEParfaitCallback`. Caminho de build: `C:\90741\CapCutPC\AppMonitor\VECrashMonitor\VEParfaitWrapper\`.
+- O minidump é gerado fora do processo (handler dedicado) e enviado via rede (`crash_upload`), no mesmo padrão dos demais serviços ByteDance.
+
+---
+
+*Gerado em: 2026-10-15 | Fonte: engenharia reversa estática, arquitetural e dinâmica/comportamental (Fases 1 a 4; itens de circunvenção de licença/anti-fraude deliberadamente fora de escopo) do CapCut v9.6.0.4097*
