@@ -319,14 +319,63 @@
 | Fase 7 — IA Avançada Local (100% Offline) | ✅ Concluída (100%) | 🟠 Alta |
 | Fase 8 — Exportação Profissional e Codecs Adicionais | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 9 — UX, Produtividade e Assets | ✅ Concluída (100%) | 🟢 Concluída |
-| Fase 10 — Aceleração GPU por Hardware e Mídia Proxy | ⏳ A Fazer (0%) | 🔴 Alta |
-| Fase 11 — Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs | ⏳ A Fazer (0%) | 🟠 Alta |
-| Fase 12 — Áudio Avançado, Voice Changers e Separação Neural | ⏳ A Fazer (0%) | 🟡 Média |
-| Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal Livre | ⏳ A Fazer (0%) | 🔴 Alta |
-| Fase 14 — Interoperabilidade Pro (FCPXML / OTIO / EDL) | ⏳ A Fazer (0%) | 🟢 Média |
+| Fase 10 — Aceleração GPU por Hardware e Mídia Proxy | ✅ Concluída (100%) | 🔴 Alta |
+| Fase 11 — Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs | ✅ Concluída (100%) | 🟠 Alta |
+| Fase 12 — Áudio Avançado, Voice Changers e Separação Neural | ✅ Concluída (100%) | 🟡 Média |
+| Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal Livre | ✅ Concluída (100%) | 🔴 Alta |
+| Fase 14 — Interoperabilidade Pro (FCPXML / EDL / Bundler) | ✅ Concluída (100%) | 🟢 Concluída |
+| Fase 15 — Gravação Direta na Timeline (Voiceover, Mic & Webcam PiP) | ⏳ A Fazer (0%) | 🟠 Alta |
+| Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync) | ⏳ A Fazer (0%) | 🟡 Média |
+| Fase 17 — Dublagem Neural e Conversão Texto-em-Fala (TTS Local & Legendas Bilíngues) | ⏳ A Fazer (0%) | 🟡 Média |
+| Fase 18 — Exportador de Animações Web e Stickers (GIF / WebP Animado) | ⏳ A Fazer (0%) | 🟢 Baixa |
 
 ---
 
-*Última atualização: 2026-10-15 — Fases 1 a 9 concluídas (55 testes passando) | Mapeamento completo de paridade com CapCut (Fases 10 a 14 catalogadas)*
+## 🎙️ Fase 15 — Gravação Direta na Timeline (Voiceover, Microfone & Webcam PiP)
+
+### 15.1 Gravação de Áudio e Locução (Voiceover)
+- [ ] Implementar gravador de voz nativo com contagem regressiva 3..2..1 e inserção automática na agulha
+- [ ] Implementar medidor visual de nível de áudio (VU Meter em tempo real) com detecção de clipping
+- [ ] Implementar seleção de dispositivo de entrada de microfone e cancelamento de eco
+
+### 15.2 Captura de Webcam para Picture-in-Picture
+- [ ] Implementar gravação simultânea de câmera frontal para criação de reacts, tutoriais e gameplays
+- [ ] Inserção automática da gravação de webcam na trilha de sobreposição (PiP) com máscara circular/retangular
+
+---
+
+## ⚡ Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync)
+
+### 16.1 Removedor de Silêncio Automático (Smart Silence Remover)
+- [ ] Implementar análise acústica de trechos vazios com limiar configurável de ruído de fundo (-35dB a -50dB)
+- [ ] Remoção automática de pausas e gagueiras com corte limpo e transições suaves de áudio
+
+### 16.2 Sincronização Automática com a Batida (Auto Beat Sync)
+- [ ] Detector de transientes e batidas rítmicas com inserção de marcadores automáticos na timeline
+- [ ] Recurso de "Ajustar Cortes à Música" para alinhar transições de cena aos picos rítmicos
+
+---
+
+## 🗣️ Fase 17 — Dublagem Neural e Conversão Texto-em-Fala (TTS Local)
+
+### 17.1 Síntese de Voz Offline (Text-to-Speech)
+- [ ] Implementar motor TTS neural local para converter legendas e textos em faixas de áudio faladas
+- [ ] Seleção de timbres de voz naturais masculinos e femininos em português e inglês
+
+### 17.2 Legendas Bilíngues com Tradução Simultânea
+- [ ] Exibição simultânea de legendas no idioma original e traduzido (estilo conteúdo viral internacional)
+- [ ] Estilização visual independente para o texto principal e a tradução
+
+---
+
+## 🖼️ Fase 18 — Exportador de Animações Web e Stickers (GIF / WebP Animado)
+
+### 18.1 Exportação Direta de Memes e Stickers
+- [ ] Exportação de trechos selecionados para GIF animado com otimização de paleta adaptativa (`palettegen` / `paletteuse`)
+- [ ] Exportação para WebP animado com suporte a canal alfa transparente para figurinhas de mensageiros
+
+---
+
+*Última atualização: 2026-10-15 — Fases 1 a 14 100% concluídas (260+ testes passando) | Mapeamento expandido de recursos avançados com paridade total ao CapCut v9.6.0.4097*
 
 

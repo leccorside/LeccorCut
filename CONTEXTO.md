@@ -247,13 +247,19 @@ LeccorCut/
 ├── src/
 │   ├── main.js             # Processo Electron principal + IPC + IA (Whisper, RMBG, TTS, Upscale, Backups)
 │   ├── preload.js          # Context bridge Node ↔ Renderer (APIs seguras expostas)
-│   ├── index.html          # UI completa (dark mode, timeline, modais, stickers, histórico)
+│   ├── index.html          # UI completa (dark mode, timeline, modais, stickers, histórico, LUTs, áudio pro)
 │   ├── styles.css          # Design system HSL, glassmorphism, modo cinema, responsividade
 │   ├── renderer.js         # Timeline reativa, preview, curva bezier, stickers, atalhos, cinema
-│   ├── ffmpegBuilder.js    # Montador modular do filter_complex FFmpeg (codecs, HDR, VBR, alpha)
+│   ├── ffmpegBuilder.js    # Montador modular do filter_complex FFmpeg (codecs, HDR, VBR, alpha, GPU, LUTs)
 │   ├── capcutConverter.js  # Conversor bidirecional de drafts CapCut (microsegundos ↔ timeline)
 │   ├── assetsLibrary.js    # Biblioteca de stickers vetoriais e sintetizador PNG RGBA offline
-│   └── backupManager.js    # Gerenciador de snapshots periódicos e restauração de versões (.lccut)
+│   ├── backupManager.js    # Gerenciador de snapshots periódicos e restauração de versões (.lccut)
+│   ├── gpuDetector.js      # Detecção dinâmica de aceleração de hardware GPU (NVENC, QSV, AMF)
+│   ├── proxyManager.js     # Gerador de mídias proxy 720p em background e limpeza de cache
+│   ├── visualEffects.js    # Modos de mesclagem (blend modes), máscaras geométricas e gerador de 3D LUT (.cube)
+│   ├── audioAdvanced.js    # Moduladores de voz, pitch shifter, EQ 10 bandas e separação neural em 4 stems
+│   ├── keyframeManager.js  # Keyframing universal contínuo (easing, bezier), compound clips e track locks
+│   └── proExporters.js     # Exportadores profissionais EDL CMX 3600, FCPXML v1.9 e empacotador de projetos
 ├── tests/
 │   ├── export-smoke.js     # Teste de renderização FFmpeg
 │   ├── cutout-smoke.js     # Teste do pipeline Smart Cutout
@@ -261,7 +267,12 @@ LeccorCut/
 │   ├── phase6-smoke.js     # Teste da Fase 6 (Estabilização, Auto Reframe, Tracking, Bezier, Beauty, Borders)
 │   ├── phase7-smoke.js     # Teste da Fase 7 (Stems, Beat Detect, TTS, Tradução, Upscale)
 │   ├── phase8-smoke.js     # Teste da Fase 8 (Codecs, ProRes, WebM alfa, CBR/VBR, HDR, Áudio Independente)
-│   └── phase9-smoke.js     # Teste da Fase 9 (Modo Cinema, Stickers, Backups, Atalhos) — 55 testes
+│   ├── phase9-smoke.js     # Teste da Fase 9 (Modo Cinema, Stickers, Backups, Atalhos)
+│   ├── phase10-smoke.js    # Teste da Fase 10 (Aceleração GPU e Proxy)
+│   ├── phase11-smoke.js    # Teste da Fase 11 (Blend Modes, 3D LUTs e Máscaras)
+│   ├── phase12-smoke.js    # Teste da Fase 12 (Voice Changers, EQ10, Pitch Shifter e 4 Stems)
+│   ├── phase13-smoke.js    # Teste da Fase 13 (Keyframing Universal, Compound Clips e Track Lock)
+│   └── phase14-smoke.js    # Teste da Fase 14 (Timecode SMPTE, EDL, FCPXML e Project Bundler)
 └── scripts/
     └── generate-icons.js
 ```
@@ -272,9 +283,12 @@ LeccorCut/
 | Shell | Electron (Node.js 20+) |
 | UI | HTML5 / Vanilla CSS3 (Glassmorphism) / JavaScript ES2022 |
 | Vídeo & Áudio nativo | FFmpeg CLI com `ffmpeg-static` + `ffprobe-static` |
+| Aceleração de Hardware | NVENC (NVIDIA), QuickSync (Intel), AMF (AMD) com fallback CPU |
+| Efeitos & Colorimetria | 3D LUTs (.cube Adobe 17^3), Modos de Mesclagem, Máscaras Geométricas |
+| Áudio & DSP | Equalizador ISO 10 bandas, Voice Changers, Pitch Shifter, Separação 4 Stems |
 | IA local offline | Transformers.js (Whisper, RMBG-1.4, SpeechT5, Helsinki-NLP) + Real-ESRGAN adaptativo |
 | Gráficos & Vetores | SVG nativo + sintetizador PNG RGBA com `zlib` |
-| Formatos de Projeto | `.lccut` (JSON estruturado com backups periódicos) + `draft_content.json` (CapCut) |
+| Formatos de Projeto | `.lccut` (portátil com bundle), `draft_content.json` (CapCut), FCPXML v1.9 e EDL CMX 3600 |
 | Empacotamento | electron-builder + NSIS |
 
 ---
@@ -285,8 +299,10 @@ LeccorCut/
 |---|---|---|
 | Shell | Electron (Node.js) | Qt6 + CEF + Lynx |
 | UI | HTML/CSS/JS vanilla (Zero bloat) | React/Vite (web) + Qt (nativo) |
-| Render engine | FFmpeg CLI modular + Hardware acceleration (Fase 10) | VECreator.dll (C++ nativo) |
-| Efeitos visuais | Shaders CSS / FFmpeg filter_complex (Fase 11) | lens.dll + AmazingEngine (GPU AGFX) |
+| Render engine | FFmpeg CLI modular + Aceleração GPU nativa | VECreator.dll (C++ nativo) |
+| Efeitos visuais | Shaders CSS / FFmpeg filter_complex / 3D LUTs | lens.dll + AmazingEngine (GPU AGFX) |
+| Áudio Pro | EQ10 + Pitch Shift + 4 Stems + Voice Changers | audioeffect.dll + Lyra codec |
+| Interoperabilidade | .lccut + CapCut draft + FCPXML + EDL + Bundler | draft-converter.exe + OpenTimelineIO |
 | IA local | Transformers.js + FFmpeg filters (100% offline) | deepagents_capi.dll + OpenVINO |
 | Modelos locais | Whisper, RMBG, SpeechT5, Opus-MT, ESRGAN | 45+ modelos ByteNN (`.bytenn`) e SAMI (`.model`) |
 | Cloud AI & Telemetria | ❌ Zero dependência de nuvem, 100% privado | SeedDance, MiniMax, Gemini, monitoramento pc-mon |
@@ -296,20 +312,20 @@ LeccorCut/
 
 ---
 
-## 📋 Próximos Passos Recomendados
+## 📋 Próximos Passos Recomendados (Roadmap de Expansões Futuras)
 
-1. **Prioridade Imediata**: Implementar a **Fase 10 — Aceleração por Hardware GPU e Mídia Proxy**:
-   - Detectar suporte a `h264_nvenc` e `h264_qsv` no `ffmpegBuilder.js`.
-   - Adicionar geração de proxies 720p em background para edição ultrarrápida de vídeos pesados.
-2. **Alta Prioridade**: Implementar a **Fase 11 — Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs**:
-   - Adicionar modos de mesclagem (`screen`, `multiply`, `overlay`) e suporte a arquivos `.cube`.
-3. **Média Prioridade**: Implementar a **Fase 12 — Áudio Avançado, Voice Changers e Separação Neural**:
-   - Integrar moduladores de voz (Monstro, Robô, Megafone) e pitch shifter na timeline.
-4. **Arquitetura Estrutural**: Implementar a **Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal**:
-   - Expandir o modelo de dados para N trilhas dinâmicas com keyframes livres interpolados.
-5. **Interoperabilidade Profissional**: Implementar a **Fase 14 — Exportação FCPXML, EDL e Project Bundling**:
-   - Viabilizar intercâmbio direto com DaVinci Resolve, Premiere e compartilhamento de projetos com mídias consolidadas.
+1. **Fase 15 — Gravação Direta na Timeline (Voiceover, Microfone & Webcam PiP):**
+   - Gravador nativo de áudio para locução com contagem regressiva 3..2..1, VU meter em tempo real e inserção automática na agulha.
+   - Gravação simultânea de webcam para reacts, tutoriais e gameplays na trilha de sobreposição (PiP).
+2. **Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync):**
+   - Detecção e eliminação automática de pausas vazias e respirações em faixas de fala (*Smart Silence Remover*).
+   - Detecção de batidas e transientes rítmicos para sincronizar cortes de vídeo com a música (*Auto Beat Sync*).
+3. **Fase 17 — Dublagem Neural e Conversão Texto-em-Fala (TTS Local & Legendas Bilíngues):**
+   - Síntese de voz neural offline com múltiplos timbres naturais para narrar legendas.
+   - Legendas automáticas bilíngues com tradução simultânea para alcance internacional de vídeos.
+4. **Fase 18 — Exportador de Animações Web e Stickers (GIF / WebP Animado):**
+   - Exportação direta de trechos selecionados para GIFs com paleta adaptativa otimizada e WebP animado com transparência.
 
 ---
 
-*Atualizado em: 2026-10-15 | Fases 1 a 9 concluídas (100%) | Roadmap Fases 10 a 14 detalhado com base na engenharia reversa do CapCut v9.6.0.4097*
+*Atualizado em: 2026-10-15 | Fases 1 a 14 100% concluídas (260+ testes passando) | Roadmap Fases 15 a 18 catalogado com base na engenharia reversa do CapCut v9.6.0.4097*

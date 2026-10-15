@@ -1260,6 +1260,31 @@ Esta fase integrou recursos avançados de intercâmbio de timeline e portabilida
 
 ---
 
-*Documentação consolidada em: 2026-10-15 | Todas as Fases 1 a 14 mapeadas com fidelidade à arquitetura do CapCut v9.6.0.4097*
+## 24. Roadmap de Expansões Futuras (Fases 15 a 18)
+
+Mapeamento de recursos identificados no binário do CapCut v9.6.0.4097 (`VECreator.dll`, `audioeffect.dll`, `videoeditor.dll`, `cccreator.dll`) para implementação nas próximas fases do LeccorCut:
+
+### 24.1 Fase 15 — Gravação Direta na Timeline (Voiceover, Microfone & Webcam PiP)
+*Referência no CapCut: `audio_record_manager`, `record_controller`, `mic_stream_input`*
+- Gravador nativo de áudio para locução (*Voiceover*) com contagem regressiva 3..2..1, medidor visual de nível de áudio (VU Meter em tempo real) com detecção de clipping e inserção automática na agulha.
+- Captura de Webcam para Picture-in-Picture (PiP / Facecam) permitindo gravação simultânea de reações, tutoriais e gameplays na trilha de sobreposição com máscara circular/retangular.
+
+### 24.2 Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync)
+*Referência no CapCut: `silence_detector`, `beat_detect_model`, `audio_transient_detector`*
+- Removedor de Silêncio Automático (*Smart Silence Remover*): Análise acústica de faixas de voz com limiar configurável de ruído de fundo (-35dB a -50dB) e remoção automática de pausas e gagueiras com corte limpo e transições suaves de áudio.
+- Sincronização Automática com a Batida (*Auto Beat Sync*): Detector de transientes e batidas rítmicas com inserção de marcadores automáticos na timeline e recurso de "Ajustar Cortes à Música" para alinhar transições de cena aos picos rítmicos.
+
+### 24.3 Fase 17 — Dublagem Neural e Conversão Texto-em-Fala (TTS Local & Legendas Bilíngues)
+*Referência no CapCut: `tts_stream_synthesizer`, `bilingual_subtitle_generator`, `sam_voice_models`*
+- Síntese de Voz Offline (*Text-to-Speech*): Motor TTS neural local para converter legendas e textos em faixas de áudio faladas, com seleção de timbres naturais masculinos e femininos em português e inglês.
+- Legendas Bilíngues com Tradução Simultânea: Exibição simultânea de legendas no idioma original e traduzido (estilo conteúdo viral internacional) com estilização visual independente para o texto principal e a tradução.
+
+### 24.4 Fase 18 — Exportador de Animações Web e Stickers (GIF / WebP Animado)
+*Referência no CapCut: `gif_palette_generator`, `webp_animated_encoder`*
+- Exportação Direta de Memes e Stickers: Exportação de trechos selecionados para GIF animado com otimização de paleta adaptativa (`palettegen` / `paletteuse`) e exportação para WebP animado com suporte a canal alfa transparente para figurinhas de mensageiros.
+
+---
+
+*Documentação consolidada em: 2026-10-15 | Todas as Fases 1 a 14 100% concluídas (260+ testes passando) | Fases 15 a 18 catalogadas com fidelidade à arquitetura do CapCut v9.6.0.4097*
 
 
