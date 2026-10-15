@@ -77,7 +77,14 @@ contextBridge.exposeInMainWorld('api', {
   bundleProject: (projectData) => ipcRenderer.invoke('bundle-project', projectData),
   // ── Fase 15: Gravação Direta na Timeline (Voiceover & Webcam PiP) ──────────────
   saveAudioRecording: (arrayBuffer, namePrefix) => ipcRenderer.invoke('save-audio-recording', { arrayBuffer, namePrefix }),
-  saveVideoRecording: (arrayBuffer, namePrefix) => ipcRenderer.invoke('save-video-recording', { arrayBuffer, namePrefix })
+  saveVideoRecording: (arrayBuffer, namePrefix) => ipcRenderer.invoke('save-video-recording', { arrayBuffer, namePrefix }),
+  // ── Fase 16: Detector Inteligente de Silêncio e Cortes Rítmicos ──────────────
+  detectSilence: (opts) => ipcRenderer.invoke('detect-silence', opts),
+  sliceClipSilence: (opts) => ipcRenderer.invoke('slice-clip-silence', opts),
+  removeSilenceFile: (opts) => ipcRenderer.invoke('remove-silence-file', opts),
+  filterBeats: (opts) => ipcRenderer.invoke('filter-beats', opts),
+  alignClipsToBeats: (opts) => ipcRenderer.invoke('align-clips-to-beats', opts),
+  snapToBeat: (opts) => ipcRenderer.invoke('snap-to-beat', opts)
 });
 
 

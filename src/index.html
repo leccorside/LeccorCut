@@ -424,6 +424,8 @@
     <button id="btnSplit">✂ Dividir (S)</button>
     <button id="btnDetectScenes" class="scene-btn" title="Detecção Automática de Cenas (equivalente ao Shot Detect do CapCut)">🎬 Detectar Cenas</button>
     <button id="btnBeatMarks" class="beat-btn" title="Detectar Batidas Musicais e Gerar Marcadores na Timeline (Fase 7)">🥁 BeatMarks</button>
+    <button id="btnSilenceCut" class="smart-cut-btn" title="Removedor Inteligente de Silêncio e Pausas (Fase 16)">🔇 Silêncio</button>
+    <button id="btnBeatSync" class="beat-sync-btn" title="Sincronizar Cortes de Vídeo com as Batidas da Música (Fase 16)">🎵 Sync Batida</button>
     <button id="btnFreeze" title="Congelar Quadro no cursor (F)">❄ Congelar (F)</button>
     <button id="btnVoiceover" class="rec-btn" title="Gravar Locução / Voiceover na agulha (R)">🎙️ Locução (R)</button>
     <button id="btnWebcamPiP" class="rec-btn" title="Gravar Câmera / Webcam PiP na agulha (W)">📷 Webcam (W)</button>
@@ -716,6 +718,126 @@
         <button id="btnToggleCamRecord" class="btn-rec-main">
           <span class="rec-icon-circle"></span> <span id="camRecBtnText">Iniciar Gravação PiP</span>
         </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fase 16: Modal de Remoção Inteligente de Silêncio ─────────── -->
+<div id="silenceModal" class="modal-overlay" hidden>
+  <div class="modal-box modal-box--silence">
+    <div class="modal-header">
+      <h3>🔇 Removedor Inteligente de Silêncio e Pausas</h3>
+      <button id="btnCloseSilence" class="modal-close" title="Fechar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">
+        Detecta pausas e respirações vazias via análise acústica de decibéis e remove os silêncios com aproximação automática (Ripple Delete) e micro-fades de áudio.
+      </p>
+
+      <div class="silence-config-grid">
+        <label class="rec-label">Sensibilidade de Ruído (Limiar):
+          <select id="silenceNoiseThreshold" class="rec-select">
+            <option value="-25dB">Pouco Sensível (-25 dB)</option>
+            <option value="-30dB">Moderado (-30 dB)</option>
+            <option value="-35dB" selected>Padrão Recomendado (-35 dB)</option>
+            <option value="-40dB">Alto (-40 dB)</option>
+            <option value="-45dB">Máximo / Quarto Silencioso (-45 dB)</option>
+          </select>
+        </label>
+        <label class="rec-label">Duração Mínima de Silêncio:
+          <select id="silenceMinDuration" class="rec-select">
+            <option value="0.2">0.2s (Ultra Rápido)</option>
+            <option value="0.3">0.3s (Dinâmico)</option>
+            <option value="0.4" selected>0.4s (Padrão Recomendado)</option>
+            <option value="0.6">0.6s (Pausas Longas)</option>
+            <option value="1.0">1.0s (Apenas Grandes Silêncios)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="rec-field-group">
+        <label class="rec-label">Margem de Guarda (Padding nas Palavras):
+          <select id="silencePadding" class="rec-select">
+            <option value="0.03">30ms (Corte Justo)</option>
+            <option value="0.06" selected>60ms (Natural com Respiração)</option>
+            <option value="0.10">100ms (Suave)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="modal-actions-row">
+        <button id="btnAnalyzeSilence" class="primary">🔍 Analisar Pausas no Clipe Selecionado</button>
+      </div>
+
+      <!-- Resumo da Análise de Silêncio -->
+      <div id="silenceStatsBox" class="silence-stats-box" hidden>
+        <div class="silence-stat-item">
+          <span class="silence-stat-val" id="silenceCountVal">0</span>
+          <span class="silence-stat-lbl">Pausas Detectadas</span>
+        </div>
+        <div class="silence-stat-item">
+          <span class="silence-stat-val" id="silenceRemovedTimeVal">0.0s</span>
+          <span class="silence-stat-lbl">Tempo a Economizar</span>
+        </div>
+        <div class="silence-stat-item">
+          <span class="silence-stat-val" id="silenceSpeechPartsVal">0</span>
+          <span class="silence-stat-lbl">Blocos de Fala</span>
+        </div>
+      </div>
+
+      <div id="silencePreviewList" class="silence-preview-list" hidden></div>
+
+      <div class="silence-apply-actions" id="silenceActionsWrap" hidden>
+        <button id="btnApplySilenceCut" class="btn-rec-main">
+          ✂️ Remover Silêncios da Timeline (Ripple Delete)
+        </button>
+        <button id="btnExportSilenceFreeFile" class="btn-secondary">
+          💾 Salvar Arquivo Físico Sem Pausas
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Fase 16: Modal de Sincronização com Batidas (Auto Beat Sync) ── -->
+<div id="beatSyncModal" class="modal-overlay" hidden>
+  <div class="modal-box modal-box--beatsync">
+    <div class="modal-header">
+      <h3>🎵 Sincronizar Cortes com a Batida (Auto Beat Sync)</h3>
+      <button id="btnCloseBeatSync" class="modal-close" title="Fechar">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">
+        Ajusta automaticamente a duração e transições dos clipes de vídeo para coincidirem com os marcadores de batida rítmica da trilha musical (efeito *Cut to the Beat*).
+      </p>
+
+      <div class="rec-field-group">
+        <label class="rec-label">Cadência / Frequência de Cortes:
+          <select id="beatSyncIntervalSelect" class="rec-select">
+            <option value="1">⚡ 1x — A cada batida (Ultra acelerado / Reels dinâmico)</option>
+            <option value="2" selected>🎬 2x — A cada 2 batidas (Ritmo comercial / Padrão)</option>
+            <option value="4">🎼 4x — A cada compasso musical (Suave / Narrativo)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="rec-field-group">
+        <label class="rec-label">Duração Mínima por Clipe:
+          <select id="beatSyncMinDurSelect" class="rec-select">
+            <option value="0.3">0.3s (Cortes ultra rápidos)</option>
+            <option value="0.5" selected>0.5s (Equilibrado)</option>
+            <option value="0.8">0.8s (Mais tempo em tela)</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="beat-sync-status-box">
+        <div id="beatSyncStatusText">Verificando marcadores de batida na timeline...</div>
+      </div>
+
+      <div class="modal-actions-row">
+        <button id="btnExecuteBeatSync" class="primary wide">⚡ Sincronizar Clipes com o Ritmo</button>
       </div>
     </div>
   </div>

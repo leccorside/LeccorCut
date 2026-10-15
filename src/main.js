@@ -26,6 +26,9 @@ const {
 const { exportEdl, exportFcpxml, bundleProject } = require('./proExporters');
 // ── Fase 15: Gravação Direta na Timeline (Voiceover & Webcam PiP) ──────────────
 const { processAudioRecording, processVideoRecording } = require('./recorderManager');
+// ── Fase 16: Detector Inteligente de Silêncio e Cortes Rítmicos ──────────────
+const { detectSilence, sliceClipBySpeechSegments, removeSilenceFile } = require('./silenceDetector');
+const { filterBeatsByInterval, alignClipsToBeatTimeline, snapToNearestBeat } = require('./beatSyncManager');
 
 let win;
 function createWindow() {
@@ -1559,5 +1562,93 @@ ipcMain.handle('separate-four-stems', async (_e, inputPath) => {
     return { ok: false, error: err.message };
   }
 });
+
+// ── Fase 15: Gravação Direta na Timeline (Voiceover & Webcam PiP) ────────────
+ipcMain.handle('save-audio-recording', async (_e, { arrayBuffer, namePrefix }) => {
+  try {
+    const buffer = Buffer.from(arrayBuffer);
+    const rec = await processAudioRecording(ffmpegPath, app.getPath('userData'), buffer, namePrefix || 'locucao');
+    const info = await probe(rec.path);
+    const media = await decorateMedia(info);
+    return { success: true, media };
+  } catch (err) {
+    console.error('[save-audio-recording] Falha:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('save-video-recording', async (_e, { arrayBuffer, namePrefix }) => {
+  try {
+    const buffer = Buffer.from(arrayBuffer);
+    const rec = await processVideoRecording(ffmpegPath, app.getPath('userData'), buffer, namePrefix || 'webcam_pip');
+    const info = await probe(rec.path);
+    const media = await decorateMedia(info);
+    return { success: true, media };
+  } catch (err) {
+    console.error('[save-video-recording] Falha:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// ── Fase 16: Detector Inteligente de Silêncio e Cortes Rítmicos ──────────────
+ipcMain.handle('detect-silence', async (_e, { inputPath, noiseThreshold, minDuration, padding }) => {
+  try {
+    const res = await detectSilence(ffmpegPath, inputPath, { noiseThreshold, minDuration, padding });
+    return res;
+  } catch (err) {
+    console.error('[detect-silence] Falha:', err);
+    return { ok: false, error: err.message, silences: [], speechSegments: [] };
+  }
+});
+
+ipcMain.handle('slice-clip-silence', async (_e, { baseClip, speechSegments, startPlayheadTime }) => {
+  try {
+    const sliced = sliceClipBySpeechSegments(baseClip, speechSegments, startPlayheadTime);
+    return { ok: true, clips: sliced };
+  } catch (err) {
+    console.error('[slice-clip-silence] Falha:', err);
+    return { ok: false, error: err.message, clips: [] };
+  }
+});
+
+ipcMain.handle('remove-silence-file', async (_e, { inputPath, noiseThreshold, minDuration, padding }) => {
+  try {
+    const res = await removeSilenceFile(ffmpegPath, app.getPath('userData'), inputPath, { noiseThreshold, minDuration, padding });
+    const info = await probe(res.path);
+    const media = await decorateMedia(info);
+    return { ok: true, media, removedDuration: res.removedDuration };
+  } catch (err) {
+    console.error('[remove-silence-file] Falha:', err);
+    return { ok: false, error: err.message };
+  }
+});
+
+ipcMain.handle('filter-beats', async (_e, { beats, interval }) => {
+  try {
+    const filtered = filterBeatsByInterval(beats, interval);
+    return { ok: true, beats: filtered };
+  } catch (err) {
+    return { ok: false, error: err.message, beats: [] };
+  }
+});
+
+ipcMain.handle('align-clips-to-beats', async (_e, { clips, beats, beatInterval, minClipDuration, timelineStartOffset }) => {
+  try {
+    const res = alignClipsToBeatTimeline(clips, beats, { beatInterval, minClipDuration, timelineStartOffset });
+    return res;
+  } catch (err) {
+    console.error('[align-clips-to-beats] Falha:', err);
+    return { ok: false, error: err.message, alignedClips: clips, cutPoints: [], cutsCount: 0 };
+  }
+});
+
+ipcMain.handle('snap-to-beat', async (_e, { currentTime, beats, threshold }) => {
+  try {
+    return snapToNearestBeat(currentTime, beats, threshold);
+  } catch (_) {
+    return { snapped: false, time: currentTime };
+  }
+});
+
 
 

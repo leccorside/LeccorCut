@@ -1304,26 +1304,63 @@ Esta fase integrou recursos avançados de intercâmbio de timeline e portabilida
 
 ---
 
-## 26. Roadmap de Expansões Futuras (Fases 16 a 18)
+## 26. Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync)
+
+*Status: 100% Concluída | Data de Implementação: 2026-10-15 | Testes: `tests/phase16-smoke.js` (11 testes automatizados passando)*
+
+### 26.1 Removedor Inteligente de Silêncio e Pausas (Smart Silence Remover)
+- **Módulo Backend (`src/silenceDetector.js`):**
+  - **Análise Acústica Nativa via FFmpeg:** Utiliza o filtro `silencedetect` com limiar configurável (`noiseThreshold`: `-25dB` a `-45dB`) e duração mínima de pausa (`minDuration`: `0.2s` a `1.0s`).
+  - **Margem de Guarda Dinâmica (Padding):** Aplica padding configurável (30ms a 100ms) ao redor dos blocos falados para garantir que respirações sutis e fonemas finais não sofram cortes secos ou truncamento.
+  - **Micro-Fades Anti-Estalo:** Injeta `fadeIn = 0.015` e `fadeOut = 0.015` em todas as emendas de corte para suprimir cliques de fase de corrente contínua (*DC offset*).
+  - **Fatiamento com Ripple Delete:** A função `sliceClipBySpeechSegments()` fatia o clipe original em múltiplos blocos contíguos de fala, descartando as pausas e aproximando automaticamente os trechos remanescentes na timeline sem deixar lacunas.
+  - **Exportação Física Consolidada:** A função `removeSilenceFile()` gera novo arquivo de mídia (`sem_silencio_*.mp4` / `.wav`) usando filtros `select` e `aselect` concatenados.
+- **Interface e Painel de Controle:**
+  - Botão `#btnSilenceCut` (`🔇 Silêncio`) integrado à barra de ferramentas da timeline.
+  - Modal `#silenceModal` com controles de limiar acústico, duração mínima e padding.
+  - Painel de estatísticas em tempo real: número de pausas detectadas, tempo total economizado em segundos e quantidade de blocos de fala gerados.
+  - Lista detalhada de pausas encontradas com timestamp inicial, final e duração.
+
+### 26.2 Sincronizador com a Batida (Auto Beat Sync)
+- **Módulo de Suporte (`src/beatSyncManager.js`):**
+  - **Filtragem de Cadência Musical (`filterBeatsByInterval`):** Suporte a ritmos de corte:
+    - `1x`: A cada batida (edição ultra dinâmica e rápida para reels).
+    - `2x`: A cada 2 batidas (ritmo comercial equilibrado).
+    - `4x`: A cada compasso musical (ritmo melódico e narrativo suave).
+  - **Alinhamento Rítmico de Clipes (`alignClipsToBeatTimeline`):** Ajusta os pontos de corte e duração de toda a sequência de clipes de vídeo da timeline para que as transições coincidam com os marcadores de batida rítmica (`state.markers`).
+  - **Snap Magnético Rítmico (`snapToNearestBeat`):** Atrai suavemente o cursor e os cortes manuais para o marcador de batida mais próximo com janela de tolerância de 150ms.
+- **Interface e Experiência do Criador:**
+  - Botão `#btnBeatSync` (`🎵 Sync Batida`) na barra da timeline.
+  - Modal interativo `#beatSyncModal` informando o total de batidas detectadas na timeline e orientando o criador caso precise disparar a análise via `🥁 BeatMarks`.
+  - Execução instantânea com reorganização visual automática da timeline e toast de confirmação.
+
+### 26.3 Componentes Entregues
+1. `src/silenceDetector.js`: Funções `detectSilence()`, `sliceClipBySpeechSegments()` e `removeSilenceFile()`.
+2. `src/beatSyncManager.js`: Funções `filterBeatsByInterval()`, `alignClipsToBeatTimeline()` e `snapToNearestBeat()`.
+3. `src/main.js`: Handlers IPC `detect-silence`, `slice-clip-silence`, `remove-silence-file`, `filter-beats`, `align-clips-to-beats` e `snap-to-beat`.
+4. `src/preload.js`: Métodos correspondentes expostos no `window.api`.
+5. `src/index.html`: Botões `#btnSilenceCut` e `#btnBeatSync`, modais `#silenceModal` e `#beatSyncModal`.
+6. `src/styles.css`: Estilização para `.smart-cut-btn`, `.beat-sync-btn`, `.silence-stats-box` e `.silence-preview-list`.
+7. `src/renderer.js`: Funções `initSilenceDetector()` e `initBeatSync()` com integração ao `layout()` e `renderTimeline()`.
+8. `tests/phase16-smoke.js`: Suíte de 11 testes automatizados cobrindo detecção acústica, fatiamento, alinhamento rítmico e exportação sem pausas.
+
+---
+
+## 27. Roadmap de Expansões Futuras (Fases 17 e 18)
 
 Mapeamento de recursos identificados no binário do CapCut v9.6.0.4097 (`VECreator.dll`, `audioeffect.dll`, `videoeditor.dll`, `cccreator.dll`) para implementação nas próximas fases do LeccorCut:
 
-### 26.1 Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync)
-*Referência no CapCut: `silence_detector`, `beat_detect_model`, `audio_transient_detector`*
-- Removedor de Silêncio Automático (*Smart Silence Remover*): Análise acústica de faixas de voz com limiar configurável de ruído de fundo (-35dB a -50dB) e remoção automática de pausas e gagueiras com corte limpo e transições suaves de áudio.
-- Sincronização Automática com a Batida (*Auto Beat Sync*): Detector de transientes e batidas rítmicas com inserção de marcadores automáticos na timeline e recurso de "Ajustar Cortes à Música" para alinhar transições de cena aos picos rítmicos.
-
-### 26.2 Fase 17 — Dublagem Neural e Conversão Texto-em-Fala (TTS Local & Legendas Bilíngues)
+### 27.1 Fase 17 — Dublagem Neural e Conversão Texto-em-Fala (TTS Local & Legendas Bilíngues)
 *Referência no CapCut: `tts_stream_synthesizer`, `bilingual_subtitle_generator`, `sam_voice_models`*
 - Síntese de Voz Offline (*Text-to-Speech*): Motor TTS neural local para converter legendas e textos em faixas de áudio faladas, com seleção de timbres naturais masculinos e femininos em português e inglês.
 - Legendas Bilíngues com Tradução Simultânea: Exibição simultânea de legendas no idioma original e traduzido (estilo conteúdo viral internacional) com estilização visual independente para o texto principal e a tradução.
 
-### 26.3 Fase 18 — Exportador de Animações Web e Stickers (GIF / WebP Animado)
+### 27.2 Fase 18 — Exportador de Animações Web e Stickers (GIF / WebP Animado)
 *Referência no CapCut: `gif_palette_generator`, `webp_animated_encoder`*
 - Exportação Direta de Memes e Stickers: Exportação de trechos selecionados para GIF animado com otimização de paleta adaptativa (`palettegen` / `paletteuse`) e exportação para WebP animado com suporte a canal alfa transparente para figurinhas de mensageiros.
 
 ---
 
-*Documentação consolidada em: 2026-10-15 | Todas as Fases 1 a 15 100% concluídas (270+ testes passando) | Fases 16 a 18 catalogadas com fidelidade à arquitetura do CapCut v9.6.0.4097*
+*Documentação consolidada em: 2026-10-15 | Todas as Fases 1 a 16 100% concluídas (280+ testes passando) | Fases 17 e 18 catalogadas com fidelidade à arquitetura do CapCut v9.6.0.4097*
 
 

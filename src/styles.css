@@ -343,6 +343,34 @@ input,select{background:var(--panel2);color:var(--txt);border:1px solid var(--li
 .webcam-preview-container{width:100%;height:260px;background:#0d0d12;border:1px solid #28283a;border-radius:10px;overflow:hidden;position:relative;margin-bottom:14px;display:flex;align-items:center;justify-content:center}
 .cam-preview-video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);border-radius:8px}
 
+/* ── Fase 16: Detector Inteligente de Silêncio e Cortes Rítmicos ──── */
+.smart-cut-btn{background:rgba(0,206,201,0.15);border:1px solid rgba(0,206,201,0.45);color:#00cec9;font-weight:600;transition:all .15s ease}
+.smart-cut-btn:hover{background:rgba(0,206,201,0.3);border-color:#00cec9;color:#fff;transform:translateY(-1px)}
+
+.beat-sync-btn{background:rgba(255,159,67,0.15);border:1px solid rgba(255,159,67,0.45);color:#ff9f43;font-weight:600;transition:all .15s ease}
+.beat-sync-btn:hover{background:rgba(255,159,67,0.3);border-color:#ff9f43;color:#fff;transform:translateY(-1px)}
+
+.modal-box--silence{max-width:580px;width:95%}
+.modal-box--beatsync{max-width:520px;width:95%}
+
+.silence-config-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+
+.silence-stats-box{display:grid;grid-template-columns:repeat(3, 1fr);gap:10px;background:#101018;border:1px solid #28283a;border-radius:8px;padding:12px;margin:14px 0;text-align:center}
+.silence-stat-item{display:flex;flex-direction:column;gap:3px}
+.silence-stat-val{font-size:22px;font-weight:bold;color:var(--a1);font-family:monospace}
+.silence-stat-lbl{font-size:11px;color:#8a8aa3;text-transform:uppercase;letter-spacing:0.5px}
+
+.silence-preview-list{max-height:140px;overflow-y:auto;background:#0d0d14;border:1px solid #222232;border-radius:6px;padding:8px;margin-bottom:14px;font-size:11px;font-family:monospace;color:#c0c0d0;display:flex;flex-direction:column;gap:4px}
+.silence-item-row{display:flex;justify-content:space-between;padding:3px 6px;border-radius:3px;background:rgba(255,255,255,0.02)}
+.silence-item-row:hover{background:rgba(0,229,195,0.08);color:#fff}
+
+.silence-apply-actions{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.silence-apply-actions .btn-rec-main{background:linear-gradient(135deg, #00b894, #00cec9);box-shadow:0 4px 15px rgba(0,206,201,0.3)}
+.silence-apply-actions .btn-rec-main:hover{box-shadow:0 6px 20px rgba(0,206,201,0.5)}
+
+.beat-sync-status-box{background:#11111a;border:1px solid #28283c;border-radius:8px;padding:12px;margin:14px 0;font-size:12px;color:#a29bfe;text-align:center}
+
+
 
 
 

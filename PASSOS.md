@@ -325,7 +325,7 @@
 | Fase 13 — Multi-Trilhas Ilimitadas e Keyframing Universal Livre | ✅ Concluída (100%) | 🔴 Alta |
 | Fase 14 — Interoperabilidade Pro (FCPXML / EDL / Bundler) | ✅ Concluída (100%) | 🟢 Concluída |
 | Fase 15 — Gravação Direta na Timeline (Voiceover, Mic & Webcam PiP) | ✅ Concluída (100%) | 🟢 Concluída |
-| Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync) | ⏳ A Fazer (0%) | 🟡 Média |
+| Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync) | ✅ Concluída (100%) | 🟢 Concluída |
 | Fase 17 — Dublagem Neural e Conversão Texto-em-Fala (TTS Local & Legendas Bilíngues) | ⏳ A Fazer (0%) | 🟡 Média |
 | Fase 18 — Exportador de Animações Web e Stickers (GIF / WebP Animado) | ⏳ A Fazer (0%) | 🟢 Baixa |
 
@@ -347,12 +347,12 @@
 ## ⚡ Fase 16 — Detector Inteligente de Silêncio e Cortes Rítmicos (Beat Sync)
 
 ### 16.1 Removedor de Silêncio Automático (Smart Silence Remover)
-- [ ] Implementar análise acústica de trechos vazios com limiar configurável de ruído de fundo (-35dB a -50dB)
-- [ ] Remoção automática de pausas e gagueiras com corte limpo e transições suaves de áudio
+- [x] Implementar análise acústica de trechos vazios com limiar configurável de ruído de fundo (-35dB a -50dB)
+- [x] Remoção automática de pausas e gagueiras com corte limpo e transições suaves de áudio
 
 ### 16.2 Sincronização Automática com a Batida (Auto Beat Sync)
-- [ ] Detector de transientes e batidas rítmicas com inserção de marcadores automáticos na timeline
-- [ ] Recurso de "Ajustar Cortes à Música" para alinhar transições de cena aos picos rítmicos
+- [x] Detector de transientes e batidas rítmicas com inserção de marcadores automáticos na timeline
+- [x] Recurso de "Ajustar Cortes à Música" para alinhar transições de cena aos picos rítmicos
 
 ---
 
@@ -376,6 +376,6 @@
 
 ---
 
-*Última atualização: 2026-10-15 — Fases 1 a 15 100% concluídas (270+ testes passando) | Mapeamento expandido de recursos avançados com paridade total ao CapCut v9.6.0.4097*
+*Última atualização: 2026-10-15 — Fases 1 a 16 100% concluídas (280+ testes passando) | Mapeamento expandido de recursos avançados com paridade total ao CapCut v9.6.0.4097*
 
 

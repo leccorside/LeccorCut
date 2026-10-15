@@ -4711,4 +4711,292 @@ function initTimelineRecording() {
 
 initTimelineRecording();
 
+// ─── Fase 16: Detector Inteligente de Silêncio e Cortes Rítmicos ────────────
+function initSilenceDetector() {
+  const modal = $('silenceModal');
+  const btnOpen = $('btnSilenceCut');
+  const btnClose = $('btnCloseSilence');
+  const noiseSelect = $('silenceNoiseThreshold');
+  const minDurSelect = $('silenceMinDuration');
+  const paddingSelect = $('silencePadding');
+  const btnAnalyze = $('btnAnalyzeSilence');
+  const statsBox = $('silenceStatsBox');
+  const countVal = $('silenceCountVal');
+  const timeVal = $('silenceRemovedTimeVal');
+  const partsVal = $('silenceSpeechPartsVal');
+  const previewList = $('silencePreviewList');
+  const actionsWrap = $('silenceActionsWrap');
+  const btnApplyCut = $('btnApplySilenceCut');
+  const btnExportFile = $('btnExportSilenceFreeFile');
+
+  let currentAnalysis = null;
+  let targetMediaItem = null;
+
+  function getTargetItem() {
+    if (state.selected) {
+      const { kind, id } = state.selected;
+      if (kind === 'clip') return state.clips.find(c => c.id === id);
+      if (kind === 'audio') return state.audios.find(a => a.id === id);
+    }
+    if (state.clips && state.clips.length > 0) return state.clips[0];
+    if (state.audios && state.audios.length > 0) return state.audios[0];
+    return null;
+  }
+
+  const openModal = () => {
+    targetMediaItem = getTargetItem();
+    if (!targetMediaItem || !targetMediaItem.path) {
+      toast('Selecione um clipe ou adicione uma mídia à timeline primeiro.');
+      return;
+    }
+    if (modal) modal.hidden = false;
+    if (statsBox) statsBox.hidden = true;
+    if (previewList) previewList.hidden = true;
+    if (actionsWrap) actionsWrap.hidden = true;
+    currentAnalysis = null;
+  };
+
+  const closeModal = () => {
+    if (modal) modal.hidden = true;
+  };
+
+  if (btnOpen) btnOpen.onclick = openModal;
+  if (btnClose) btnClose.onclick = closeModal;
+  if (modal) {
+    modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+  }
+
+  if (btnAnalyze) {
+    btnAnalyze.onclick = async () => {
+      targetMediaItem = getTargetItem();
+      if (!targetMediaItem || !targetMediaItem.path) {
+        toast('Nenhum clipe disponível para análise.');
+        return;
+      }
+
+      btnAnalyze.disabled = true;
+      btnAnalyze.textContent = '⏳ Analisando acústica do arquivo...';
+      try {
+        const noiseThreshold = noiseSelect ? noiseSelect.value : '-35dB';
+        const minDuration = minDurSelect ? parseFloat(minDurSelect.value) : 0.4;
+        const padding = paddingSelect ? parseFloat(paddingSelect.value) : 0.06;
+
+        const res = await window.api.detectSilence({
+          inputPath: targetMediaItem.path,
+          noiseThreshold,
+          minDuration,
+          padding
+        });
+
+        if (!res || !res.ok) {
+          toast('Falha na detecção de silêncio: ' + (res?.error || 'Erro desconhecido'));
+          return;
+        }
+
+        currentAnalysis = res;
+
+        if (statsBox) statsBox.hidden = false;
+        if (countVal) countVal.textContent = res.silences.length;
+        if (timeVal) timeVal.textContent = `${res.totalSilenceDuration.toFixed(1)}s`;
+        if (partsVal) partsVal.textContent = res.speechSegments.length;
+
+        if (previewList) {
+          previewList.hidden = false;
+          previewList.innerHTML = '';
+          if (res.silences.length === 0) {
+            previewList.innerHTML = '<div style="padding:6px;color:#8a8aa3">Nenhuma pausa silenciosa detectada com o limiar atual. Áudio contínuo!</div>';
+          } else {
+            res.silences.slice(0, 30).forEach((s, idx) => {
+              const row = document.createElement('div');
+              row.className = 'silence-item-row';
+              row.innerHTML = `<span>Pausa #${idx + 1}: ${fmt(s.start)} → ${fmt(s.end)}</span> <span>${s.duration}s</span>`;
+              previewList.appendChild(row);
+            });
+            if (res.silences.length > 30) {
+              const more = document.createElement('div');
+              more.style.padding = '4px';
+              more.style.color = '#8a8aa3';
+              more.textContent = `... e mais ${res.silences.length - 30} pausas detectadas.`;
+              previewList.appendChild(more);
+            }
+          }
+        }
+
+        if (actionsWrap && res.speechSegments.length > 0) {
+          actionsWrap.hidden = false;
+        }
+        toast(`Análise concluída: ${res.silences.length} pausas encontradas (${res.totalSilenceDuration.toFixed(1)}s economizados)`);
+      } catch (err) {
+        console.error('Erro na análise de silêncio:', err);
+        toast('Erro ao analisar silêncio acústico.');
+      } finally {
+        btnAnalyze.disabled = false;
+        btnAnalyze.textContent = '🔍 Analisar Pausas no Clipe Selecionado';
+      }
+    };
+  }
+
+  if (btnApplyCut) {
+    btnApplyCut.onclick = async () => {
+      if (!currentAnalysis || !currentAnalysis.speechSegments || currentAnalysis.speechSegments.length === 0) {
+        toast('Faça a análise primeiro para detectar os blocos de fala.');
+        return;
+      }
+      if (!targetMediaItem) targetMediaItem = getTargetItem();
+      if (!targetMediaItem) return;
+
+      const isClip = state.clips.some(c => c.id === targetMediaItem.id);
+      const isAudio = state.audios.some(a => a.id === targetMediaItem.id);
+
+      const res = await window.api.sliceClipSilence({
+        baseClip: targetMediaItem,
+        speechSegments: currentAnalysis.speechSegments,
+        startPlayheadTime: targetMediaItem.start || 0
+      });
+
+      if (!res || !res.ok || !res.clips || res.clips.length === 0) {
+        toast('Erro ao fatiar clipe na timeline.');
+        return;
+      }
+
+      if (isClip) {
+        const originalIndex = state.clips.findIndex(c => c.id === targetMediaItem.id);
+        if (originalIndex >= 0) {
+          state.clips.splice(originalIndex, 1, ...res.clips);
+          // Ripple delete: reajusta starts dos clipes subsequentes para encostar sem lacunas
+          const { starts } = layout();
+          state.clips.forEach((c, idx) => {
+            if (starts[idx] !== undefined) c.start = starts[idx];
+          });
+        }
+      } else if (isAudio) {
+        const originalIndex = state.audios.findIndex(a => a.id === targetMediaItem.id);
+        if (originalIndex >= 0) {
+          state.audios.splice(originalIndex, 1, ...res.clips);
+        }
+      }
+
+      renderTimeline();
+      renderPreview();
+      toast(`✂️ Silêncios removidos! ${res.clips.length} partes preservadas com Ripple Delete.`);
+      closeModal();
+    };
+  }
+
+  if (btnExportFile) {
+    btnExportFile.onclick = async () => {
+      if (!targetMediaItem || !targetMediaItem.path) return;
+      btnExportFile.disabled = true;
+      btnExportFile.textContent = '⏳ Exportando arquivo sem silêncio...';
+      try {
+        const noiseThreshold = noiseSelect ? noiseSelect.value : '-35dB';
+        const minDuration = minDurSelect ? parseFloat(minDurSelect.value) : 0.4;
+        const padding = paddingSelect ? parseFloat(paddingSelect.value) : 0.06;
+
+        const res = await window.api.removeSilenceFile({
+          inputPath: targetMediaItem.path,
+          noiseThreshold,
+          minDuration,
+          padding
+        });
+
+        if (res && res.ok && res.media) {
+          state.media.push(res.media);
+          renderMediaList();
+          toast(`💾 Novo arquivo sem silêncio salvo com sucesso (${res.duration}s)!`);
+          closeModal();
+        } else {
+          toast('Falha ao exportar arquivo sem silêncio.');
+        }
+      } catch (err) {
+        console.error('Erro ao exportar arquivo sem silêncio:', err);
+        toast('Erro ao gerar arquivo sem silêncios.');
+      } finally {
+        btnExportFile.disabled = false;
+        btnExportFile.textContent = '💾 Salvar Arquivo Físico Sem Pausas';
+      }
+    };
+  }
+}
+
+function initBeatSync() {
+  const modal = $('beatSyncModal');
+  const btnOpen = $('btnBeatSync');
+  const btnClose = $('btnCloseBeatSync');
+  const intervalSelect = $('beatSyncIntervalSelect');
+  const minDurSelect = $('beatSyncMinDurSelect');
+  const statusText = $('beatSyncStatusText');
+  const btnExecute = $('btnExecuteBeatSync');
+
+  const getBeats = () => {
+    if (!state.markers || state.markers.length === 0) return [];
+    return state.markers
+      .map(m => (typeof m === 'number' ? m : m.time))
+      .filter(t => typeof t === 'number' && !isNaN(t) && t >= 0)
+      .sort((a, b) => a - b);
+  };
+
+  const openModal = () => {
+    if (modal) modal.hidden = false;
+    const beats = getBeats();
+    if (statusText) {
+      if (beats.length === 0) {
+        statusText.innerHTML = '⚠️ Nenhuma batida detectada na timeline.<br><small>Clique no botão <strong>🥁 BeatMarks</strong> da timeline para detectar as batidas da música primeiro.</small>';
+        if (btnExecute) btnExecute.disabled = true;
+      } else {
+        statusText.innerHTML = `✅ <strong>${beats.length} batidas musicais</strong> detectadas na timeline.<br><small>Pronto para alinhar ${state.clips?.length || 0} clipes de vídeo ao ritmo.</small>`;
+        if (btnExecute) btnExecute.disabled = false;
+      }
+    }
+  };
+
+  const closeModal = () => {
+    if (modal) modal.hidden = true;
+  };
+
+  if (btnOpen) btnOpen.onclick = openModal;
+  if (btnClose) btnClose.onclick = closeModal;
+  if (modal) {
+    modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+  }
+
+  if (btnExecute) {
+    btnExecute.onclick = async () => {
+      const beats = getBeats();
+      if (beats.length === 0) {
+        toast('Detecte batidas musicais na timeline antes de sincronizar.');
+        return;
+      }
+      if (!state.clips || state.clips.length === 0) {
+        toast('Adicione clipes de vídeo à timeline para sincronizar ao ritmo.');
+        return;
+      }
+
+      const beatInterval = intervalSelect ? parseInt(intervalSelect.value) || 1 : 1;
+      const minClipDuration = minDurSelect ? parseFloat(minDurSelect.value) || 0.5 : 0.5;
+
+      const res = await window.api.alignClipsToBeats({
+        clips: state.clips,
+        beats,
+        beatInterval,
+        minClipDuration,
+        timelineStartOffset: 0
+      });
+
+      if (res && res.ok && res.alignedClips) {
+        state.clips = res.alignedClips;
+        renderTimeline();
+        renderPreview();
+        toast(`🎵 ${res.rhythmSummary || 'Clipes sincronizados ao ritmo da música!'}`);
+        closeModal();
+      } else {
+        toast('Erro ao sincronizar clipes com as batidas: ' + (res?.error || ''));
+      }
+    };
+  }
+}
+
+initSilenceDetector();
+initBeatSync();
+
 
