@@ -5,7 +5,7 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/export-smoke.js",
+    "test": "node tests/export-smoke.js && node tests/cutout-smoke.js",
     "dist": "electron-builder --win"
   },
   "dependencies": {

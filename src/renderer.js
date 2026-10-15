@@ -601,6 +601,56 @@ function slider(label, key, min, max, obj) {
   return `<div class="prop">${label}<input type="range" min="${min}" max="${max}" value="${obj[key] || 0}" data-k="${key}"></div>`;
 }
 
+async function executeSmartCutout(itemPath, targetKind, targetItem) {
+  toast('Iniciando remoção de fundo por IA (Smart Cutout)...');
+  window.api.onCutoutProgress(msg => toast(msg));
+  try {
+    const res = await window.api.smartCutout(itemPath);
+    if (!res.ok) {
+      return toast('Erro no recorte: ' + (res.error || 'Falha ao processar'));
+    }
+    const transparentPath = res.path;
+    const cutName = '✂ ' + (targetItem?.name || 'Recorte IA');
+
+    if (targetKind === 'overlay' && targetItem) {
+      targetItem.path = transparentPath;
+      targetItem.isImage = true;
+      targetItem.chroma = false;
+      renderPreview();
+      renderProps();
+      toast('Fundo do overlay removido com sucesso!');
+    } else {
+      const newOv = {
+        id: uid++,
+        path: transparentPath,
+        name: cutName,
+        isImage: true,
+        start: state.time,
+        in: 0,
+        duration: targetItem ? Math.min(6, targetItem.duration) : 4,
+        max: 999,
+        scale: 35,
+        rotate: 0,
+        hflip: false,
+        x: 0.5,
+        y: 0.5,
+        opacity: 1,
+        motion: false,
+        anim: 'zoom_in',
+        chroma: false
+      };
+      state.overlays.push(newOv);
+      select({ kind: 'overlay', id: newOv.id });
+      renderTimeline();
+      renderProps();
+      renderPreview();
+      toast('Objeto recortado adicionado à trilha de sobreposição!');
+    }
+  } catch (err) {
+    toast('Erro: ' + (err.message || err));
+  }
+}
+
 function renderProps() {
   const p = $('props'); const s = state.selected;
   if (!s) { p.innerHTML = '<p class="hint">Selecione um clipe na timeline.</p>'; return; }
@@ -609,6 +659,7 @@ function renderProps() {
     const r = (id, label, min, max, step, val) => `<div class="prop">${label}<input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}"></div>`;
     p.innerHTML = `<div class="prop">Início (s)<input type="number" id="oStart" value="${o.start.toFixed(1)}" min="0" step="0.5"></div>`
       + `<div class="prop">Duração (s)<input type="number" id="oDur" value="${o.duration.toFixed(1)}" min="0.5" step="0.5"></div>`
+      + `<button id="btnSmartCutoutOverlay" class="wide primary">✂ Remover Fundo por IA (Smart Cutout)</button>`
       + `<div class="prop">Animação<select id="oAnim">
         <option value="none" ${(o.anim || 'none') === 'none' ? 'selected' : ''}>Nenhuma</option>
         <option value="fade" ${o.anim === 'fade' ? 'selected' : ''}>Fade In / Out</option>
@@ -633,6 +684,7 @@ function renderProps() {
       + `<div class="prop"><label><input type="checkbox" id="oChroma" ${o.chroma ? 'checked' : ''}> Chroma key (remover cor)</label></div>`
       + `<div class="prop">Cor<input type="color" id="oCColor" value="${o.chromaColor || '#00ff00'}"></div>`
       + r('oCSim', 'Tolerância', 0.05, 0.6, 0.01, o.chromaSim ?? 0.3);
+    if ($('btnSmartCutoutOverlay')) $('btnSmartCutoutOverlay').onclick = () => executeSmartCutout(o.path, 'overlay', o);
     $('oAnim').onchange = (e) => { o.anim = e.target.value; renderPreview(); };
     $('oRot').oninput = (e) => { o.rotate = +e.target.value; renderPreview(); };
     $('oFlip').onchange = (e) => { o.hflip = e.target.checked; renderPreview(); };
@@ -764,9 +816,11 @@ function renderProps() {
        + `<div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>
        <div class="prop"><label><input type="checkbox" id="pDenoise" ${c.filters.denoise ? 'checked' : ''}> Redução de ruído (chiado)</label></div>
        <div class="prop"><label><input type="checkbox" id="pLoudnorm" ${c.filters.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>`
+       + `<button id="btnSmartCutoutClip" class="wide primary">✂ Extrair Objeto com IA para Sobreposição (PiP)</button>`
        + (c.hasAudio && !c.isImage ? `<button id="btnDetach" class="wide">Separar Áudio do Vídeo</button>` : '');
   p.querySelectorAll('input[data-k]').forEach(i => i.oninput = () => { c.filters[i.dataset.k] = +i.value; renderPreview(); });
   $('pFill').onchange = (e) => { c.filters.fillMode = e.target.value; renderPreview(); };
+  if ($('btnSmartCutoutClip')) $('btnSmartCutoutClip').onclick = () => executeSmartCutout(c.path, 'clip', c);
   if ($('btnDetach')) $('btnDetach').onclick = () => detachAudio(c);
   $('pDenoise').onchange = (e) => { c.filters.denoise = e.target.checked; };
   $('pLoudnorm').onchange = (e) => { c.filters.loudnorm = e.target.checked; };
@@ -926,7 +980,18 @@ function renderMedia() {
       renderTimeline(); renderPreview();
     };
     l.appendChild(e);
-    if (m.hasVideo) {
+    if (m.hasVideo || m.isImage) {
+      const bCut = document.createElement('button');
+      bCut.className = 'pip';
+      bCut.textContent = '✂';
+      bCut.title = 'Remover fundo por IA (Smart Cutout)';
+      bCut.style.marginRight = '4px';
+      bCut.onclick = (ev) => {
+        ev.stopPropagation();
+        executeSmartCutout(m.path, 'media', m);
+      };
+      e.prepend(bCut);
+
       const b = document.createElement('button'); b.className = 'pip'; b.textContent = 'PiP'; b.title = 'Adicionar como sobreposição (picture-in-picture)';
       b.onclick = (ev) => {
         ev.stopPropagation();

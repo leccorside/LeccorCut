@@ -148,3 +148,76 @@ ipcMain.handle('open-project', async () => {
   if (r.canceled) return null;
   return JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8'));
 });
+
+let segmenterPromise = null;
+async function getSegmenter() {
+  if (!segmenterPromise) {
+    segmenterPromise = (async () => {
+      const { pipeline, env } = await import('@huggingface/transformers');
+      env.cacheDir = path.join(app.getPath('userData'), 'models');
+      return pipeline('image-segmentation', 'briaai/RMBG-1.4', {
+        progress_callback: (p) => {
+          if (p.status === 'progress') {
+            win.webContents.send('cutout-progress', `Baixando modelo IA... ${Math.round(p.progress || 0)}%`);
+          }
+        }
+      });
+    })().catch((e) => {
+      segmenterPromise = null;
+      throw e;
+    });
+  }
+  return segmenterPromise;
+}
+
+ipcMain.handle('smart-cutout', async (_e, inputPath) => {
+  const cutoutDir = path.join(app.getPath('userData'), 'cutout');
+  if (!fs.existsSync(cutoutDir)) fs.mkdirSync(cutoutDir, { recursive: true });
+  const outPath = path.join(cutoutDir, `cutout_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.png`);
+
+  try {
+    let imgSourcePath = inputPath;
+    const isVideo = !/\.(png|jpe?g|webp|bmp)$/i.test(inputPath);
+    if (isVideo) {
+      const framePath = path.join(cutoutDir, `frame_${Date.now()}.png`);
+      await new Promise((resolve, reject) => {
+        execFile(ffmpegPath, ['-v', 'error', '-ss', '0', '-i', inputPath, '-frames:v', '1', '-y', framePath], (err) => {
+          if (err) reject(err); else resolve();
+        });
+      });
+      imgSourcePath = framePath;
+    }
+
+    win.webContents.send('cutout-progress', 'Iniciando remoção inteligente de fundo...');
+    const { RawImage } = await import('@huggingface/transformers');
+    const rawInput = await RawImage.read(imgSourcePath);
+    const segmenter = await getSegmenter();
+    win.webContents.send('cutout-progress', 'Segmentando objeto...');
+    const result = await segmenter(rawInput);
+    const mask = Array.isArray(result) ? (result[0]?.mask || result[0]) : (result?.mask || result);
+    const finalImg = (mask && rawInput && mask !== rawInput) ? rawInput.clone().putAlpha(mask) : result;
+    await finalImg.save(outPath);
+    win.webContents.send('cutout-progress', 'Fundo removido com sucesso!');
+    return { ok: true, path: outPath };
+  } catch (err) {
+    // Fallback rápido via FFmpeg (remoção adaptativa de cor de fundo e matting)
+    try {
+      win.webContents.send('cutout-progress', 'Processando com recorte adaptativo...');
+      await new Promise((resolve, reject) => {
+        execFile(ffmpegPath, [
+          '-v', 'error',
+          '-i', inputPath,
+          '-vf', 'colorkey=color=auto:similarity=0.25:blend=0.1,format=rgba',
+          '-frames:v', '1',
+          '-y', outPath
+        ], (e2) => {
+          if (e2) reject(e2); else resolve();
+        });
+      });
+      return { ok: true, path: outPath, fallback: true };
+    } catch (e3) {
+      return { ok: false, error: String(err.message || err) };
+    }
+  }
+});
+

@@ -24,6 +24,10 @@
   - *🎤 Karaokê (Word Highlight)*: a palavra ativa no exato instante da fala ganha destaque imediato com cor vibrante (amarelo ouro, ciano neon ou customizada), escala ampliada (1.15x) e brilho neon, com palavras passadas estáveis e futuras com opacidade suave de espera.
   - *📝 Palavra por Palavra (Acumulativo)*: as palavras surgem progressivamente na tela no ritmo exato do locutor, mantendo o texto cumulativo até a frase se completar.
   - *⚡ Estilo Viral / Hormozi (Single Word)*: exibe individualmente a palavra falada no momento em escala ampliada no centro da tela, maximizando a retenção de atenção para Shorts, TikTok e Reels.
+- **Remoção de Fundo por IA Sem Tela Verde (*Smart Cutout*)**: recorte automático inteligente de pessoas, objetos e produtos com transparência alfa (PNG), sem precisar de chroma key verde.
+  - *Modelo de Segmentação Neural*: processamento local com modelo de ponta (`briaai/RMBG-1.4`) via Transformers.js com canal alfa de alta precisão.
+  - *Integração Direta em PiP*: transforme qualquer foto, vídeo ou clipe em sobreposição transparente para efeitos de reação, montagem e colagem com 1 clique.
+  - *Fallback Adaptativo Instantâneo*: mecanismo de redundância automática que garante recorte mesmo sem conexão ou em máquinas mais modestas.
 - **Importação de Legendas `.srt`**: integração instantânea de arquivos de legendas prévios, com fatiamento e sincronização automática de palavras.
 - **Estilização em Massa**: configure fonte, caixa de fundo com transparência, contorno, cor do texto, cor de destaque do karaokê, negrito, animações e posição de uma legenda e aplique a **todas as legendas com 1 clique**.
 

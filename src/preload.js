@@ -8,5 +8,7 @@ contextBridge.exposeInMainWorld('api', {
   importSrt: () => ipcRenderer.invoke('import-srt'),
   freezeFrame: (videoPath, timeSec) => ipcRenderer.invoke('freeze-frame', videoPath, timeSec),
   openProject: () => ipcRenderer.invoke('open-project'),
-  onProgress: (cb) => ipcRenderer.on('export-progress', (_e, s) => cb(s))
+  onProgress: (cb) => ipcRenderer.on('export-progress', (_e, s) => cb(s)),
+  smartCutout: (imagePath) => ipcRenderer.invoke('smart-cutout', imagePath),
+  onCutoutProgress: (cb) => ipcRenderer.on('cutout-progress', (_e, m) => cb(m))
 });
