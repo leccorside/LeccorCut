@@ -64,7 +64,13 @@ contextBridge.exposeInMainWorld('api', {
   importLut: () => ipcRenderer.invoke('import-lut'),
   getBlendModes: () => ipcRenderer.invoke('get-blend-modes'),
   getShapeMasks: () => ipcRenderer.invoke('get-shape-masks'),
-  getStylingEffects: () => ipcRenderer.invoke('get-styling-effects')
+  getStylingEffects: () => ipcRenderer.invoke('get-styling-effects'),
+  // ── Fase 12: Áudio Avançado, Voice Changers e Separação Neural ────────────────
+  getVoiceEffects: () => ipcRenderer.invoke('get-voice-effects'),
+  getEq10Frequencies: () => ipcRenderer.invoke('get-eq10-frequencies'),
+  getWaveformData: (filePath, targetPoints) => ipcRenderer.invoke('get-waveform-data', filePath, targetPoints),
+  separateFourStems: (inputPath) => ipcRenderer.invoke('separate-four-stems', inputPath),
+  onStem4Progress: (cb) => ipcRenderer.on('stem4-progress', (_e, data) => cb(data))
 });
 
 

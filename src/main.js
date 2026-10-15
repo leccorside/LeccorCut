@@ -15,6 +15,13 @@ const { detectGpuEncoders, resolveEncoderArgs } = require('./gpuDetector');
 const proxyManager = require('./proxyManager');
 // ── Fase 11: Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs ─────────────
 const { BUILTIN_LUTS, ensureBuiltinLut, BLEND_MODES, SHAPE_MASKS, STYLING_EFFECTS } = require('./visualEffects');
+// ── Fase 12: Áudio Avançado, Voice Changers e Separação Neural ────────────────
+const {
+  VOICE_EFFECTS,
+  EQ10_FREQUENCIES,
+  separateFourStems,
+  extractWaveformData
+} = require('./audioAdvanced');
 
 let win;
 function createWindow() {
@@ -1433,6 +1440,55 @@ ipcMain.handle('get-styling-effects', async () => {
     key,
     label: val.label
   }));
+});
+
+// ── Fase 12: Áudio Avançado, Voice Changers e Separação Neural ────────────────
+
+ipcMain.handle('get-voice-effects', async () => {
+  return Object.entries(VOICE_EFFECTS).map(([key, val]) => ({
+    key,
+    name: val.name,
+    description: val.description,
+    icon: val.icon
+  }));
+});
+
+ipcMain.handle('get-eq10-frequencies', async () => {
+  return EQ10_FREQUENCIES;
+});
+
+ipcMain.handle('get-waveform-data', async (_e, filePath, targetPoints = 120) => {
+  try {
+    const points = await extractWaveformData(ffmpegPath, filePath, targetPoints);
+    return { ok: true, points };
+  } catch (err) {
+    console.error('[get-waveform-data] Falha:', err);
+    return { ok: false, error: err.message, points: [] };
+  }
+});
+
+ipcMain.handle('separate-four-stems', async (_e, inputPath) => {
+  try {
+    if (!inputPath || !fs.existsSync(inputPath)) {
+      throw new Error(`Arquivo de entrada não encontrado: ${inputPath}`);
+    }
+    const stemsBaseDir = path.join(app.getPath('userData'), 'stems');
+    if (!fs.existsSync(stemsBaseDir)) fs.mkdirSync(stemsBaseDir, { recursive: true });
+
+    const jobName = `stem_${Date.now()}`;
+    const outputDir = path.join(stemsBaseDir, jobName);
+
+    const stems = await separateFourStems(ffmpegPath, inputPath, outputDir, (progress) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send('stem4-progress', progress);
+      }
+    });
+
+    return { ok: true, outputDir, stems };
+  } catch (err) {
+    console.error('[separate-four-stems] Falha:', err);
+    return { ok: false, error: err.message };
+  }
 });
 
 

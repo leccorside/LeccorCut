@@ -66,6 +66,7 @@
       <button id="tabAssets" class="panel-tab" title="Biblioteca de Stickers, Molduras e Overlays Vetoriais">✨ Stickers</button>
       <button id="tabAi" class="panel-tab" title="Ferramentas de IA Local (Fase 7)">🤖 IA</button>
       <button id="tabFx" class="panel-tab" title="Efeitos Visuais, Shaders, Modos de Mesclagem e LUTs (Fase 11)">🎭 Efeitos & LUTs</button>
+      <button id="tabAudioPro" class="panel-tab" title="Áudio Avançado, Voice Changers, EQ 10 Bandas e Separação de Stems (Fase 12)">🎚️ Áudio Pro</button>
     </div>
     <div id="mediaView">
       <button id="btnImport" class="primary wide">+ Importar</button>
@@ -296,6 +297,79 @@
             <input type="range" id="fxBloomIntensity" min="0.2" max="3.0" value="1.0" step="0.1">
             <span id="fxBloomVal">1.0x</span>
           </div>
+        </div>
+      </details>
+    </div>
+    <!-- ── Fase 12: Áudio Avançado, Voice Changers e Separação Neural ── -->
+    <div id="audioProView" hidden>
+      <!-- 12.1: Moduladores de Voz (Voice Changers) -->
+      <details class="audio-pro-section" open>
+        <summary>🎙️ Modulador de Voz (Voice Changer)</summary>
+        <p class="audio-pro-desc">Efeitos de transformação vocal profissional com modulação harmônica:</p>
+        <label class="audio-pro-label">Efeito:
+          <select id="voiceEffectSelect">
+            <option value="none" selected>Nenhum (Voz Original)</option>
+            <option value="deep_monster">👹 Voz Grave (Monstro / Vilão)</option>
+            <option value="chipmunk">🐿️ Voz Aguda (Chipmunk / Esquilo)</option>
+            <option value="robot">🤖 Robô Cibernético</option>
+            <option value="megaphone">📢 Megafone / Rádio Antigo</option>
+            <option value="space_echo">🌌 Eco Espacial / Reverberação</option>
+          </select>
+        </label>
+        <div id="voiceEffectDesc" class="audio-effect-desc">Modifique o tom e ressonância da voz do clipe selecionado.</div>
+      </details>
+
+      <!-- 12.2: Pitch Shifter Contínuo (-12 a +12 semitons) -->
+      <details class="audio-pro-section" open>
+        <summary>🎚️ Pitch Shifter (Ajuste de Tom)</summary>
+        <p class="audio-pro-desc">Altera o tom sem acelerar ou desacelerar o áudio (preserva duração exata):</p>
+        <div class="audio-slider-row">
+          <label class="audio-pro-label">Semitons:
+            <input type="range" id="pitchShiftRange" min="-12" max="12" value="0" step="1">
+            <span id="pitchShiftVal">0 st (Original)</span>
+          </label>
+          <button id="btnResetPitch" class="btn-small" style="margin-top:6px;width:100%;">↺ Tom Original (0 st)</button>
+        </div>
+      </details>
+
+      <!-- 12.3: Equalizador Paramétrico de 10 Bandas (EQ10) -->
+      <details class="audio-pro-section" open>
+        <summary>📊 Equalizador Gráfico de 10 Bandas (EQ10)</summary>
+        <p class="audio-pro-desc">Equalização ISO precisa de frequências de 31Hz a 16kHz:</p>
+        <div class="audio-presets-row">
+          <label class="audio-pro-label">Preset:
+            <select id="eqPresetSelect">
+              <option value="flat" selected>Flat (Padrão 0 dB)</option>
+              <option value="bass_boost">🎸 Bass Boost (+6dB)</option>
+              <option value="vocal_clarity">🎙️ Vocal Clarity (Realce de Voz)</option>
+              <option value="treble_boost">✨ Treble Boost (Agudos Cristalinos)</option>
+              <option value="podcast">📻 Podcast / Broadcast</option>
+            </select>
+          </label>
+          <button id="btnResetEq" class="btn-small">↺ Resetar EQ</button>
+        </div>
+        <div id="eq10Container" class="eq10-wrap">
+          <!-- 10 faders verticais -->
+        </div>
+      </details>
+
+      <!-- 12.4: Compressor Dinâmico -->
+      <details class="audio-pro-section">
+        <summary>🗜️ Compressor Dinâmico</summary>
+        <p class="audio-pro-desc">Nivela variações bruscas de intensidade sonora e previne distorção:</p>
+        <div class="audio-checkboxes">
+          <label><input type="checkbox" id="audioCompressorCheck"> Ativar Compressor de Estúdio (Punch & Picos)</label>
+        </div>
+      </details>
+
+      <!-- 12.5: Separação Neural em 4 Stems -->
+      <details class="audio-pro-section" open>
+        <summary>🎛️ Separação em 4 Stems (Demucs / Spleeter DSP)</summary>
+        <p class="audio-pro-desc">Isola separadamente Voz, Bateria, Baixo e Outros Instrumentos em trilhas independentes:</p>
+        <button id="btnSeparate4Stems" class="wide primary">🎛️ Separar em 4 Stems (Clipe Selecionado)</button>
+        <div id="stem4Progress" class="stem4-progress-wrap" hidden>
+          <div class="stem4-progress-bar"><div id="stem4ProgressFill" class="stem4-progress-fill"></div></div>
+          <div id="stem4Status" class="stem4-status-label">Iniciando separação neural em 4 canais...</div>
         </div>
       </details>
     </div>

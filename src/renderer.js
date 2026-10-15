@@ -926,12 +926,17 @@ function renderTimeline() {
     const e = document.createElement('div'); e.className = 'clip' + (state.selected?.id === c.id ? ' sel' : '');
     e.style.left = acc * pxPerSec + 'px'; e.style.width = c.duration * pxPerSec + 'px';
     const baseName = (c.transition && c.transition !== 'none' ? '⇆ ' : '') + c.name;
+    let audioBadges = '';
+    if (c.voiceEffect && c.voiceEffect !== 'none') audioBadges += `<span class="clip-audio-badge">🎙️ ${c.voiceEffect}</span>`;
+    if (c.pitchShift) audioBadges += `<span class="clip-audio-badge">🎚️ ${c.pitchShift > 0 ? '+' : ''}${c.pitchShift}st</span>`;
+    if (c.compressor) audioBadges += `<span class="clip-audio-badge">🗜️ Comp</span>`;
+
     if (c.speedCurve && c.speedCurve !== 'none' && SPEED_CURVES[c.speedCurve]) {
-      e.innerHTML = `<span class="clip-title">${baseName}</span><span class="clip-speed-badge">${SPEED_CURVES[c.speedCurve].badge}</span>`;
+      e.innerHTML = `<span class="clip-title">${baseName}</span><span class="clip-speed-badge">${SPEED_CURVES[c.speedCurve].badge}</span>${audioBadges}`;
     } else if (c.speed && c.speed !== 1) {
-      e.innerHTML = `<span class="clip-title">${baseName}</span><span class="clip-speed-badge">${c.speed}x</span>`;
+      e.innerHTML = `<span class="clip-title">${baseName}</span><span class="clip-speed-badge">${c.speed}x</span>${audioBadges}`;
     } else {
-      e.textContent = baseName;
+      e.innerHTML = `<span class="clip-title">${baseName}</span>${audioBadges}`;
     }
     if (c.thumb) { e.style.backgroundImage = `linear-gradient(rgba(0,0,0,.4),rgba(0,0,0,.4)),url(${c.thumb})`; e.style.backgroundSize = 'auto 100%'; e.style.backgroundRepeat = 'repeat-x'; }
     decorate(e, 'clip', c);
@@ -952,7 +957,12 @@ function renderTimeline() {
   });
   state.audios.forEach(a => {
     const e = document.createElement('div'); e.className = 'clip audio' + (state.selected?.id === a.id ? ' sel' : '');
-    e.style.left = a.start * pxPerSec + 'px'; e.style.width = a.duration * pxPerSec + 'px'; e.textContent = '♪ ' + a.name;
+    e.style.left = a.start * pxPerSec + 'px'; e.style.width = a.duration * pxPerSec + 'px';
+    let audioBadges = '';
+    if (a.voiceEffect && a.voiceEffect !== 'none') audioBadges += `<span class="clip-audio-badge">🎙️ ${a.voiceEffect}</span>`;
+    if (a.pitchShift) audioBadges += `<span class="clip-audio-badge">🎚️ ${a.pitchShift > 0 ? '+' : ''}${a.pitchShift}st</span>`;
+    if (a.compressor) audioBadges += `<span class="clip-audio-badge">🗜️ Comp</span>`;
+    e.innerHTML = `<span class="clip-title">♪ ${a.name}</span>${audioBadges}`;
     if (a.wave) { e.style.backgroundImage = `url(${a.wave}), linear-gradient(135deg,#00b894,#00e5c3)`; e.style.backgroundSize = `${a.max * pxPerSec}px 100%, 100% 100%`; e.style.backgroundPosition = `${-(a.in || 0) * pxPerSec}px 0, 0 0`; e.style.backgroundRepeat = 'no-repeat'; }
     decorate(e, 'audio', a);
     ta.appendChild(e);
@@ -960,7 +970,13 @@ function renderTimeline() {
   updateTime();
 }
 
-function select(s) { state.selected = s; renderTimeline(); renderProps(); if (typeof syncFxPanel === 'function') syncFxPanel(); }
+function select(s) {
+  state.selected = s;
+  renderTimeline();
+  renderProps();
+  if (typeof syncFxPanel === 'function') syncFxPanel();
+  if (typeof syncAudioProPanel === 'function') syncAudioProPanel();
+}
 
 function slider(label, key, min, max, obj) {
   return `<div class="prop">${label}<input type="range" min="${min}" max="${max}" value="${obj[key] || 0}" data-k="${key}"></div>`;
@@ -1295,7 +1311,26 @@ function renderProps() {
       <div class="prop">Fade in (s)<input type="number" id="aFadeIn" value="${a.fadeIn || 0}" min="0" max="10" step="0.2"></div>
       <div class="prop">Fade out (s)<input type="number" id="aFadeOut" value="${a.fadeOut || 0}" min="0" max="10" step="0.2"></div>
       <div class="prop"><label><input type="checkbox" id="aDenoise" ${a.denoise ? 'checked' : ''}> Redução de ruído (chiado)</label></div>
-      <div class="prop"><label><input type="checkbox" id="aLoudnorm" ${a.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>`;
+      <div class="prop"><label><input type="checkbox" id="aLoudnorm" ${a.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>
+      <div class="prop-card">
+        <div class="prop-card-title">🎚️ Efeitos de Voz & Tom (Fase 12)</div>
+        <div class="prop">Modulador de Voz
+          <select id="aVoiceEffect">
+            <option value="none" ${(a.voiceEffect || 'none') === 'none' ? 'selected' : ''}>Original</option>
+            <option value="deep_monster" ${a.voiceEffect === 'deep_monster' ? 'selected' : ''}>👹 Monstro / Grave</option>
+            <option value="chipmunk" ${a.voiceEffect === 'chipmunk' ? 'selected' : ''}>🐿️ Esquilo / Agudo</option>
+            <option value="robot" ${a.voiceEffect === 'robot' ? 'selected' : ''}>🤖 Robô</option>
+            <option value="megaphone" ${a.voiceEffect === 'megaphone' ? 'selected' : ''}>📢 Megafone</option>
+            <option value="space_echo" ${a.voiceEffect === 'space_echo' ? 'selected' : ''}>🌌 Eco Espacial</option>
+          </select>
+        </div>
+        <div class="prop">Pitch Shifter: <span id="lblAPitch">${a.pitchShift ? (a.pitchShift > 0 ? '+' : '') + a.pitchShift + ' st' : '0 st'}</span>
+          <input type="range" id="aPitchShift" min="-12" max="12" step="1" value="${a.pitchShift || 0}">
+        </div>
+        <div class="prop"><label><input type="checkbox" id="aCompressor" ${a.compressor ? 'checked' : ''}> Compressor de Estúdio</label></div>
+        <button id="btnOpenAudioProFromAudio" class="wide btn-small" style="margin-top:6px;">📊 Abrir Equalizador de 10 Bandas (EQ10)</button>
+        <button id="btnSeparate4StemsFromAudio" class="wide secondary" style="margin-top:4px;">🎛️ Separar em 4 Stems (Voz, Bateria, Baixo, Outros)</button>
+      </div>`;
     $('aStart').onchange = (e) => { a.start = Math.max(0, +e.target.value); renderTimeline(); };
     $('aDur').onchange = (e) => { a.duration = Math.min(a.max, +e.target.value); renderTimeline(); };
     $('aVol').oninput = (e) => { a.volume = +e.target.value; syncAudio(); };
@@ -1303,6 +1338,18 @@ function renderProps() {
     $('aFadeOut').onchange = (e) => { a.fadeOut = Math.max(0, +e.target.value); };
     $('aDenoise').onchange = (e) => { a.denoise = e.target.checked; };
     $('aLoudnorm').onchange = (e) => { a.loudnorm = e.target.checked; };
+    $('aVoiceEffect').onchange = (e) => { a.voiceEffect = e.target.value; renderTimeline(); if (typeof syncAudioProPanel === 'function') syncAudioProPanel(); };
+    $('aPitchShift').oninput = (e) => {
+      a.pitchShift = +e.target.value;
+      if ($('lblAPitch')) $('lblAPitch').textContent = `${a.pitchShift > 0 ? '+' : ''}${a.pitchShift} st`;
+      renderTimeline();
+      if (typeof syncAudioProPanel === 'function') syncAudioProPanel();
+    };
+    $('aCompressor').onchange = (e) => { a.compressor = e.target.checked; renderTimeline(); if (typeof syncAudioProPanel === 'function') syncAudioProPanel(); };
+    if ($('btnOpenAudioProFromAudio')) $('btnOpenAudioProFromAudio').onclick = () => {
+      if ($('tabAudioPro')) $('tabAudioPro').click();
+    };
+    if ($('btnSeparate4StemsFromAudio')) $('btnSeparate4StemsFromAudio').onclick = () => executeFourStemsSeparation(a.path, a);
     return;
   }
   if (s.kind === 'text') {
@@ -1415,6 +1462,27 @@ function renderProps() {
        + `<div class="prop">Volume<input type="range" id="pVol" min="0" max="1" step="0.05" value="${c.volume ?? 1}"></div>
        <div class="prop"><label><input type="checkbox" id="pDenoise" ${c.filters.denoise ? 'checked' : ''}> Redução de ruído (chiado)</label></div>
        <div class="prop"><label><input type="checkbox" id="pLoudnorm" ${c.filters.loudnorm ? 'checked' : ''}> Normalizar volume (-14 LUFS)</label></div>`
+        + (c.hasAudio && !c.isImage ? `
+          <div class="prop-card">
+            <div class="prop-card-title">🎚️ Efeitos de Voz & Tom (Fase 12)</div>
+            <div class="prop">Modulador de Voz
+              <select id="cVoiceEffect">
+                <option value="none" ${(c.voiceEffect || 'none') === 'none' ? 'selected' : ''}>Original</option>
+                <option value="deep_monster" ${c.voiceEffect === 'deep_monster' ? 'selected' : ''}>👹 Monstro / Grave</option>
+                <option value="chipmunk" ${c.voiceEffect === 'chipmunk' ? 'selected' : ''}>🐿️ Esquilo / Agudo</option>
+                <option value="robot" ${c.voiceEffect === 'robot' ? 'selected' : ''}>🤖 Robô</option>
+                <option value="megaphone" ${c.voiceEffect === 'megaphone' ? 'selected' : ''}>📢 Megafone</option>
+                <option value="space_echo" ${c.voiceEffect === 'space_echo' ? 'selected' : ''}>🌌 Eco Espacial</option>
+              </select>
+            </div>
+            <div class="prop">Pitch Shifter: <span id="lblCPitch">${c.pitchShift ? (c.pitchShift > 0 ? '+' : '') + c.pitchShift + ' st' : '0 st'}</span>
+              <input type="range" id="cPitchShift" min="-12" max="12" step="1" value="${c.pitchShift || 0}">
+            </div>
+            <div class="prop"><label><input type="checkbox" id="cCompressor" ${c.compressor ? 'checked' : ''}> Compressor de Estúdio</label></div>
+            <button id="btnOpenAudioProFromClip" class="wide btn-small" style="margin-top:6px;">📊 Abrir Equalizador de 10 Bandas (EQ10)</button>
+            <button id="btnSeparate4StemsFromClip" class="wide secondary" style="margin-top:4px;">🎛️ Separar em 4 Stems (Voz, Bateria, Baixo, Outros)</button>
+          </div>
+        ` : '')
        + `<button id="btnSmartCutoutClip" class="wide primary">✂ Extrair Objeto com IA para Sobreposição (PiP)</button>`
        + (!c.isImage ? `<button id="btnVideoMattingClip" class="wide secondary" style="margin-top:4px;">✂ Matting de Vídeo Contínuo (Extrair Vídeo Transparente PiP)</button>` : '')
        + (!c.isImage ? `<button id="btnStabilizeClip" class="wide" style="margin-top:4px;">🎥 Estabilizar Vídeo (Reduzir Trepidação)</button>` : '')
@@ -1438,6 +1506,18 @@ function renderProps() {
   };
   if ($('btnMotionTrackClip')) $('btnMotionTrackClip').onclick = () => executeMotionTrack(c);
   if ($('btnDetach')) $('btnDetach').onclick = () => detachAudio(c);
+  if ($('cVoiceEffect')) $('cVoiceEffect').onchange = (e) => { c.voiceEffect = e.target.value; renderTimeline(); if (typeof syncAudioProPanel === 'function') syncAudioProPanel(); };
+  if ($('cPitchShift')) $('cPitchShift').oninput = (e) => {
+    c.pitchShift = +e.target.value;
+    if ($('lblCPitch')) $('lblCPitch').textContent = `${c.pitchShift > 0 ? '+' : ''}${c.pitchShift} st`;
+    renderTimeline();
+    if (typeof syncAudioProPanel === 'function') syncAudioProPanel();
+  };
+  if ($('cCompressor')) $('cCompressor').onchange = (e) => { c.compressor = e.target.checked; renderTimeline(); if (typeof syncAudioProPanel === 'function') syncAudioProPanel(); };
+  if ($('btnOpenAudioProFromClip')) $('btnOpenAudioProFromClip').onclick = () => {
+    if ($('tabAudioPro')) $('tabAudioPro').click();
+  };
+  if ($('btnSeparate4StemsFromClip')) $('btnSeparate4StemsFromClip').onclick = () => executeFourStemsSeparation(c.path, c);
   $('pDenoise').onchange = (e) => { c.filters.denoise = e.target.checked; };
   $('pLoudnorm').onchange = (e) => { c.filters.loudnorm = e.target.checked; };
   $('pGray').onchange = (e) => { c.filters.grayscale = e.target.checked; renderPreview(); };
@@ -2035,7 +2115,8 @@ function initPanelTabs() {
     { btn: $('tabSfx'), view: $('sfxView') },
     { btn: $('tabAssets'), view: $('assetsView') },
     { btn: $('tabAi'), view: $('aiView') },
-    { btn: $('tabFx'), view: $('fxView') }
+    { btn: $('tabFx'), view: $('fxView') },
+    { btn: $('tabAudioPro'), view: $('audioProView') }
   ].filter(t => t.btn && t.view);
 
   tabs.forEach(activeTab => {
@@ -3314,5 +3395,298 @@ function initVisualEffects() {
 }
 
 initVisualEffects();
+
+// ── Fase 12: Áudio Avançado, Voice Changers e Separação Neural ────────────────
+
+const EQ_FREQUENCIES_HZ = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const EQ_LABELS = ['31', '62', '125', '250', '500', '1k', '2k', '4k', '8k', '16k'];
+
+const EQ_PRESETS = {
+  flat: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  bass_boost: [6, 5, 3, 0, 0, 0, 0, 0, 0, 0],
+  vocal_clarity: [-3, -2, 0, 1, 3, 4, 3, 1, 0, 0],
+  treble_boost: [0, 0, 0, 0, 0, 1, 2, 4, 5, 6],
+  podcast: [-6, -2, 2, 1, 1, 3, 3, 1, -1, -2]
+};
+
+const VOICE_DESCRIPTIONS = {
+  none: 'Voz original sem alterações.',
+  deep_monster: '👹 Pitch grave (-7 st) com ressonância profunda de sub-graves.',
+  chipmunk: '🐿️ Pitch agudo (+8 st) acelerado harmonicamente.',
+  robot: '🤖 Modulação metálica em anel com ressonância flanger.',
+  megaphone: '📢 Passa-banda telefônico estreito com saturação harmônica.',
+  space_echo: '🌌 Reflexões acústicas multidirecionais com atenuação suave.'
+};
+
+function getActiveAudioTarget() {
+  const s = state.selected;
+  if (s) {
+    if (s.kind === 'clip') {
+      const c = state.clips.find(x => x.id === s.id);
+      if (c && c.hasAudio && !c.isImage) return c;
+    } else if (s.kind === 'audio') {
+      const a = state.audios.find(x => x.id === s.id);
+      if (a) return a;
+    }
+  }
+  const firstClip = state.clips.find(c => c.hasAudio && !c.isImage);
+  if (firstClip) return firstClip;
+  return state.audios[0] || null;
+}
+
+function syncAudioProPanel() {
+  const target = getActiveAudioTarget();
+  const effectSelect = $('voiceEffectSelect');
+  const effectDesc = $('voiceEffectDesc');
+  const pitchRange = $('pitchShiftRange');
+  const pitchVal = $('pitchShiftVal');
+  const compCheck = $('audioCompressorCheck');
+
+  if (!target) {
+    if (effectDesc) effectDesc.textContent = 'Selecione um clipe ou faixa de áudio na timeline.';
+    return;
+  }
+
+  const currentEff = target.voiceEffect || 'none';
+  if (effectSelect) effectSelect.value = currentEff;
+  if (effectDesc) effectDesc.textContent = VOICE_DESCRIPTIONS[currentEff] || '';
+
+  const currentPitch = target.pitchShift || 0;
+  if (pitchRange) pitchRange.value = currentPitch;
+  if (pitchVal) pitchVal.textContent = currentPitch === 0 ? '0 st (Original)' : `${currentPitch > 0 ? '+' : ''}${currentPitch} st`;
+
+  if (compCheck) compCheck.checked = !!target.compressor;
+
+  const gains = Array.isArray(target.eq10) ? target.eq10 : (target.eq10 ? Object.values(target.eq10) : []);
+  EQ_FREQUENCIES_HZ.forEach((_, idx) => {
+    const sld = $(`eqSlider_${idx}`);
+    const val = $(`eqVal_${idx}`);
+    const g = Number(gains[idx]) || 0;
+    if (sld) sld.value = g;
+    if (val) val.textContent = `${g > 0 ? '+' : ''}${g}dB`;
+  });
+}
+
+async function executeFourStemsSeparation(inputPath, targetItem) {
+  if (!inputPath) {
+    toast('Nenhum arquivo de áudio ou vídeo válido para separação de stems.');
+    return;
+  }
+  const progWrap = $('stem4Progress');
+  const progFill = $('stem4ProgressFill');
+  const statusLbl = $('stem4Status');
+
+  if (progWrap) progWrap.hidden = false;
+  if (progFill) progFill.style.width = '10%';
+  if (statusLbl) statusLbl.textContent = 'Iniciando separação neural em 4 stems (DSP)...';
+  toast('Iniciando separação em 4 stems...');
+
+  if (window.api && window.api.onStem4Progress) {
+    window.api.onStem4Progress((data) => {
+      if (progFill) progFill.style.width = `${data.percent}%`;
+      if (statusLbl) statusLbl.textContent = `${data.stage ? `[${data.stage}] ` : ''}${data.text || `Processando: ${data.percent}%`}`;
+    });
+  }
+
+  try {
+    const res = await window.api.separateFourStems(inputPath);
+    if (!res || !res.ok) {
+      if (statusLbl) statusLbl.textContent = 'Erro: ' + (res?.error || 'Falha na separação');
+      toast('Erro ao separar stems: ' + (res?.error || 'Falha ao processar'));
+      return;
+    }
+
+    if (progFill) progFill.style.width = '100%';
+    if (statusLbl) statusLbl.textContent = 'Separação concluída com sucesso!';
+
+    const baseName = targetItem?.name ? targetItem.name.replace(/^♪\s*/, '') : 'Áudio';
+    const start = targetItem?.start !== undefined ? targetItem.start : state.time;
+    const dur = targetItem?.duration || 10;
+    const max = targetItem?.max || dur;
+
+    if (targetItem) {
+      targetItem.volume = 0;
+    }
+
+    const stemMeta = [
+      { key: 'vocal', prefix: '🎙️ Voz' },
+      { key: 'drums', prefix: '🥁 Bateria' },
+      { key: 'bass', prefix: '🎸 Baixo' },
+      { key: 'other', prefix: '🎹 Outros' }
+    ];
+
+    for (const sm of stemMeta) {
+      const stemPath = res.stems[sm.key];
+      if (stemPath) {
+        const audioObj = {
+          id: uid++,
+          path: stemPath,
+          name: `${sm.prefix} - ${baseName}`,
+          start,
+          in: 0,
+          duration: dur,
+          max,
+          volume: 1,
+          fadeIn: 0,
+          fadeOut: 0
+        };
+        if (window.api && window.api.getWaveformData) {
+          window.api.getWaveformData(stemPath, 160).then(wf => {
+            if (wf && wf.ok && wf.points) {
+              audioObj.waveformPoints = wf.points;
+              renderTimeline();
+            }
+          }).catch(() => {});
+        }
+        state.audios.push(audioObj);
+      }
+    }
+
+    renderTimeline();
+    renderProps();
+    toast('4 Stems (Voz, Bateria, Baixo e Outros) adicionados à timeline!');
+    setTimeout(() => {
+      if (progWrap) progWrap.hidden = true;
+    }, 4000);
+  } catch (err) {
+    if (statusLbl) statusLbl.textContent = 'Erro: ' + (err.message || err);
+    toast('Erro: ' + (err.message || err));
+  }
+}
+
+function initAudioPro() {
+  const eqContainer = $('eq10Container');
+  if (eqContainer) {
+    eqContainer.innerHTML = '';
+    EQ_FREQUENCIES_HZ.forEach((freq, idx) => {
+      const col = document.createElement('div');
+      col.className = 'eq10-col';
+      col.innerHTML = `
+        <span class="eq10-val" id="eqVal_${idx}">0dB</span>
+        <input type="range" class="eq10-slider" id="eqSlider_${idx}" min="-12" max="12" step="1" value="0" data-idx="${idx}">
+        <span class="eq10-freq">${EQ_LABELS[idx]}</span>
+      `;
+      eqContainer.appendChild(col);
+    });
+
+    eqContainer.querySelectorAll('.eq10-slider').forEach(slider => {
+      slider.oninput = (e) => {
+        const idx = +e.target.dataset.idx;
+        const val = +e.target.value;
+        const valEl = $(`eqVal_${idx}`);
+        if (valEl) valEl.textContent = `${val > 0 ? '+' : ''}${val}dB`;
+
+        const target = getActiveAudioTarget();
+        if (target) {
+          if (!Array.isArray(target.eq10)) {
+            target.eq10 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+          }
+          target.eq10[idx] = val;
+        }
+      };
+    });
+  }
+
+  const eqPresetSelect = $('eqPresetSelect');
+  if (eqPresetSelect) {
+    eqPresetSelect.onchange = (e) => {
+      const presetKey = e.target.value;
+      const presetGains = EQ_PRESETS[presetKey] || EQ_PRESETS.flat;
+      const target = getActiveAudioTarget();
+      if (target) target.eq10 = [...presetGains];
+
+      EQ_FREQUENCIES_HZ.forEach((_, idx) => {
+        const sld = $(`eqSlider_${idx}`);
+        const val = $(`eqVal_${idx}`);
+        const g = presetGains[idx] || 0;
+        if (sld) sld.value = g;
+        if (val) val.textContent = `${g > 0 ? '+' : ''}${g}dB`;
+      });
+      toast(`Equalizador aplicado: ${e.target.options[e.target.selectedIndex].text}`);
+    };
+  }
+
+  const btnResetEq = $('btnResetEq');
+  if (btnResetEq) {
+    btnResetEq.onclick = () => {
+      if (eqPresetSelect) eqPresetSelect.value = 'flat';
+      const target = getActiveAudioTarget();
+      if (target) target.eq10 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+      EQ_FREQUENCIES_HZ.forEach((_, idx) => {
+        const sld = $(`eqSlider_${idx}`);
+        const val = $(`eqVal_${idx}`);
+        if (sld) sld.value = 0;
+        if (val) val.textContent = '0dB';
+      });
+      toast('Equalizador resetado para 0 dB');
+    };
+  }
+
+  const voiceSelect = $('voiceEffectSelect');
+  if (voiceSelect) {
+    voiceSelect.onchange = (e) => {
+      const effectKey = e.target.value;
+      const target = getActiveAudioTarget();
+      if (target) {
+        target.voiceEffect = effectKey;
+        renderTimeline();
+      }
+      const descEl = $('voiceEffectDesc');
+      if (descEl) descEl.textContent = VOICE_DESCRIPTIONS[effectKey] || '';
+    };
+  }
+
+  const pitchRange = $('pitchShiftRange');
+  const pitchVal = $('pitchShiftVal');
+  const btnResetPitch = $('btnResetPitch');
+  if (pitchRange) {
+    pitchRange.oninput = (e) => {
+      const semi = +e.target.value;
+      if (pitchVal) pitchVal.textContent = semi === 0 ? '0 st (Original)' : `${semi > 0 ? '+' : ''}${semi} st`;
+      const target = getActiveAudioTarget();
+      if (target) {
+        target.pitchShift = semi;
+        renderTimeline();
+      }
+    };
+  }
+  if (btnResetPitch) {
+    btnResetPitch.onclick = () => {
+      if (pitchRange) pitchRange.value = 0;
+      if (pitchVal) pitchVal.textContent = '0 st (Original)';
+      const target = getActiveAudioTarget();
+      if (target) {
+        target.pitchShift = 0;
+        renderTimeline();
+      }
+    };
+  }
+
+  const compCheck = $('audioCompressorCheck');
+  if (compCheck) {
+    compCheck.onchange = (e) => {
+      const target = getActiveAudioTarget();
+      if (target) {
+        target.compressor = e.target.checked;
+        renderTimeline();
+      }
+    };
+  }
+
+  const btnSep4 = $('btnSeparate4Stems');
+  if (btnSep4) {
+    btnSep4.onclick = () => {
+      const target = getActiveAudioTarget();
+      if (!target) {
+        toast('Selecione um clipe ou faixa de áudio para separar em 4 stems.');
+        return;
+      }
+      executeFourStemsSeparation(target.path, target);
+    };
+  }
+}
+
+initAudioPro();
 
 

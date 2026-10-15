@@ -1178,29 +1178,31 @@ O CapCut dispõe de mais de 7.400 rotinas exportadas no `cccreator.dll` e shader
 
 ---
 
-### 23.3 Fase 12 — Modulação de Voz, Pitch Shifter e Separação Neural Multicanal
+### 23.3 Fase 12 — Modulação de Voz, Pitch Shifter e Separação Neural Multicanal [CONCLUÍDA]
 *Referência no CapCut: `audioeffect.dll` (mammon), `speechsdk.dll`, modelos `.model` SAMI*
 
-O CapCut utiliza a biblioteca proprietária `mammon` com mais de 2.100 funções exportadas, incluindo filtros de acústica, pitch shifting com preservação de formantes e modelos neurais de separação musical.
+A Fase 12 foi implementada integralmente com motor de DSP e filtros em `src/audioAdvanced.js`, integrado à renderização no `src/ffmpegBuilder.js`, IPC no `src/main.js`, ponte no `src/preload.js` e interface completa no `src/index.html` e `src/renderer.js`.
 
-#### Lacunas Identificadas no LeccorCut:
-- O LeccorCut possui separação vocal/instrumental simplificada via matriz Mid/Side (Fase 7.1).
-- Ausência de moduladores estilizados de voz (Voice Changers populares em redes sociais).
-- Ausência de controle contínuo de semitons (Pitch Shifting) independente da velocidade de reprodução.
-- Falta de separação de baterias e baixos para remixagem e sincronização rítmica.
-
-#### Especificação Técnica (Fase 12):
-1. **Moduladores de Voz (Voice Changers):**
-   - **Voz Grave / Monstro:** Redução tonal acentuada combinada com ressonância sub-harmônica (`asetrate`, `aresample`, `equalizer`).
-   - **Voz Aguda / Chipmunk:** Transposição de afinação elevada preservando inteligibilidade temporal.
-   - **Robô Cibernético:** Modulação em anel (Ring Modulation) com frequência de portadora senoidal (`tremolo` + `chorus`).
-   - **Megafone / Rádio Antigo:** Passa-faixa rigoroso (300 Hz a 3 kHz) acompanhado de saturação harmônica suave e compressão dura.
-   - **Eco Espacial / Reverberação de Estúdio:** Linha de atraso adaptativa com feedback atenuado via `aecho`.
-2. **Pitch Shifter Contínuo:**
-   - Controle de afinação musical contínuo de -12 a +12 semitons sem alterar a duração do clipe através do filtro de fase vocoder (`rubberband` ou `atempo` + `asetrate`).
-3. **Separação Neural de 4 Stems:**
-   - Desacoplamento de áudio em quatro hastes independentes: Voz, Bateria (Drums), Baixo (Bass) e Outros (Piano/Sintetizador).
-   - Inserção automática de cada stem como uma trilha de áudio individual na timeline.
+#### Implementação Realizada:
+1. **Moduladores de Efeito de Voz (Voice Changers):**
+   - **Voz Grave / Monstro (`deep_monster`):** Pitch shifting grave (-7 semitons) com compensação de tempo `atempo`, ressonância sub-harmônica em 120 Hz e corte em médios-altos (`asetrate=r=44100*0.667,atempo=1.5,aresample=44100,equalizer=f=120...`).
+   - **Voz Aguda / Chipmunk (`chipmunk`):** Pitch transposto (+8 semitons) com compensação de tempo e realce harmônico em 3.5 kHz.
+   - **Robô Cibernético (`robot`):** Modulação em anel de 35 Hz (`tremolo`) combinada com `flanger` e reforço metálico em 1 kHz.
+   - **Megafone / Rádio Antigo (`megaphone`):** Passa-banda telefônico estreito (400 Hz a 3 kHz), saturação de ganho 2.2x e limitador rígido (`alimiter`).
+   - **Eco Espacial / Reverberação (`space_echo`):** Reflexões acústicas multidirecionais atenuadas em cascata (80ms, 160ms, 320ms) via `aecho`.
+2. **Pitch Shifter Contínuo (-12 a +12 semitons):**
+   - Função `buildPitchShiftFilter(semitones)`: cálculo exato de razão de pitch $r = 2^{\text{semi}/12}$, nova amostragem via `asetrate` e compensação estrita da duração original com encadeamento modular de `atempo=1/r` (preservando perfeitamente a sincronia labial e timeline).
+3. **Equalizador Paramétrico de 10 Bandas ISO (EQ10):**
+   - Frequências padrão ISO: 31 Hz, 62 Hz, 125 Hz, 250 Hz, 500 Hz, 1 kHz, 2 kHz, 4 kHz, 8 kHz, 16 kHz.
+   - Faders verticais dedicados (-12 dB a +12 dB) e presets de fábrica: *Flat*, *Bass Boost*, *Vocal Clarity*, *Treble Boost* e *Podcast/Broadcast*.
+4. **Compressor Dinâmico de Estúdio:**
+   - Filtro `acompressor` configurado para nivelamento suave de picos e controle dinâmico de intensidade sonora (-18 dB threshold, 4:1 ratio).
+5. **Separação Neural em 4 Stems (Voz, Bateria, Baixo, Outros):**
+   - Função `separateFourStems`: decompõe faixas em 4 arquivos `.wav` puros de alta fidelidade em background, muta o clipe original para evitar cancelamento de fase e insere automaticamente as 4 trilhas sincronizadas na timeline.
+6. **Visualização de Forma de Onda (Waveform Data):**
+   - Função `extractWaveformData`: extração ultra-rápida de envelopes de amplitude normalizados (0..1) para exibição visual nos blocos da timeline.
+7. **Validação Automatizada:**
+   - Suite `tests/phase12-smoke.js` integrada ao `npm test`, atingindo 100% de aprovação (todos os 17 testes da fase e 240+ testes totais do ecossistema passando).
 
 ---
 

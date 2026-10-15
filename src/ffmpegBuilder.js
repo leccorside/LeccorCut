@@ -2,6 +2,13 @@ const fs = require('fs');
 const os = require('os');
 const pathMod = require('path');
 const { buildColorGradingFilter, buildLutFilter, buildFfmpegMaskFilter, BLEND_MODES } = require('./visualEffects');
+const {
+  getVoiceEffectFilter,
+  buildPitchShiftFilter,
+  buildEq10Filter,
+  buildCompressorFilter,
+  appendAdvancedAudioFilters
+} = require('./audioAdvanced');
 const FONTS = {
   'Arial': ['arial.ttf', 'arialbd.ttf'], 'Impact': ['impact.ttf', 'impact.ttf'], 'Segoe UI': ['segoeui.ttf', 'segoeuib.ttf'],
   'Comic Sans MS': ['comic.ttf', 'comicbd.ttf'], 'Times New Roman': ['times.ttf', 'timesbd.ttf'], 'Courier New': ['cour.ttf', 'courbd.ttf']
@@ -64,6 +71,7 @@ function buildAtempo(speed) {
   parts.push(`atempo=${Number(s.toFixed(4))}`);
   return parts.join(',');
 }
+
 
 function pointsToSegments(pts) {
   if (!pts || !Array.isArray(pts) || pts.length < 2) {
@@ -343,6 +351,7 @@ function buildFfmpeg(project, outPath) {
         if (fl.denoise) af += ',afftdn=nf=-25';
         if (fl.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
         af += ',aresample=44100,aformat=channel_layouts=stereo';
+        af = appendAdvancedAudioFilters(af, c);
         f.push(`${audioLabel}${af}[a${i}]`);
       } else {
         const tempo = speed !== 1 ? `,${buildAtempo(speed)}` : '';
@@ -350,6 +359,7 @@ function buildFfmpeg(project, outPath) {
         if (fl.denoise) af += ',afftdn=nf=-25';
         if (fl.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
         af += ',aresample=44100,aformat=channel_layouts=stereo';
+        af = appendAdvancedAudioFilters(af, c);
         f.push(`[${i}:a]${af}[a${i}]`);
       }
     } else {
@@ -385,6 +395,7 @@ function buildFfmpeg(project, outPath) {
       if (a.denoise) af += ',afftdn=nf=-25';
       if (a.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
       af += `,aresample=44100,aformat=channel_layouts=stereo,adelay=${ms}|${ms}`;
+      af = appendAdvancedAudioFilters(af, a);
       f.push(`[${idx}:a]${af}[m${j}]`);
     });
     const n = audios.length + 1;
@@ -568,6 +579,7 @@ function buildAudioOnlyFfmpeg(project, outPath) {
         if (fl.denoise) af += ',afftdn=nf=-25';
         if (fl.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
         af += ',aresample=44100,aformat=channel_layouts=stereo';
+        af = appendAdvancedAudioFilters(af, c);
         f.push(`${segInputs}concat=n=${curveSegs.length}:v=0:a=1,${af}[a${i}]`);
       } else {
         const tempo = speed !== 1 ? `,${buildAtempo(speed)}` : '';
@@ -575,6 +587,7 @@ function buildAudioOnlyFfmpeg(project, outPath) {
         if (fl.denoise) af += ',afftdn=nf=-25';
         if (fl.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
         af += ',aresample=44100,aformat=channel_layouts=stereo';
+        af = appendAdvancedAudioFilters(af, c);
         f.push(`[${i}:a]${af}[a${i}]`);
       }
     } else {
@@ -614,6 +627,7 @@ function buildAudioOnlyFfmpeg(project, outPath) {
       if (a.denoise) af += ',afftdn=nf=-25';
       if (a.loudnorm) af += ',loudnorm=I=-14:TP=-1.5:LRA=11';
       af += `,aresample=44100,aformat=channel_layouts=stereo,adelay=${ms}|${ms}`;
+      af = appendAdvancedAudioFilters(af, a);
       f.push(`[${idx}:a]${af}[m${j}]`);
     });
 

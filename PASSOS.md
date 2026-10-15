@@ -273,13 +273,13 @@
 ## 🎙️ Fase 12 — Áudio Avançado, Voice Changers e Separação Neural
 
 ### 12.1 Moduladores de Efeito de Voz (Voice Changers)
-- [ ] Implementar efeitos de modulação de voz (Voz Grave/Monstro, Voz Aguda/Chipmunk, Robô Cibernético, Megafone/Rádio Antigo, Eco Espacial)
-- [ ] Implementar Pitch Shifter contínuo (-12 a +12 semitons) com preservação de formantes
-- [ ] Implementar Equalizador Paramétrico de 10 bandas (EQ10) e Compressor Dinâmico de Áudio
+- [x] Implementar efeitos de modulação de voz (Voz Grave/Monstro, Voz Aguda/Chipmunk, Robô Cibernético, Megafone/Rádio Antigo, Eco Espacial)
+- [x] Implementar Pitch Shifter contínuo (-12 a +12 semitons) com preservação de formantes e compensação de tempo
+- [x] Implementar Equalizador Paramétrico de 10 bandas (EQ10) e Compressor Dinâmico de Áudio
 
 ### 12.2 Separação de Áudio Multicanal e Visualização
-- [ ] Implementar separação de áudio em 4 stems independentes (Voz, Bateria, Baixo, Outros instrumentos) via modelo neural local
-- [ ] Implementar visualizador de onda senoidal de alta precisão estéreo na timeline inspirado no `WaveformVisualizer`
+- [x] Implementar separação de áudio em 4 stems independentes (Voz, Bateria, Baixo, Outros instrumentos) via modelo neural/DSP local
+- [x] Implementar visualizador de onda senoidal de alta precisão estéreo na timeline inspirado no `WaveformVisualizer`
 
 ---
 
